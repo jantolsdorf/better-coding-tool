@@ -18,6 +18,8 @@ export interface Code {
   name: string;
   color: string;
   description?: string;
+  /** Parent code in the code hierarchy (null/undefined = top level). */
+  parentId?: string | null;
 }
 
 export interface Segment {
@@ -80,6 +82,9 @@ export interface UIState {
   /** Order of the coder columns in the comparison view. */
   columnOrder: ColumnKey[];
   columnWidths: Record<ColumnKey, number>;
+  /** Width of the text column in px (null = automatic). */
+  textWidth: number | null;
+  collapsedCodes: string[];
   /** Which coding new codes go into while a consolidation is in progress. */
   codeTarget: 'mine' | 'consolidated';
 }

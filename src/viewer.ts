@@ -3,6 +3,7 @@ import {
   activeLayer,
   applyCode,
   codeById,
+  codePath,
   commitUI,
   currentDoc,
   deleteSegment,
@@ -83,11 +84,18 @@ export function initViewer(el: HTMLElement, empty: HTMLElement) {
 
   headerEl = h('div', { class: 'viewer-header' });
   textBody = h('div', { class: 'text-body' });
-  gridEl = h(
+  const textCol = h(
     'div',
-    { class: 'viewer-grid' },
-    h('div', { class: 'text-col' }, h('div', { class: 'col-head' }, 'Text'), textBody),
+    { class: 'text-col' },
+    h('div', { class: 'col-head' }, 'Text'),
+    textBody,
+    h('div', { class: 'col-resizer', title: 'Drag to resize · double-click for automatic width' }),
   );
+  gridEl = h('div', { class: 'viewer-grid' }, textCol);
+  makeResizable(textCol, (w) => {
+    ui.textWidth = w && Math.round(w);
+    commitUI();
+  });
   scrollEl = h('div', { class: 'viewer-scroll' }, gridEl);
   root.append(headerEl, scrollEl, emptyEl);
 
@@ -114,6 +122,7 @@ export function renderViewer() {
     scrollEl.scrollTop = 0;
   }
   renderHeader(doc);
+  applyTextWidth();
   buildColumns(doc);
   applyHighlights(doc);
   layoutColumns();
@@ -297,7 +306,7 @@ function buildColumns(doc: Doc) {
       h('div', { class: 'col-resizer', title: 'Drag to resize' }),
     );
     const width = ui.columnWidths[col.key];
-    if (width) el.style.flexBasis = `${width}px`;
+    if (width) setFixedWidth(el, width);
     makeColumnDraggable(el, col.key);
     gridEl.append(el);
     return { col, segs, codes, body };
@@ -384,26 +393,41 @@ function makeColumnDraggable(el: HTMLElement, key: ColumnKey) {
     clear();
     moveColumn(dragged, key, after);
   });
+  makeResizable(el, (w) => setColumnWidth(key, w), 90, 700);
+}
 
-  el.querySelector<HTMLElement>('.col-resizer')!.addEventListener('mousedown', (e) => {
+/** Lets the user drag the element's .col-resizer to set its width; double-click resets it (null). */
+function makeResizable(el: HTMLElement, save: (width: number | null) => void, min = 300, max = 2000) {
+  const handle = el.querySelector<HTMLElement>('.col-resizer')!;
+  handle.addEventListener('dblclick', () => save(null));
+  handle.addEventListener('mousedown', (e) => {
     e.preventDefault();
     const startX = e.clientX;
     const startW = el.offsetWidth;
     let width = startW;
     const move = (ev: MouseEvent) => {
-      width = Math.max(90, Math.min(700, startW + ev.clientX - startX));
-      el.style.flexBasis = `${width}px`;
+      width = Math.max(min, Math.min(max, startW + ev.clientX - startX));
+      setFixedWidth(el, width);
     };
     const up = () => {
       window.removeEventListener('mousemove', move);
       window.removeEventListener('mouseup', up);
       document.body.classList.remove('resizing');
-      if (width !== startW) setColumnWidth(key, width);
+      if (width !== startW) save(width);
     };
     document.body.classList.add('resizing');
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   });
+}
+
+function setFixedWidth(el: HTMLElement, width: number | null) {
+  el.style.flex = width ? `0 0 ${width}px` : '';
+  el.style.maxWidth = width ? 'none' : '';
+}
+
+function applyTextWidth() {
+  setFixedWidth(gridEl.querySelector<HTMLElement>('.text-col')!, ui.textWidth);
 }
 
 function scheduleLayout() {
@@ -650,7 +674,12 @@ function renderPopupList() {
         'li',
         { class: i === p.active ? 'active' : '', onMousedown: pick(i) },
         h('span', { class: 'swatch', style: { background: c.color } }),
-        h('span', { class: 'grow' }, c.name),
+        h(
+          'span',
+          { class: 'grow' },
+          c.name,
+          c.parentId ? h('span', { class: 'code-parent' }, ` in ${codePath(c).split(' › ').slice(0, -1).join(' › ')}`) : null,
+        ),
         h('span', { class: 'muted' }, String(p.counts.get(c.id) ?? 0)),
       ),
     ),
@@ -672,9 +701,10 @@ function renderPopupList() {
 function renderApplied() {
   const p = popup;
   if (!p) return;
-  const here = layerSegments().filter((s) => s.docId === p.docId && s.start === p.start && s.end === p.end);
+  // Codes already covering the whole selected passage (possibly as part of a larger segment).
+  const here = layerSegments().filter((s) => s.docId === p.docId && s.start <= p.start && s.end >= p.end);
   p.applied.replaceChildren(
-    ...(here.length ? [h('span', { class: 'muted' }, 'Applied: ')] : []),
+    ...(here.length ? [h('span', { class: 'muted' }, 'Already coded: ')] : []),
     ...here.map((s) => {
       const c = codeById(s.codeId);
       return c ? h('span', { class: 'chip', style: { background: hexToRgba(c.color, 0.25) } }, c.name) : '';
@@ -687,7 +717,9 @@ function applyFromPopup(keepOpen: boolean) {
   if (!p) return;
   const name = p.active >= 0 ? p.items[p.active].name : p.input.value.trim();
   if (!name) return;
-  applyCode(p.docId, p.start, p.end, name, p.color.value);
+  const res = applyCode(p.docId, p.start, p.end, name, p.color.value);
+  if (res?.result === 'extended') toast(`Extended the existing “${res.code.name}” segment to include this passage.`);
+  if (res?.result === 'contained') toast(`This passage is already part of a “${res.code.name}” segment.`);
   if (!keepOpen) return closePopup();
   p.input.value = '';
   p.color.value = nextColor();

@@ -195,6 +195,21 @@ kbd {
 .menu-list[hidden] {
   display: none;
 }
+.menu-list.left {
+  right: auto;
+  left: 0;
+  min-width: 220px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--text);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: #fff;
+}
 .menu-list button {
   display: block;
   width: 100%;
@@ -240,6 +255,9 @@ kbd {
   }
   .layout.segments-hidden {
     grid-template-columns: 220px minmax(0, 1fr) 0;
+  }
+  #save-status {
+    display: none;
   }
   .text-col {
     min-width: 300px !important;
@@ -355,14 +373,91 @@ kbd {
 /* ---------- codebook ---------- */
 
 .code-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  position: relative;
   padding: 2px 6px;
   border-radius: 5px;
 }
 .code-row:hover {
   background: #f3f4f6;
+}
+.code-main {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.code-row.dragging {
+  opacity: 0.4;
+}
+.code-row.drag-over {
+  background: var(--accent-soft);
+  outline: 1px solid #c7cafc;
+}
+/* Two drop targets cover a code while another code is dragged over it (no layout shift). */
+.drop-opts {
+  display: none;
+  position: absolute;
+  inset: 0;
+  gap: 3px;
+  padding: 1px;
+  z-index: 2;
+}
+.code-row.drag-over .drop-opts {
+  display: flex;
+}
+.drop-opt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  border: 1px dashed #a5b4fc;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--accent);
+}
+.drop-opt.merge {
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+.drop-opt.over {
+  background: var(--accent);
+  border-style: solid;
+  color: #fff;
+}
+.drop-opt.merge.over {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+.drop-opt.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.code-top-drop {
+  display: none;
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  margin: 6px 4px 0;
+  padding: 6px;
+  border: 1px dashed var(--border);
+  border-radius: 5px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.dragging-code .code-top-drop {
+  display: block;
+}
+.code-top-drop.over {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.code-parent {
+  color: var(--muted);
+  font-size: 12px;
 }
 .code-name {
   flex: 1;

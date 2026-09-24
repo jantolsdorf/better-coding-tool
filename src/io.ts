@@ -1,7 +1,14 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import {
   addExternalCoding,
+  childCodes,
+  codebookEntries,
+  codeById,
+  codePath,
   currentDoc,
+  findCodeByName,
+  importCodebook,
+  type CodebookEntry,
   docsInTreeOrder,
   emptyProject,
   folderChain,
@@ -14,7 +21,7 @@ import {
   tableColumns,
 } from './store';
 import type { Code, Doc, Project, Segment } from './types';
-import { downloadFile, lineSpan, pickFiles, safeFileName, toast } from './util';
+import { byName, downloadFile, lineSpan, pickFiles, safeFileName, toast } from './util';
 
 const today = () => {
   const d = new Date();
@@ -25,6 +32,11 @@ const PROJECT_JSON = 'project.json';
 
 /** Reads a project from an exported .zip (via its project.json) or a plain .json file. */
 async function readProjectFile(file: File): Promise<Project> {
+  return parseProject(await readJsonFile(file));
+}
+
+/** Parses a .json file, or the project.json inside an exported .zip. */
+async function readJsonFile(file: File): Promise<unknown> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let text: string;
   if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
@@ -41,13 +53,11 @@ async function readProjectFile(file: File): Promise<Project> {
   } else {
     text = strFromU8(bytes);
   }
-  let data: unknown;
   try {
-    data = JSON.parse(text);
+    return JSON.parse(text);
   } catch {
     throw new Error('The file is not valid JSON.');
   }
-  return parseProject(data);
 }
 
 function csvCell(v: string | number): string {
@@ -75,11 +85,59 @@ function codebookCSV(): string {
   const consolidated = new Map<string, number>();
   for (const s of project.segments) mine.set(s.codeId, (mine.get(s.codeId) ?? 0) + 1);
   for (const s of project.consolidated ?? []) consolidated.set(s.codeId, (consolidated.get(s.codeId) ?? 0) + 1);
-  const rows: (string | number)[][] = [['code', 'color', 'description', 'segments', 'consolidated_segments']];
-  for (const c of project.codes) {
-    rows.push([c.name, c.color, c.description ?? '', mine.get(c.id) ?? 0, consolidated.get(c.id) ?? 0]);
+  const rows: (string | number)[][] = [['code', 'path', 'parent', 'color', 'description', 'segments', 'consolidated_segments']];
+  const parentName = (c: Code) => (c.parentId && codeById(c.parentId)?.name) || '';
+  for (const c of codesInTreeOrder()) {
+    rows.push([c.name, codePath(c), parentName(c), c.color, c.description ?? '', mine.get(c.id) ?? 0, consolidated.get(c.id) ?? 0]);
   }
   return toCSV(rows);
+}
+
+/** Codes depth-first in the order the codebook shows them. */
+function codesInTreeOrder(parentId: string | null = null, depth = 0): Code[] {
+  if (depth > 100) return [];
+  return childCodes(parentId)
+    .sort(byName)
+    .flatMap((c) => [c, ...codesInTreeOrder(c.id, depth + 1)]);
+}
+
+const CODEBOOK_FORMAT = 'bct-codebook';
+
+/** Just the code system (names, colors, descriptions, hierarchy), without documents or coding. */
+export function exportCodebook(kind: 'json' | 'csv') {
+  const who = safeFileName(project.coderName || 'project');
+  if (kind === 'csv') return downloadFile(`codebook-${who}-${today()}.csv`, codebookCSV(), 'text/csv');
+  const data = { format: CODEBOOK_FORMAT, version: 1, exportedAt: new Date().toISOString(), codes: codebookEntries(codesInTreeOrder()) };
+  downloadFile(`codebook-${who}-${today()}.json`, JSON.stringify(data, null, 1), 'application/json');
+}
+
+/** Adds codes from an exported codebook, or from the codebook of an exported project. */
+export async function importCodebookUI() {
+  const [file] = await pickFiles(PROJECT_FILES, false);
+  if (!file) return;
+  let entries: CodebookEntry[];
+  try {
+    const data = await readJsonFile(file);
+    const d = data as { format?: string; codes?: unknown };
+    entries =
+      d?.format === CODEBOOK_FORMAT && Array.isArray(d.codes)
+        ? (d.codes as CodebookEntry[])
+        : codebookEntries(parseProject(data).codes);
+  } catch (e) {
+    return alert(`Could not import “${file.name}”: ${(e as Error).message}`);
+  }
+  const existing = entries.filter((e) => typeof e?.name === 'string' && findCodeByName(e.name)).length;
+  const fresh = entries.length - existing;
+  if (!entries.length) return toast('The codebook is empty.');
+  let update = false;
+  if (existing) {
+    update = confirm(
+      `“${file.name}” has ${entries.length} code(s): ${fresh} new, ${existing} with the same name as one of yours.\n\n` +
+        'OK: also update color, description and position of those existing codes.\nCancel: only add the new codes.',
+    );
+  }
+  const res = importCodebook(entries, update);
+  toast(`Added ${res.added} code(s)${res.updated ? `, updated ${res.updated}` : ''}.`);
 }
 
 /**

@@ -14,11 +14,13 @@
       </label>
       <span id="save-status" class="muted small"></span>
       <span class="grow"></span>
+      <button id="btn-undo" class="btn icon" title="Undo (⌘Z / Ctrl+Z)" disabled>↶ Undo</button>
+      <button id="btn-redo" class="btn icon" title="Redo (⇧⌘Z / Ctrl+Y)" disabled>↷ Redo</button>
       <button id="btn-import-project" class="btn" title="Replace the current project with an exported project file">Import project</button>
       <button id="btn-export-project" class="btn primary" title="Download the whole project as a zip: all folders and text files, the codebook, and all coding">Export project</button>
       <div class="menu">
-        <button id="btn-export-menu" class="btn" aria-haspopup="true">Export CSV ▾</button>
-        <div id="export-menu" class="menu-list" hidden>
+        <button class="btn menu-toggle" aria-haspopup="true">Export CSV ▾</button>
+        <div class="menu-list" hidden>
           <button id="btn-export-table-current" title="One row per line of the open document; one column per coder shown in the table view">
             Export table to CSV — this document
           </button>
@@ -45,6 +47,18 @@
           <div class="panel-head">
             <span class="grow">Codebook</span>
             <button id="btn-add-code" class="btn small" title="Add a code without applying it">+ Code</button>
+            <div class="menu">
+              <button class="btn small menu-toggle" title="Export or import the codebook only" aria-haspopup="true">⋯</button>
+              <div class="menu-list left" hidden>
+                <button id="btn-export-codebook" title="Codes with colors, descriptions and hierarchy; can be imported into another project">
+                  Export codebook
+                </button>
+                <button id="btn-export-codebook-csv" title="For reading in a spreadsheet">Export codebook as CSV</button>
+                <button id="btn-import-codebook" title="Add codes from an exported codebook or project, without any documents or coding">
+                  Import codebook…
+                </button>
+              </div>
+            </div>
           </div>
           <div id="codebook" class="panel-body"></div>
         </section>

@@ -23,12 +23,23 @@ npm run build      # produces a single self-contained dist/index.html
   type a code (existing codes are suggested) and press **Enter**. **Shift+Enter** applies the
   code and keeps the box open to add more codes to the same passage. **↑/↓** chooses a
   suggestion, **Tab** completes it, **Esc** cancels.
+  If the passage overlaps a segment that already has the same code, no new segment is created:
+  the existing segment is extended to cover both.
 - **Display**: coded passages are highlighted in the code's color. The column next to the text
   shows a bracket per segment spanning its first to last line; the right panel lists each
   segment with its line range (e.g. `L6–L8`) and text. Hover to highlight, click to jump.
 - **Codebook**: change a code's color with its swatch; click its name to rename it, add a
-  description, see every segment coded with it across all documents, merge it into another
-  code, or delete it.
+  description, set its parent code, see every segment coded with it across all documents,
+  merge it into another code, or delete it.
+  - **Hierarchy**: drag a code onto another code. The target shows two options: **⤷ Subcode**
+    (nests it, no confirmation) and **⇢ Merge** (moves all its segments and subcodes into the
+    target after confirmation). Drop on *Drop here to move to the top level* to un-nest.
+    Counts read “own · including subcodes”.
+  - **⋯ menu**: export the codebook only (JSON, re-importable, or CSV), or import a codebook.
+    Importing accepts a codebook file or any exported project and only adds codes (matched by
+    name); you can choose whether existing codes take the imported color, description and parent.
+- **Undo / redo**: the ↶/↷ buttons or ⌘Z / ⇧⌘Z (Ctrl+Z / Ctrl+Y) undo any change to the
+  project (last 50 steps, kept until the page is reloaded).
 - **Export project** downloads the whole project as a `.zip`:
   - `project.json`: everything (folders, documents, codebook, your coding, other coders,
     consolidation). This is what gets imported again.
@@ -45,7 +56,8 @@ npm run build      # produces a single self-contained dist/index.html
 - **Comparing coders**: under **Other coders → Import…**, choose another person's exported
   project. Their coding appears as an extra column next to the text; each additional coder gets
   another column. Documents are matched by identical text. Use the checkboxes to show or hide
-  coders. Drag a column header to reorder columns; drag a column's right edge to resize it.
+  coders. Drag a column header to reorder columns; drag the right edge of any column, including
+  the text column, to resize it (double-click the edge to reset).
 - **Consolidating**: **Start consolidation** adds a *Consolidated* column. Hover a segment in
   any coder's column and click **＋** to accept it (✓ marks accepted ones), or use **⇉ All** in a
   column header to accept all of that coder's segments in the document. While consolidating,

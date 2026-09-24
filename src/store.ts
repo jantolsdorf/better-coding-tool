@@ -69,6 +69,8 @@ function loadUI(): UIState {
     segmentsHidden: false,
     columnOrder: [],
     columnWidths: {},
+    textWidth: null,
+    collapsedCodes: [],
     codeTarget: 'mine',
   };
   try {
@@ -80,7 +82,7 @@ function loadUI(): UIState {
 
 export let project: Project = loadProject();
 export const ui: UIState = loadUI();
-export let savedBytes = 0;
+export let savedBytes = JSON.stringify(project).length * 2;
 
 const listeners: (() => void)[] = [];
 export function subscribe(fn: () => void) {
@@ -88,10 +90,41 @@ export function subscribe(fn: () => void) {
 }
 const emit = () => listeners.forEach((fn) => fn());
 
+// Undo/redo keeps serialized snapshots of the project, taken whenever a change is committed.
+const UNDO_LIMIT = 50;
+let lastJson = JSON.stringify(project);
+const undoStack: string[] = [];
+const redoStack: string[] = [];
+export const canUndo = () => undoStack.length > 0;
+export const canRedo = () => redoStack.length > 0;
+
+function restore(json: string) {
+  project = JSON.parse(json) as Project;
+  lastJson = json;
+  saveProject(json);
+  saveUI();
+  emit();
+}
+
+export function undo(): boolean {
+  const prev = undoStack.pop();
+  if (prev === undefined) return false;
+  redoStack.push(lastJson);
+  restore(prev);
+  return true;
+}
+
+export function redo(): boolean {
+  const next = redoStack.pop();
+  if (next === undefined) return false;
+  undoStack.push(lastJson);
+  restore(next);
+  return true;
+}
+
 let quotaWarned = false;
-function saveProject() {
+function saveProject(json: string) {
   try {
-    const json = JSON.stringify(project);
     localStorage.setItem(PROJECT_KEY, json);
     savedBytes = json.length * 2;
     quotaWarned = false;
@@ -115,9 +148,16 @@ function saveUI() {
   }
 }
 
-/** Persist the project and re-render. */
+/** Persist the project (recording an undo step if it changed) and re-render. */
 export function commit() {
-  saveProject();
+  const json = JSON.stringify(project);
+  if (json !== lastJson) {
+    undoStack.push(lastJson);
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+    redoStack.length = 0;
+    lastJson = json;
+  }
+  saveProject(json);
   saveUI();
   emit();
 }
@@ -315,10 +355,30 @@ function codeFor(name: string, colorForNew?: string): Code {
   return code;
 }
 
-/** Adds a segment unless the same code is already applied to exactly this range. */
-function pushSegment(list: Segment[], doc: Doc, start: number, end: number, codeId: string, source?: string) {
-  if (list.some((s) => s.docId === doc.id && s.codeId === codeId && s.start === start && s.end === end)) return;
-  list.push({ id: uid('s'), docId: doc.id, codeId, start, end, text: doc.content.slice(start, end), createdAt: now(), source });
+export type AddResult = 'added' | 'extended' | 'contained';
+
+/**
+ * Adds a coded segment to `list`. If the same code already covers an overlapping passage,
+ * no new segment is created: the existing one is extended to cover both (and any other
+ * overlapping segments of that code are folded into it).
+ */
+function addOrMerge(list: Segment[], doc: Doc, start: number, end: number, codeId: string, source?: string): AddResult {
+  const overlapping = list
+    .filter((s) => s.docId === doc.id && s.codeId === codeId && s.start < end && s.end > start)
+    .sort((a, b) => a.start - b.start);
+  if (!overlapping.length) {
+    list.push({ id: uid('s'), docId: doc.id, codeId, start, end, text: doc.content.slice(start, end), createdAt: now(), source });
+    return 'added';
+  }
+  const [keep, ...absorbed] = overlapping;
+  const newStart = Math.min(start, keep.start);
+  const newEnd = Math.max(end, ...overlapping.map((s) => s.end));
+  if (!absorbed.length && newStart === keep.start && newEnd === keep.end) return 'contained';
+  keep.start = newStart;
+  keep.end = newEnd;
+  keep.text = doc.content.slice(newStart, newEnd);
+  for (const s of absorbed) list.splice(list.indexOf(s), 1);
+  return 'extended';
 }
 
 /** Codes the passage [start, end) of a document with the given code name, creating the code if needed. */
@@ -327,9 +387,9 @@ export function applyCode(docId: string, start: number, end: number, codeName: s
   const name = codeName.trim();
   if (!doc || !name) return null;
   const code = codeFor(name, colorForNew);
-  pushSegment(layerSegments(), doc, start, end, code.id);
+  const result = addOrMerge(layerSegments(), doc, start, end, code.id);
   commit();
-  return code;
+  return { code, result };
 }
 
 /** Removes a segment from your coding or the consolidated coding (ids are unique across both). */
@@ -346,31 +406,120 @@ export function updateCode(id: string, patch: Partial<Omit<Code, 'id'>>) {
   commit();
 }
 
+/** Deletes a code and its segments; its subcodes move up to the deleted code's parent. */
 export function deleteCode(id: string) {
+  const code = codeById(id);
+  for (const c of project.codes) if (c.parentId === id) c.parentId = code?.parentId ?? null;
   project.codes = project.codes.filter((c) => c.id !== id);
   project.segments = project.segments.filter((s) => s.codeId !== id);
   if (project.consolidated) project.consolidated = project.consolidated.filter((s) => s.codeId !== id);
   commit();
 }
 
-function mergeIn(list: Segment[], fromId: string, intoId: string): Segment[] {
-  const seen = new Set(list.filter((s) => s.codeId === intoId).map((s) => `${s.docId}:${s.start}:${s.end}`));
-  return list.filter((s) => {
-    if (s.codeId !== fromId) return true;
-    const key = `${s.docId}:${s.start}:${s.end}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    s.codeId = intoId;
-    return true;
-  });
+function mergeIn(list: Segment[], fromId: string, intoId: string) {
+  for (const s of list.filter((x) => x.codeId === fromId)) {
+    list.splice(list.indexOf(s), 1);
+    const doc = getDoc(s.docId);
+    if (doc) addOrMerge(list, doc, s.start, s.end, intoId, s.source);
+  }
 }
 
-/** Reassigns all segments of `fromId` to `intoId` and removes `fromId`. */
+/** Reassigns all segments and subcodes of `fromId` to `intoId` and removes `fromId`. */
 export function mergeCode(fromId: string, intoId: string) {
-  project.segments = mergeIn(project.segments, fromId, intoId);
-  if (project.consolidated) project.consolidated = mergeIn(project.consolidated, fromId, intoId);
+  const from = codeById(fromId);
+  if (!from || fromId === intoId) return;
+  mergeIn(project.segments, fromId, intoId);
+  if (project.consolidated) mergeIn(project.consolidated, fromId, intoId);
+  for (const c of project.codes) {
+    // If a code is merged into its own subcode, that subcode takes the merged code's place.
+    if (c.parentId === fromId) c.parentId = c.id === intoId ? (from.parentId ?? null) : intoId;
+  }
   project.codes = project.codes.filter((c) => c.id !== fromId);
   commit();
+}
+
+// ---------- code hierarchy ----------
+
+export const childCodes = (parentId: string | null) =>
+  project.codes.filter((c) => (c.parentId ?? null) === parentId && c.id !== parentId);
+
+/** Whether code `id` is `rootId` itself or one of its (nested) subcodes. */
+export function isCodeInSubtree(id: string, rootId: string): boolean {
+  for (let c = codeById(id), depth = 0; c && depth < 100; c = c.parentId ? codeById(c.parentId) : undefined, depth++) {
+    if (c.id === rootId) return true;
+  }
+  return false;
+}
+
+/** Makes `id` a subcode of `parentId` (null = top level). Refuses to create cycles. */
+export function setCodeParent(id: string, parentId: string | null): boolean {
+  const code = codeById(id);
+  if (!code || (parentId && isCodeInSubtree(parentId, id))) return false;
+  code.parentId = parentId;
+  if (parentId) ui.collapsedCodes = ui.collapsedCodes.filter((x) => x !== parentId);
+  commit();
+  return true;
+}
+
+export interface CodebookEntry {
+  name: string;
+  color: string;
+  description?: string;
+  /** Name of the parent code, if any. */
+  parent?: string | null;
+}
+
+/** The codebook in a portable form: codes refer to their parents by name. */
+export function codebookEntries(codes: Code[] = project.codes): CodebookEntry[] {
+  const byId = new Map(codes.map((c) => [c.id, c]));
+  return codes.map((c) => ({
+    name: c.name,
+    color: c.color,
+    description: c.description,
+    parent: (c.parentId && byId.get(c.parentId)?.name) || null,
+  }));
+}
+
+/**
+ * Adds the codes of another codebook, matched by name. Existing codes keep their color,
+ * description and position unless `updateExisting` is set.
+ */
+export function importCodebook(entries: CodebookEntry[], updateExisting: boolean) {
+  const created = new Set<string>();
+  let updated = 0;
+  for (const e of entries) {
+    if (typeof e?.name !== 'string' || !e.name.trim()) continue;
+    const existing = findCodeByName(e.name);
+    const color = /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : nextColor();
+    if (!existing) {
+      const code: Code = { id: uid('c'), name: e.name.trim(), color, description: e.description || undefined, parentId: null };
+      project.codes.push(code);
+      created.add(code.id);
+    } else if (updateExisting) {
+      existing.color = color;
+      existing.description = e.description || existing.description;
+      updated++;
+    }
+  }
+  for (const e of entries) {
+    const code = typeof e?.name === 'string' ? findCodeByName(e.name) : undefined;
+    if (!code || (!created.has(code.id) && !updateExisting)) continue;
+    const parent = e.parent ? findCodeByName(e.parent) : undefined;
+    if (parent && !isCodeInSubtree(parent.id, code.id)) code.parentId = parent.id;
+    else if (!e.parent && updateExisting) code.parentId = null;
+  }
+  commit();
+  return { added: created.size, updated };
+}
+
+/** "Parent › Child" path of a code. */
+export function codePath(code: Code): string {
+  const parts = [code.name];
+  for (let p = code.parentId ? codeById(code.parentId) : undefined, depth = 0; p && depth < 100; depth++) {
+    parts.unshift(p.name);
+    p = p.parentId ? codeById(p.parentId) : undefined;
+  }
+  return parts.join(' › ');
 }
 
 // ---------- other coders ----------
@@ -474,8 +623,10 @@ export function moveColumn(key: ColumnKey, target: ColumnKey, after: boolean) {
   commitUI();
 }
 
-export function setColumnWidth(key: ColumnKey, width: number) {
-  ui.columnWidths[key] = Math.round(width);
+/** Sets a coder column's width in px (null = default width). */
+export function setColumnWidth(key: ColumnKey, width: number | null) {
+  if (width) ui.columnWidths[key] = Math.round(width);
+  else delete ui.columnWidths[key];
   commitUI();
 }
 
@@ -512,23 +663,23 @@ export function finishConsolidation(): string {
   return keptAs;
 }
 
-/** Whether the consolidated coding already has a code with this name on exactly this range. */
+/** Whether the consolidated coding already covers this passage with a code of this name. */
 export function isConsolidated(seg: Segment, codeName: string): boolean {
   const code = findCodeByName(codeName);
   return !!code && !!project.consolidated?.some(
-    (s) => s.docId === seg.docId && s.codeId === code.id && s.start === seg.start && s.end === seg.end,
+    (s) => s.docId === seg.docId && s.codeId === code.id && s.start <= seg.start && s.end >= seg.end,
   );
 }
 
-/** Copies segments of a coder into the consolidated coding, matching codes by name. */
+/** Copies segments of a coder into the consolidated coding, matching codes by name. Returns how many changed it. */
 export function acceptIntoConsolidated(items: { seg: Segment; code: Code; source: string }[]) {
   if (!project.consolidated) return 0;
-  const before = project.consolidated.length;
+  let changed = 0;
   for (const { seg, code, source } of items) {
     const doc = getDoc(seg.docId);
     if (!doc) continue;
-    pushSegment(project.consolidated, doc, seg.start, seg.end, codeFor(code.name, code.color).id, source);
+    if (addOrMerge(project.consolidated, doc, seg.start, seg.end, codeFor(code.name, code.color).id, source) !== 'contained') changed++;
   }
   commit();
-  return project.consolidated.length - before;
+  return changed;
 }
