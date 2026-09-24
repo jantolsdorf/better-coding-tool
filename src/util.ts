@@ -75,7 +75,7 @@ export function lineLabel(doc: Doc, start: number, end: number): string {
   return a === b ? `L${a}` : `L${a}–L${b}`;
 }
 
-export function downloadFile(name: string, content: string, mime: string) {
+export function downloadFile(name: string, content: BlobPart, mime: string) {
   const url = URL.createObjectURL(new Blob([content], { type: mime }));
   const a = h('a', { href: url, download: name });
   document.body.append(a);

@@ -29,13 +29,30 @@ npm run build      # produces a single self-contained dist/index.html
 - **Codebook**: change a code's color with its swatch; click its name to rename it, add a
   description, see every segment coded with it across all documents, merge it into another
   code, or delete it.
-- **Export / import**: **Export project** downloads documents, folders, codebook and coding as
-  one JSON file. **Import project** replaces the current project with such a file.
-  **Export CSV** downloads one row per coded segment (all coders) for spreadsheets.
+- **Export project** downloads the whole project as a `.zip`:
+  - `project.json`: everything (folders, documents, codebook, your coding, other coders,
+    consolidation). This is what gets imported again.
+  - `documents/`: every text file in its folder structure.
+  - `codebook.csv`: codes with colors, descriptions and counts.
+
+  **Import project** replaces the current project with such a `.zip` (or a `.json` from older
+  versions).
+- **Export CSV ▾**
+  - *Export table to CSV* (this document / all documents): one row per line of text with the
+    columns `file, line, text` and then one column per coder, in the order of the comparison
+    view. Each cell lists the codes on that line, separated by semicolons.
+  - *Export segments to CSV*: one row per coded segment, for every coder.
 - **Comparing coders**: under **Other coders → Import…**, choose another person's exported
-  project. Their coding appears as an extra column to the right of yours, aligned with the
-  text; each additional coder gets another column. Documents are matched by identical text.
-  Use the checkboxes to show or hide coders.
+  project. Their coding appears as an extra column next to the text; each additional coder gets
+  another column. Documents are matched by identical text. Use the checkboxes to show or hide
+  coders. Drag a column header to reorder columns; drag a column's right edge to resize it.
+- **Consolidating**: **Start consolidation** adds a *Consolidated* column. Hover a segment in
+  any coder's column and click **＋** to accept it (✓ marks accepted ones), or use **⇉ All** in a
+  column header to accept all of that coder's segments in the document. While consolidating,
+  new codes go into the consolidated coding (switch with *Code into* in the code box), so you
+  can also add or re-cut segments directly. **✓ Finish** makes the consolidated coding your
+  coding and keeps your previous coding under *Other coders* as “… (before consolidation)”;
+  **✕** discards the consolidation.
 
 ## Code layout
 

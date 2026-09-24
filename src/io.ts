@@ -1,36 +1,127 @@
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import {
   addExternalCoding,
+  currentDoc,
+  docsInTreeOrder,
   emptyProject,
+  folderChain,
   folderPath,
   getDoc,
   matchDocs,
   parseProject,
   project,
   replaceProject,
+  tableColumns,
 } from './store';
-import type { Code, Project, Segment } from './types';
+import type { Code, Doc, Project, Segment } from './types';
 import { downloadFile, lineSpan, pickFiles, safeFileName, toast } from './util';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const PROJECT_FILES = '.zip,.json,application/zip,application/json';
+const PROJECT_JSON = 'project.json';
 
+/** Reads a project from an exported .zip (via its project.json) or a plain .json file. */
 async function readProjectFile(file: File): Promise<Project> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let text: string;
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
+    let entries: Record<string, Uint8Array>;
+    try {
+      entries = unzipSync(bytes, { filter: (f) => f.name.split('/').pop() === PROJECT_JSON });
+    } catch {
+      throw new Error('The zip file could not be read.');
+    }
+    // Prefer the least nested project.json, in case the zip was repacked inside a folder.
+    const key = Object.keys(entries).sort((a, b) => a.split('/').length - b.split('/').length)[0];
+    if (!key) throw new Error(`The zip file does not contain a ${PROJECT_JSON}.`);
+    text = strFromU8(entries[key]);
+  } else {
+    text = strFromU8(bytes);
+  }
   let data: unknown;
   try {
-    data = JSON.parse(await file.text());
+    data = JSON.parse(text);
   } catch {
     throw new Error('The file is not valid JSON.');
   }
   return parseProject(data);
 }
 
-/** Documents, folders, codebook and coding in one JSON file. */
+function csvCell(v: string | number): string {
+  const s = String(v);
+  return /[",\n\r;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function toCSV(rows: (string | number)[][]): string {
+  // The BOM makes Excel read the file as UTF-8.
+  return '﻿' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
+}
+
+/** A file or folder name that is safe on all common file systems. */
+function pathSegment(name: string): string {
+  return name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/^\.+/, '_').trim() || '_';
+}
+
+/** Path of a document inside the export, e.g. "Wave 1/Students/interview.txt". */
+function docPath(doc: Doc): string {
+  return [...folderChain(doc.folderId), doc.name].join('/');
+}
+
+function codebookCSV(): string {
+  const mine = new Map<string, number>();
+  const consolidated = new Map<string, number>();
+  for (const s of project.segments) mine.set(s.codeId, (mine.get(s.codeId) ?? 0) + 1);
+  for (const s of project.consolidated ?? []) consolidated.set(s.codeId, (consolidated.get(s.codeId) ?? 0) + 1);
+  const rows: (string | number)[][] = [['code', 'color', 'description', 'segments', 'consolidated_segments']];
+  for (const c of project.codes) {
+    rows.push([c.name, c.color, c.description ?? '', mine.get(c.id) ?? 0, consolidated.get(c.id) ?? 0]);
+  }
+  return toCSV(rows);
+}
+
+/**
+ * The whole project as a zip: project.json (everything, re-importable), every text file in its
+ * folder structure under documents/, and the codebook as CSV.
+ */
 export function exportProject() {
+  const files: Record<string, Uint8Array> = {
+    [PROJECT_JSON]: strToU8(JSON.stringify(project, null, 1)),
+    'codebook.csv': strToU8(codebookCSV()),
+    'README.txt': strToU8(
+      'Exported from Better Coding Tool on ' + new Date().toLocaleString() + '.\n\n' +
+        `${PROJECT_JSON}  - the complete project (documents, folders, codebook, coding of all coders).\n` +
+        '                Import this zip (or the json) with "Import project" or "Other coders > Import".\n' +
+        'documents/    - the text files in their folder structure.\n' +
+        'codebook.csv  - the codes with colors and descriptions.\n',
+    ),
+  };
+  const used = new Set<string>();
+  for (const doc of docsInTreeOrder()) {
+    const dir = ['documents', ...folderChain(doc.folderId).map(pathSegment)].join('/');
+    const name = pathSegment(doc.name);
+    const dot = name.lastIndexOf('.');
+    const [base, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, '.txt'];
+    let path = `${dir}/${base}${ext}`;
+    for (let n = 2; used.has(path.toLowerCase()); n++) path = `${dir}/${base} (${n})${ext}`;
+    used.add(path.toLowerCase());
+    files[path] = strToU8(doc.content);
+  }
+  // Keep empty folders, too.
+  for (const f of project.folders) {
+    if (!project.docs.some((d) => d.folderId === f.id) && !project.folders.some((c) => c.parentId === f.id)) {
+      files[['documents', ...folderChain(f.id).map(pathSegment)].join('/') + '/'] = new Uint8Array(0);
+    }
+  }
+  const zip = zipSync(files, { level: 6 });
   const who = safeFileName(project.coderName || 'project');
-  downloadFile(`coding-${who}-${today()}.json`, JSON.stringify(project, null, 1), 'application/json');
+  downloadFile(`coding-${who}-${today()}.zip`, zip, 'application/zip');
 }
 
 export async function importProjectUI() {
-  const [file] = await pickFiles('.json,application/json', false);
+  const [file] = await pickFiles(PROJECT_FILES, false);
   if (!file) return;
   try {
     const p = await readProjectFile(file);
@@ -55,7 +146,7 @@ export function newProjectUI() {
 
 /** Imports the coding of other people (their exported project files) for comparison. */
 export async function importCoderUI() {
-  const files = await pickFiles('.json,application/json', true);
+  const files = await pickFiles(PROJECT_FILES, true);
   for (const file of files) {
     let src: Project;
     try {
@@ -64,7 +155,7 @@ export async function importCoderUI() {
       alert(`Could not import “${file.name}”: ${(e as Error).message}`);
       continue;
     }
-    const suggested = src.coderName || file.name.replace(/\.json$/i, '');
+    const suggested = src.coderName || file.name.replace(/\.(json|zip)$/i, '');
     const input = prompt(`Whose coding is “${file.name}”?`, suggested);
     if (input === null) continue;
     const name = input.trim() || suggested;
@@ -97,13 +188,37 @@ export async function importCoderUI() {
   }
 }
 
-function csvCell(v: string | number): string {
-  const s = String(v);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+/**
+ * One row per line of text, with one column per coder as currently shown in the comparison
+ * view (same order). Each cell lists the codes on that line, separated by semicolons.
+ */
+export function exportTableCSV(scope: 'current' | 'all') {
+  const docs = scope === 'current' ? [currentDoc()].filter((d): d is Doc => !!d) : docsInTreeOrder();
+  if (!docs.length) return toast(scope === 'current' ? 'Open a document first.' : 'There are no documents.');
+  const cols = tableColumns();
+  const rows: (string | number)[][] = [['file', 'line', 'text', ...cols.map((c) => c.name)]];
+  for (const doc of docs) {
+    const lines = doc.content.split('\n');
+    const cells = cols.map((col) => {
+      const names = new Map(col.codes.map((c) => [c.id, c.name]));
+      const perLine = lines.map(() => new Set<string>());
+      const segs = col.segments.filter((s) => s.docId === doc.id).sort((a, b) => a.start - b.start);
+      for (const s of segs) {
+        const [a, b] = lineSpan(doc, s.start, s.end);
+        const name = names.get(s.codeId) ?? '(unknown code)';
+        for (let i = a; i <= b; i++) perLine[i - 1]?.add(name);
+      }
+      return perLine;
+    });
+    const file = docPath(doc);
+    lines.forEach((text, i) => rows.push([file, i + 1, text, ...cells.map((c) => [...c[i]].join('; '))]));
+  }
+  const what = scope === 'current' ? safeFileName(docs[0].name.replace(/\.txt$/i, '')) : 'all-documents';
+  downloadFile(`table-${what}-${today()}.csv`, toCSV(rows), 'text/csv');
 }
 
 /** One row per coded segment, for all coders, for analysis in a spreadsheet. */
-export function exportCSV() {
+export function exportSegmentsCSV() {
   const rows: (string | number)[][] = [
     ['coder', 'folder', 'document', 'code', 'start_line', 'end_line', 'start_offset', 'end_offset', 'text'],
   ];
@@ -117,7 +232,7 @@ export function exportCSV() {
     }
   };
   add(project.coderName || 'me', project.codes, project.segments);
+  if (project.consolidated) add('Consolidated', project.codes, project.consolidated);
   for (const x of project.externalCodings) add(x.coderName, x.codes, x.segments);
-  const csv = '﻿' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
-  downloadFile(`segments-${safeFileName(project.coderName || 'project')}-${today()}.csv`, csv, 'text/csv');
+  downloadFile(`segments-${safeFileName(project.coderName || 'project')}-${today()}.csv`, toCSV(rows), 'text/csv');
 }

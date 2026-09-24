@@ -1,4 +1,4 @@
-import { codeById, currentDoc, deleteSegment, project } from './store';
+import { activeLayer, codeById, currentDoc, deleteSegment, layerSegments } from './store';
 import { h, hexToRgba, lineLabel } from './util';
 import { openCodeModal } from './codebook';
 import { focusSegment, setHoverRange } from './viewer';
@@ -15,14 +15,15 @@ export function initSegments(container: HTMLElement) {
   });
 }
 
-export function renderSegments(container: HTMLElement, countEl: HTMLElement) {
+export function renderSegments(container: HTMLElement, countEl: HTMLElement, titleEl: HTMLElement) {
+  titleEl.textContent = activeLayer() === 'consolidated' ? 'Consolidated segments' : 'Coded segments';
   const doc = currentDoc();
   if (!doc) {
     countEl.textContent = '';
     container.replaceChildren(h('p', { class: 'muted pad' }, 'Open a document to see its coded segments.'));
     return;
   }
-  const segs = project.segments
+  const segs = layerSegments()
     .filter((s) => s.docId === doc.id)
     .sort((a, b) => a.start - b.start || a.end - b.end);
   countEl.textContent = String(segs.length);

@@ -1,6 +1,27 @@
-import { applyCode, codeById, commitUI, currentDoc, folderPath, nextColor, project, segmentCounts, ui } from './store';
-import type { Code, Doc, Segment } from './types';
-import { h, hexToRgba, lineLabel, lineOf, lineStartsOf } from './util';
+import {
+  acceptIntoConsolidated,
+  activeLayer,
+  applyCode,
+  codeById,
+  commitUI,
+  currentDoc,
+  deleteSegment,
+  discardConsolidation,
+  finishConsolidation,
+  folderPath,
+  isConsolidated,
+  layerSegments,
+  moveColumn,
+  nextColor,
+  project,
+  segmentCounts,
+  setColumnWidth,
+  startConsolidation,
+  tableColumns,
+  ui,
+} from './store';
+import type { Code, ColumnKey, Doc, Segment, TableColumn } from './types';
+import { h, hexToRgba, lineLabel, lineOf, lineStartsOf, toast } from './util';
 
 // CSS Custom Highlight API: colors text ranges without touching the DOM.
 type HighlightLike = { priority: number };
@@ -11,12 +32,13 @@ const HighlightCtor = (globalThis as unknown as { Highlight?: new (...r: Range[]
 const hlSupported = !!registry && !!HighlightCtor;
 
 interface Column {
-  name: string;
-  mine: boolean;
+  col: TableColumn;
   segs: Segment[];
   codes: Map<string, Code>;
   body: HTMLElement;
 }
+
+const COLUMN_DND_TYPE = 'application/x-bct-column';
 
 interface Popup {
   el: HTMLElement;
@@ -27,6 +49,7 @@ interface Popup {
   color: HTMLInputElement;
   list: HTMLUListElement;
   applied: HTMLElement;
+  target: HTMLElement;
   items: Code[];
   exact: Code | undefined;
   /** Index into items, or -1 for "use the typed text". */
@@ -98,25 +121,42 @@ export function renderViewer() {
 
 function renderHeader(doc: Doc) {
   const path = folderPath(doc.folderId);
-  const mine = project.segments.filter((s) => s.docId === doc.id).length;
+  const layer = activeLayer();
+  const count = layerSegments(layer).filter((s) => s.docId === doc.id).length;
+  const into = layer === 'consolidated' ? ' · New codes go into the consolidated coding' : ' · Select text to code it';
   headerEl.replaceChildren(
     h('div', { class: 'vh-title' }, path ? h('span', { class: 'vh-path' }, `${path} / `) : null, doc.name),
     h(
       'div',
       { class: 'vh-meta' },
-      `${lineStarts.length} lines · ${mine} coded segment${mine === 1 ? '' : 's'} · Select text to code it`,
+      `${lineStarts.length} lines · ${count} ${layer === 'consolidated' ? 'consolidated' : 'coded'} segment${count === 1 ? '' : 's'}${into}`,
     ),
     h(
-      'button',
-      {
-        class: 'btn small',
-        title: 'Show or hide the list of coded segments',
-        onClick: () => {
-          ui.segmentsHidden = !ui.segmentsHidden;
-          commitUI();
+      'div',
+      { class: 'vh-actions' },
+      !project.consolidated && project.externalCodings.length
+        ? h(
+            'button',
+            {
+              class: 'btn small',
+              title: 'Build an agreed coding by accepting segments from each coder’s column',
+              onClick: startConsolidation,
+            },
+            'Start consolidation',
+          )
+        : null,
+      h(
+        'button',
+        {
+          class: 'btn small',
+          title: 'Show or hide the list of coded segments',
+          onClick: () => {
+            ui.segmentsHidden = !ui.segmentsHidden;
+            commitUI();
+          },
         },
-      },
-      ui.segmentsHidden ? 'Show segment list' : 'Hide segment list',
+        ui.segmentsHidden ? 'Show segment list' : 'Hide segment list',
+      ),
     ),
   );
   if (!hlSupported) {
@@ -199,7 +239,7 @@ function applyHighlights(doc: Doc | null) {
     return;
   }
   const byCode = new Map<string, Range[]>();
-  for (const s of project.segments) {
+  for (const s of layerSegments()) {
     if (s.docId !== doc.id) continue;
     if (!byCode.has(s.codeId)) byCode.set(s.codeId, []);
     byCode.get(s.codeId)!.push(rangeFor(s.start, s.end));
@@ -238,29 +278,131 @@ export function focusSegment(start: number, end: number) {
 
 function buildColumns(doc: Doc) {
   gridEl.querySelectorAll('.coder-col').forEach((c) => c.remove());
-  const sources = [
-    { name: project.coderName || 'You', mine: true, segments: project.segments, codes: project.codes },
-    ...project.externalCodings
-      .filter((x) => !ui.hiddenExternal.includes(x.id))
-      .map((x) => ({ name: x.coderName, mine: false, segments: x.segments, codes: x.codes })),
-  ];
-  columns = sources.map((src) => {
-    const segs = src.segments.filter((s) => s.docId === doc.id);
+  columns = tableColumns().map((col) => {
+    const segs = col.segments.filter((s) => s.docId === doc.id);
+    const codes = new Map(col.codes.map((c) => [c.id, c]));
     const body = h('div', { class: 'col-body' });
-    gridEl.append(
+    const el = h(
+      'div',
+      { class: `coder-col ${col.kind}`, 'data-key': col.key },
       h(
         'div',
-        { class: 'coder-col' + (src.mine ? ' mine' : '') },
-        h(
-          'div',
-          { class: 'col-head', title: src.name },
-          h('span', { class: 'col-name' }, src.name),
-          h('span', { class: 'badge' }, String(segs.length)),
-        ),
-        body,
+        { class: 'col-head', title: `${col.name} — drag to reorder`, draggable: true },
+        h('span', { class: 'grip' }, '⋮⋮'),
+        h('span', { class: 'col-name' }, col.name),
+        h('span', { class: 'badge' }, String(segs.length)),
+        ...columnActions(col, segs, codes),
       ),
+      body,
+      h('div', { class: 'col-resizer', title: 'Drag to resize' }),
     );
-    return { name: src.name, mine: src.mine, segs, codes: new Map(src.codes.map((c) => [c.id, c])), body };
+    const width = ui.columnWidths[col.key];
+    if (width) el.style.flexBasis = `${width}px`;
+    makeColumnDraggable(el, col.key);
+    gridEl.append(el);
+    return { col, segs, codes, body };
+  });
+}
+
+function columnActions(col: TableColumn, segs: Segment[], codes: Map<string, Code>): HTMLElement[] {
+  if (!project.consolidated) return [];
+  if (col.kind === 'consolidated') {
+    return [
+      h(
+        'button',
+        {
+          class: 'icon-btn head-btn',
+          title: 'Finish: make the consolidated coding your coding',
+          onClick: () => {
+            const ok = confirm(
+              'Finish the consolidation?\n\nThe consolidated coding becomes your coding. Your current coding is kept under ' +
+                '“Other coders” so you can still compare against it.',
+            );
+            if (ok) toast(`Done. Your previous coding is kept as “${finishConsolidation()}”.`, 5000);
+          },
+        },
+        '✓ Finish',
+      ),
+      h(
+        'button',
+        {
+          class: 'icon-btn head-btn',
+          title: 'Discard the consolidated coding',
+          onClick: () => {
+            if (confirm('Discard the consolidated coding? This cannot be undone.')) discardConsolidation();
+          },
+        },
+        '✕',
+      ),
+    ];
+  }
+  return [
+    h(
+      'button',
+      {
+        class: 'icon-btn head-btn',
+        title: `Accept all of ${col.name}’s segments in this document into the consolidated coding`,
+        onClick: () => {
+          const items = segs.flatMap((seg) => {
+            const code = codes.get(seg.codeId);
+            return code ? [{ seg, code, source: col.name }] : [];
+          });
+          const n = acceptIntoConsolidated(items);
+          toast(n ? `Accepted ${n} segment${n === 1 ? '' : 's'} from ${col.name}.` : 'Nothing new to accept.');
+        },
+      },
+      '⇉ All',
+    ),
+  ];
+}
+
+/** Columns are reordered by dragging their header and resized by dragging their right edge. */
+function makeColumnDraggable(el: HTMLElement, key: ColumnKey) {
+  const head = el.querySelector<HTMLElement>('.col-head')!;
+  head.addEventListener('dragstart', (e) => {
+    e.dataTransfer?.setData(COLUMN_DND_TYPE, key);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+    el.classList.add('dragging');
+  });
+  head.addEventListener('dragend', () => el.classList.remove('dragging'));
+
+  const clear = () => el.classList.remove('drop-before', 'drop-after');
+  el.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer?.types.includes(COLUMN_DND_TYPE)) return;
+    e.preventDefault();
+    const r = el.getBoundingClientRect();
+    const after = e.clientX > r.left + r.width / 2;
+    el.classList.toggle('drop-after', after);
+    el.classList.toggle('drop-before', !after);
+  });
+  el.addEventListener('dragleave', clear);
+  el.addEventListener('drop', (e) => {
+    const dragged = e.dataTransfer?.getData(COLUMN_DND_TYPE);
+    if (!dragged) return;
+    e.preventDefault();
+    const after = el.classList.contains('drop-after');
+    clear();
+    moveColumn(dragged, key, after);
+  });
+
+  el.querySelector<HTMLElement>('.col-resizer')!.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = el.offsetWidth;
+    let width = startW;
+    const move = (ev: MouseEvent) => {
+      width = Math.max(90, Math.min(700, startW + ev.clientX - startX));
+      el.style.flexBasis = `${width}px`;
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      document.body.classList.remove('resizing');
+      if (width !== startW) setColumnWidth(key, width);
+    };
+    document.body.classList.add('resizing');
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
   });
 }
 
@@ -315,17 +457,50 @@ function layoutColumns() {
   }
 }
 
+function boxActions(col: Column, s: Segment, code: Code | undefined): HTMLElement | null {
+  const kind = col.col.kind;
+  const btn = (label: string, title: string, fn: () => void) =>
+    h(
+      'button',
+      {
+        class: 'stripe-btn',
+        title,
+        onClick: (e: MouseEvent) => {
+          e.stopPropagation();
+          setHoverRange(null);
+          fn();
+        },
+      },
+      label,
+    );
+  if (kind === 'consolidated' || (kind === 'mine' && !project.consolidated)) {
+    return h('span', { class: 'stripe-actions' }, btn('✕', 'Remove this segment', () => deleteSegment(s.id)));
+  }
+  if (!project.consolidated || !code) return null;
+  if (isConsolidated(s, code.name)) {
+    return h('span', { class: 'stripe-actions always', title: 'Already in the consolidated coding' }, h('span', { class: 'stripe-ok' }, '✓'));
+  }
+  return h(
+    'span',
+    { class: 'stripe-actions' },
+    btn('＋', 'Accept into the consolidated coding', () =>
+      acceptIntoConsolidated([{ seg: s, code, source: col.col.name }]),
+    ),
+  );
+}
+
 function makeBox(doc: Doc, col: Column, s: Segment, top: number, bottom: number, lane: number, lanes: number) {
   const code = col.codes.get(s.codeId);
   const color = code?.color ?? '#9ca3af';
   const name = code?.name ?? '(unknown code)';
   const lines = lineLabel(doc, s.start, s.end);
   const excerpt = s.text.length > 300 ? s.text.slice(0, 300) + '…' : s.text;
+  const from = s.source ? ` · from ${s.source}` : '';
   return h(
     'div',
     {
       class: 'stripe',
-      title: `${name} · ${lines}\n\n${excerpt}`,
+      title: `${name} · ${lines}${from}\n\n${excerpt}`,
       style: {
         top: `${top}px`,
         height: `${bottom - top}px`,
@@ -338,9 +513,10 @@ function makeBox(doc: Doc, col: Column, s: Segment, top: number, bottom: number,
       onMouseleave: () => setHoverRange(null),
       onClick: () => {
         focusSegment(s.start, s.end);
-        if (col.mine) document.dispatchEvent(new CustomEvent('bct:segment-selected', { detail: s.id }));
+        if (col.col.kind === activeLayer()) document.dispatchEvent(new CustomEvent('bct:segment-selected', { detail: s.id }));
       },
     },
+    boxActions(col, s, code),
     h('span', { class: 'stripe-label' }, name),
     bottom - top >= 34 ? h('span', { class: 'stripe-lines' }, lines) : null,
   );
@@ -379,10 +555,12 @@ function openPopup(doc: Doc, start: number, end: number) {
   const color = h('input', { type: 'color', class: 'popup-color', value: nextColor(), title: 'Color for a new code' });
   const list = h('ul', { class: 'popup-list' });
   const applied = h('div', { class: 'popup-applied' });
+  const target = h('div', { class: 'popup-target' });
   const el = h(
     'div',
     { class: 'code-popup' },
     h('div', { class: 'popup-meta' }, `${lineLabel(doc, start, end)} · ${end - start} characters`),
+    target,
     h('div', { class: 'popup-row' }, color, input),
     list,
     applied,
@@ -396,14 +574,42 @@ function openPopup(doc: Doc, start: number, end: number) {
   el.style.left = `${Math.max(8, Math.min(last.left - grid.left, grid.width - width - 8))}px`;
   el.style.top = `${last.bottom - grid.top + 8}px`;
 
-  popup = { el, docId: doc.id, start, end, input, color, list, applied, items: [], exact: undefined, active: -1, counts: segmentCounts() };
+  popup = { el, docId: doc.id, start, end, input, color, list, applied, target, items: [], exact: undefined, active: -1, counts: segmentCounts() };
   setNamedHighlight('qc-pending', range, 10);
   input.addEventListener('input', refreshSuggestions);
   input.addEventListener('keydown', onPopupKey);
   refreshSuggestions();
+  renderTarget();
   renderApplied();
   input.focus({ preventScroll: true });
   el.scrollIntoView({ block: 'nearest' });
+}
+
+/** While consolidating, lets the user choose whether the code goes into their coding or the consolidated one. */
+function renderTarget() {
+  const p = popup;
+  if (!p) return;
+  if (!project.consolidated) return p.target.replaceChildren();
+  const option = (value: 'mine' | 'consolidated', label: string) =>
+    h(
+      'button',
+      {
+        class: 'seg-toggle' + (activeLayer() === value ? ' on' : ''),
+        onMousedown: (e: MouseEvent) => {
+          e.preventDefault();
+          ui.codeTarget = value;
+          commitUI();
+          renderTarget();
+          renderApplied();
+        },
+      },
+      label,
+    );
+  p.target.replaceChildren(
+    h('span', { class: 'muted' }, 'Code into'),
+    option('consolidated', 'Consolidated'),
+    option('mine', project.coderName || 'Your coding'),
+  );
 }
 
 export function closePopup() {
@@ -466,7 +672,7 @@ function renderPopupList() {
 function renderApplied() {
   const p = popup;
   if (!p) return;
-  const here = project.segments.filter((s) => s.docId === p.docId && s.start === p.start && s.end === p.end);
+  const here = layerSegments().filter((s) => s.docId === p.docId && s.start === p.start && s.end === p.end);
   p.applied.replaceChildren(
     ...(here.length ? [h('span', { class: 'muted' }, 'Applied: ')] : []),
     ...here.map((s) => {

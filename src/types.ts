@@ -29,6 +29,8 @@ export interface Segment {
   end: number;
   text: string;
   createdAt: string;
+  /** For consolidated segments: whose coding it was accepted from. */
+  source?: string;
 }
 
 /** The coding of another person, imported for side-by-side comparison. */
@@ -49,6 +51,22 @@ export interface Project {
   codes: Code[];
   segments: Segment[];
   externalCodings: ExternalCoding[];
+  /**
+   * The agreed coding built from all coders during consolidation (null = not started).
+   * Uses the same codebook as Project.codes.
+   */
+  consolidated: Segment[] | null;
+}
+
+/** 'me', 'consolidated', or the id of an ExternalCoding. */
+export type ColumnKey = string;
+
+export interface TableColumn {
+  key: ColumnKey;
+  kind: 'mine' | 'consolidated' | 'external';
+  name: string;
+  codes: Code[];
+  segments: Segment[];
 }
 
 export interface UIState {
@@ -59,4 +77,9 @@ export interface UIState {
   /** External codings that are hidden in the comparison view. */
   hiddenExternal: string[];
   segmentsHidden: boolean;
+  /** Order of the coder columns in the comparison view. */
+  columnOrder: ColumnKey[];
+  columnWidths: Record<ColumnKey, number>;
+  /** Which coding new codes go into while a consolidation is in progress. */
+  codeTarget: 'mine' | 'consolidated';
 }

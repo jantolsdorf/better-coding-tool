@@ -1,5 +1,5 @@
-import type { Code, Doc, ExternalCoding, Folder, Project, Segment, UIState } from './types';
-import { PALETTE } from './util';
+import type { Code, ColumnKey, Doc, ExternalCoding, Folder, Project, Segment, TableColumn, UIState } from './types';
+import { byName, PALETTE } from './util';
 
 const PROJECT_KEY = 'bct:project:v1';
 const UI_KEY = 'bct:ui:v1';
@@ -20,6 +20,7 @@ export function emptyProject(coderName = ''): Project {
     codes: [],
     segments: [],
     externalCodings: [],
+    consolidated: null,
   };
 }
 
@@ -45,6 +46,7 @@ export function parseProject(data: unknown): Project {
     codes: arr<Code>(d.codes),
     segments: arr<Segment>(d.segments).filter(validSegment),
     externalCodings,
+    consolidated: Array.isArray(d.consolidated) ? arr<Segment>(d.consolidated).filter(validSegment) : null,
   };
 }
 
@@ -65,6 +67,9 @@ function loadUI(): UIState {
     collapsed: [],
     hiddenExternal: [],
     segmentsHidden: false,
+    columnOrder: [],
+    columnWidths: {},
+    codeTarget: 'mine',
   };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(UI_KEY) ?? '{}') };
@@ -143,15 +148,31 @@ export function findCodeByName(name: string): Code | undefined {
   return project.codes.find((c) => c.name.toLowerCase() === n);
 }
 
-export function folderPath(folderId: string | null): string {
+/** Folder names from the top level down to `folderId`. */
+export function folderChain(folderId: string | null): string[] {
   const parts: string[] = [];
   let f = project.folders.find((x) => x.id === folderId);
-  while (f) {
+  while (f && parts.length < 100) {
     parts.unshift(f.name);
     const parent = f.parentId;
     f = project.folders.find((x) => x.id === parent);
   }
-  return parts.join(' / ');
+  return parts;
+}
+
+export function folderPath(folderId: string | null): string {
+  return folderChain(folderId).join(' / ');
+}
+
+/** All documents in the order the document tree shows them (folders first, then by name). */
+export function docsInTreeOrder(parentId: string | null = null): Doc[] {
+  return [
+    ...project.folders
+      .filter((f) => f.parentId === parentId)
+      .sort(byName)
+      .flatMap((f) => docsInTreeOrder(f.id)),
+    ...project.docs.filter((d) => d.folderId === parentId).sort(byName),
+  ];
 }
 
 function descendantFolderIds(id: string): Set<string> {
@@ -169,9 +190,10 @@ function descendantFolderIds(id: string): Set<string> {
   return out;
 }
 
+/** Segments per code in the active coding (yours, or the consolidated one while consolidating into it). */
 export function segmentCounts(): Map<string, number> {
   const m = new Map<string, number>();
-  for (const s of project.segments) m.set(s.codeId, (m.get(s.codeId) ?? 0) + 1);
+  for (const s of layerSegments()) m.set(s.codeId, (m.get(s.codeId) ?? 0) + 1);
   return m;
 }
 
@@ -218,6 +240,7 @@ export function renameFolder(id: string, name: string) {
 function removeDocsData(docIds: Set<string>) {
   project.docs = project.docs.filter((d) => !docIds.has(d.id));
   project.segments = project.segments.filter((s) => !docIds.has(s.docId));
+  if (project.consolidated) project.consolidated = project.consolidated.filter((s) => !docIds.has(s.docId));
   for (const x of project.externalCodings) x.segments = x.segments.filter((s) => !docIds.has(s.docId));
   if (ui.selectedDocId && docIds.has(ui.selectedDocId)) ui.selectedDocId = null;
 }
@@ -274,37 +297,45 @@ export function createCode(name: string, color = nextColor()): Code {
   return code;
 }
 
+/** The coding that new codes go into and that is highlighted in the text: yours or the consolidated one. */
+export function activeLayer(): 'mine' | 'consolidated' {
+  return project.consolidated && ui.codeTarget === 'consolidated' ? 'consolidated' : 'mine';
+}
+
+export function layerSegments(layer = activeLayer()): Segment[] {
+  return layer === 'consolidated' ? (project.consolidated ?? []) : project.segments;
+}
+
+function codeFor(name: string, colorForNew?: string): Code {
+  let code = findCodeByName(name);
+  if (!code) {
+    code = { id: uid('c'), name: name.trim(), color: colorForNew ?? nextColor() };
+    project.codes.push(code);
+  }
+  return code;
+}
+
+/** Adds a segment unless the same code is already applied to exactly this range. */
+function pushSegment(list: Segment[], doc: Doc, start: number, end: number, codeId: string, source?: string) {
+  if (list.some((s) => s.docId === doc.id && s.codeId === codeId && s.start === start && s.end === end)) return;
+  list.push({ id: uid('s'), docId: doc.id, codeId, start, end, text: doc.content.slice(start, end), createdAt: now(), source });
+}
+
 /** Codes the passage [start, end) of a document with the given code name, creating the code if needed. */
 export function applyCode(docId: string, start: number, end: number, codeName: string, colorForNew?: string) {
   const doc = getDoc(docId);
   const name = codeName.trim();
   if (!doc || !name) return null;
-  let code = findCodeByName(name);
-  if (!code) {
-    code = { id: uid('c'), name, color: colorForNew ?? nextColor() };
-    project.codes.push(code);
-  }
-  const codeId = code.id;
-  const duplicate = project.segments.some(
-    (s) => s.docId === docId && s.codeId === codeId && s.start === start && s.end === end,
-  );
-  if (!duplicate) {
-    project.segments.push({
-      id: uid('s'),
-      docId,
-      codeId,
-      start,
-      end,
-      text: doc.content.slice(start, end),
-      createdAt: now(),
-    });
-  }
+  const code = codeFor(name, colorForNew);
+  pushSegment(layerSegments(), doc, start, end, code.id);
   commit();
   return code;
 }
 
+/** Removes a segment from your coding or the consolidated coding (ids are unique across both). */
 export function deleteSegment(id: string) {
   project.segments = project.segments.filter((s) => s.id !== id);
+  if (project.consolidated) project.consolidated = project.consolidated.filter((s) => s.id !== id);
   commit();
 }
 
@@ -318,15 +349,13 @@ export function updateCode(id: string, patch: Partial<Omit<Code, 'id'>>) {
 export function deleteCode(id: string) {
   project.codes = project.codes.filter((c) => c.id !== id);
   project.segments = project.segments.filter((s) => s.codeId !== id);
+  if (project.consolidated) project.consolidated = project.consolidated.filter((s) => s.codeId !== id);
   commit();
 }
 
-/** Reassigns all segments of `fromId` to `intoId` and removes `fromId`. */
-export function mergeCode(fromId: string, intoId: string) {
-  const seen = new Set(
-    project.segments.filter((s) => s.codeId === intoId).map((s) => `${s.docId}:${s.start}:${s.end}`),
-  );
-  project.segments = project.segments.filter((s) => {
+function mergeIn(list: Segment[], fromId: string, intoId: string): Segment[] {
+  const seen = new Set(list.filter((s) => s.codeId === intoId).map((s) => `${s.docId}:${s.start}:${s.end}`));
+  return list.filter((s) => {
     if (s.codeId !== fromId) return true;
     const key = `${s.docId}:${s.start}:${s.end}`;
     if (seen.has(key)) return false;
@@ -334,6 +363,12 @@ export function mergeCode(fromId: string, intoId: string) {
     s.codeId = intoId;
     return true;
   });
+}
+
+/** Reassigns all segments of `fromId` to `intoId` and removes `fromId`. */
+export function mergeCode(fromId: string, intoId: string) {
+  project.segments = mergeIn(project.segments, fromId, intoId);
+  if (project.consolidated) project.consolidated = mergeIn(project.consolidated, fromId, intoId);
   project.codes = project.codes.filter((c) => c.id !== fromId);
   commit();
 }
@@ -388,6 +423,7 @@ export function renameExternal(id: string, name: string) {
 export function removeExternal(id: string) {
   project.externalCodings = project.externalCodings.filter((x) => x.id !== id);
   ui.hiddenExternal = ui.hiddenExternal.filter((x) => x !== id);
+  ui.columnOrder = ui.columnOrder.filter((x) => x !== id);
   commit();
 }
 
@@ -395,4 +431,104 @@ export function setExternalVisible(id: string, visible: boolean) {
   ui.hiddenExternal = ui.hiddenExternal.filter((x) => x !== id);
   if (!visible) ui.hiddenExternal.push(id);
   commitUI();
+}
+
+// ---------- comparison table ----------
+
+export const CONSOLIDATED_KEY = 'consolidated';
+export const MINE_KEY = 'me';
+
+/** The coder columns shown next to the text, in the user's chosen order. */
+export function tableColumns(): TableColumn[] {
+  const cols: TableColumn[] = [
+    { key: MINE_KEY, kind: 'mine', name: project.coderName || 'You', codes: project.codes, segments: project.segments },
+  ];
+  if (project.consolidated) {
+    cols.push({ key: CONSOLIDATED_KEY, kind: 'consolidated', name: 'Consolidated', codes: project.codes, segments: project.consolidated });
+  }
+  for (const x of project.externalCodings) {
+    if (!ui.hiddenExternal.includes(x.id)) {
+      cols.push({ key: x.id, kind: 'external', name: x.coderName, codes: x.codes, segments: x.segments });
+    }
+  }
+  // Columns not yet in the saved order go to the end, except a new consolidation, which starts next to the text.
+  const rank = (k: ColumnKey) => {
+    const i = ui.columnOrder.indexOf(k);
+    return i !== -1 ? i : k === CONSOLIDATED_KEY ? -1 : Infinity;
+  };
+  return cols
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => rank(a.c.key) - rank(b.c.key) || a.i - b.i)
+    .map((x) => x.c);
+}
+
+/** Moves column `key` directly before (or after) column `target`. */
+export function moveColumn(key: ColumnKey, target: ColumnKey, after: boolean) {
+  if (key === target) return;
+  const order = tableColumns().map((c) => c.key).filter((k) => k !== key);
+  const i = order.indexOf(target);
+  if (i === -1) return;
+  order.splice(after ? i + 1 : i, 0, key);
+  // Keep the positions of hidden coders so they come back where they were.
+  ui.columnOrder = [...order, ...ui.columnOrder.filter((k) => !order.includes(k) && k !== key)];
+  commitUI();
+}
+
+export function setColumnWidth(key: ColumnKey, width: number) {
+  ui.columnWidths[key] = Math.round(width);
+  commitUI();
+}
+
+// ---------- consolidation ----------
+
+export function startConsolidation() {
+  project.consolidated = [];
+  ui.codeTarget = 'consolidated';
+  ui.columnOrder = ui.columnOrder.filter((k) => k !== CONSOLIDATED_KEY);
+  commit();
+}
+
+export function discardConsolidation() {
+  project.consolidated = null;
+  ui.codeTarget = 'mine';
+  commit();
+}
+
+/**
+ * Makes the consolidated coding your coding. Your previous coding is kept as an
+ * "other coder" so nothing is lost and it can still be compared.
+ */
+export function finishConsolidation(): string {
+  if (!project.consolidated) return '';
+  const keptAs = `${project.coderName || 'You'} (before consolidation)`;
+  project.externalCodings = project.externalCodings.filter((x) => x.coderName !== keptAs);
+  const before = { id: uid('x'), coderName: keptAs, codes: project.codes.map((c) => ({ ...c })), segments: project.segments, importedAt: now() };
+  project.externalCodings.push(before);
+  ui.hiddenExternal.push(before.id);
+  project.segments = project.consolidated;
+  project.consolidated = null;
+  ui.codeTarget = 'mine';
+  commit();
+  return keptAs;
+}
+
+/** Whether the consolidated coding already has a code with this name on exactly this range. */
+export function isConsolidated(seg: Segment, codeName: string): boolean {
+  const code = findCodeByName(codeName);
+  return !!code && !!project.consolidated?.some(
+    (s) => s.docId === seg.docId && s.codeId === code.id && s.start === seg.start && s.end === seg.end,
+  );
+}
+
+/** Copies segments of a coder into the consolidated coding, matching codes by name. */
+export function acceptIntoConsolidated(items: { seg: Segment; code: Code; source: string }[]) {
+  if (!project.consolidated) return 0;
+  const before = project.consolidated.length;
+  for (const { seg, code, source } of items) {
+    const doc = getDoc(seg.docId);
+    if (!doc) continue;
+    pushSegment(project.consolidated, doc, seg.start, seg.end, codeFor(code.name, code.color).id, source);
+  }
+  commit();
+  return project.consolidated.length - before;
 }

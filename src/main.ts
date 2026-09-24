@@ -1,7 +1,7 @@
 import './style.css';
 import { addCodeUI, renderCodebook } from './codebook';
 import { renderCoders } from './coders';
-import { exportCSV, exportProject, importCoderUI, importProjectUI, newProjectUI } from './io';
+import { exportProject, exportSegmentsCSV, exportTableCSV, importCoderUI, importProjectUI, newProjectUI } from './io';
 import { SAMPLE_NAME, SAMPLE_TEXT } from './sample';
 import { initSegments, renderSegments } from './segments';
 import { addDocs, commit, project, savedBytes, subscribe, ui } from './store';
@@ -27,7 +27,15 @@ $('btn-add-code').addEventListener('click', addCodeUI);
 $('btn-import-coder').addEventListener('click', importCoderUI);
 $('btn-export-project').addEventListener('click', exportProject);
 $('btn-import-project').addEventListener('click', importProjectUI);
-$('btn-export-csv').addEventListener('click', exportCSV);
+const exportMenu = $('export-menu');
+$('btn-export-menu').addEventListener('click', (e) => {
+  e.stopPropagation();
+  exportMenu.hidden = !exportMenu.hidden;
+});
+document.addEventListener('click', () => (exportMenu.hidden = true));
+$('btn-export-table-current').addEventListener('click', () => exportTableCSV('current'));
+$('btn-export-table-all').addEventListener('click', () => exportTableCSV('all'));
+$('btn-export-segments').addEventListener('click', exportSegmentsCSV);
 $('btn-new-project').addEventListener('click', newProjectUI);
 $('btn-empty-add').addEventListener('click', addFilesUI);
 $('btn-sample').addEventListener('click', () => addDocs([{ name: SAMPLE_NAME, content: SAMPLE_TEXT }], ui.selectedFolderId));
@@ -52,7 +60,7 @@ function render() {
   keepScroll(codebookEl, () => renderCodebook(codebookEl));
   renderCoders(codersEl);
   renderViewer();
-  keepScroll(segmentsEl, () => renderSegments(segmentsEl, $('segments-count')));
+  keepScroll(segmentsEl, () => renderSegments(segmentsEl, $('segments-count'), $('segments-title')));
   if (document.activeElement !== coderInput) coderInput.value = project.coderName;
   const kb = savedBytes / 1024;
   saveStatus.textContent = savedBytes ? `Saved in browser · ${kb < 1024 ? `${kb.toFixed(0)} KB` : `${(kb / 1024).toFixed(1)} MB`}` : '';
