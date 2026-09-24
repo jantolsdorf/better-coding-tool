@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Better Coding Tool</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">Better Coding Tool</div>
+      <label class="coder-field">
+        Coder
+        <input id="coder-name" type="text" placeholder="Your name" />
+      </label>
+      <span id="save-status" class="muted small"></span>
+      <span class="grow"></span>
+      <button id="btn-import-project" class="btn" title="Replace the current project with an exported project file">Import project</button>
+      <button id="btn-export-project" class="btn primary" title="Download documents, codebook and coding as one JSON file">Export project</button>
+      <button id="btn-export-csv" class="btn" title="Download all coded segments as a spreadsheet">Export CSV</button>
+      <button id="btn-new-project" class="btn ghost-danger" title="Start over with an empty project">New</button>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panel docs">
+          <div class="panel-head">
+            <span class="grow">Documents</span>
+            <button id="btn-add-files" class="btn small" title="Add .txt files to the selected folder">+ Files</button>
+            <button id="btn-add-folder" class="btn small" title="Create a folder inside the selected folder">+ Folder</button>
+          </div>
+          <div id="tree" class="panel-body"></div>
+        </section>
+        <section class="panel codes">
+          <div class="panel-head">
+            <span class="grow">Codebook</span>
+            <button id="btn-add-code" class="btn small" title="Add a code without applying it">+ Code</button>
+          </div>
+          <div id="codebook" class="panel-body"></div>
+        </section>
+        <section class="panel coders">
+          <div class="panel-head">
+            <span class="grow">Other coders</span>
+            <button id="btn-import-coder" class="btn small" title="Import someone else's exported project to compare">Import…</button>
+          </div>
+          <div id="coders" class="panel-body"></div>
+        </section>
+      </aside>
+
+      <section id="viewer" class="viewer">
+        <div id="viewer-empty" class="viewer-empty">
+          <h2>Qualitative coding, in your browser</h2>
+          <ol>
+            <li>Add interview transcripts as <code>.txt</code> files (or drop them on the document list).</li>
+            <li>Open a document and highlight a passage.</li>
+            <li>Type a code and press <kbd>Enter</kbd>. Existing codes are suggested as you type.</li>
+            <li>Export your project to share it; import others’ exports to compare coding side by side.</li>
+          </ol>
+          <div class="row">
+            <button id="btn-empty-add" class="btn primary">Add .txt files</button>
+            <button id="btn-sample" class="btn">Try a sample interview</button>
+          </div>
+          <p class="muted small">Everything is stored in this browser’s local storage. Export regularly to keep a backup.</p>
+        </div>
+      </section>
+
+      <aside class="segments">
+        <div class="panel-head">
+          <span class="grow">Coded segments</span>
+          <span id="segments-count" class="badge"></span>
+        </div>
+        <div id="segments-list"></div>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
