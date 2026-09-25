@@ -1,6 +1,7 @@
 // The comparison table: which coder columns are shown next to the text, and in which order.
 
 import { allConsolidated, consolidationOf } from './layers';
+import { memosOf } from './memos';
 import { project, ui } from './state';
 import type { ColumnKey, TableColumn } from './types';
 
@@ -8,6 +9,8 @@ export const CONSOLIDATED_KEY = 'consolidated';
 export const MINE_KEY = 'me';
 /** The text column, which can be moved among the coder columns. */
 export const TEXT_KEY = 'text';
+/** The column with the open document's memos (sticky notes). */
+export const MEMOS_KEY = 'memos';
 
 /**
  * The coder columns shown next to the text, in the user's chosen order. The Consolidated column
@@ -36,19 +39,33 @@ export function tableColumns(docIds: (string | null)[] = [ui.selectedDocId]): Ta
     .map((x) => x.c);
 }
 
-/** Keys of all visible columns including the text column, in display order (text first by default). */
+/**
+ * Keys of all visible columns in display order: the coder columns plus the text column and,
+ * when the open document has memos, the memo column. By default the text comes first and the
+ * memos right after it.
+ */
 export function columnKeysInOrder(): ColumnKey[] {
   const keys = tableColumns().map((c) => c.key);
-  const textAt = ui.columnOrder.indexOf(TEXT_KEY);
-  if (textAt === -1) return [TEXT_KEY, ...keys];
-  // Put the text column right after the last column that comes before it in the saved order.
-  let pos = 0;
-  keys.forEach((k, i) => {
-    const saved = ui.columnOrder.indexOf(k);
-    if (saved !== -1 && saved < textAt) pos = i + 1;
-  });
-  keys.splice(pos, 0, TEXT_KEY);
+  insertAtSavedPosition(keys, TEXT_KEY, 0);
+  if (memosOf(ui.selectedDocId).length) insertAtSavedPosition(keys, MEMOS_KEY, keys.indexOf(TEXT_KEY) + 1);
   return keys;
+}
+
+/**
+ * Inserts `key` right after the last column that comes before it in the saved order, or at
+ * `defaultPos` if it has not been moved yet.
+ */
+function insertAtSavedPosition(keys: ColumnKey[], key: ColumnKey, defaultPos: number) {
+  const savedAt = ui.columnOrder.indexOf(key);
+  let pos = defaultPos;
+  if (savedAt !== -1) {
+    pos = 0;
+    keys.forEach((k, i) => {
+      const saved = ui.columnOrder.indexOf(k);
+      if (saved !== -1 && saved < savedAt) pos = i + 1;
+    });
+  }
+  keys.splice(pos, 0, key);
 }
 
 /**

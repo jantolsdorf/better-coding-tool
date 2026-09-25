@@ -28,7 +28,9 @@ npm run build      # produces a single self-contained dist/index.html
   Organise them in nested folders (**+ Folder**, or the ＋ on a folder). Drag documents and
   folders to move them. New files go into the selected folder.
 - **Coding**: open a document and highlight a passage. A small box opens below the selection;
-  type a code (existing codes are suggested) and press **Enter**. **Shift+Enter** applies the
+  type a code (existing codes are suggested) and press **Enter**. Pressing **Enter** without
+  typing anything creates an *in-vivo code* from the highlighted words (or applies it, if a code
+  with that name exists); **Tab** first puts the words into the box so you can shorten them. **Shift+Enter** applies the
   code and keeps the box open to add more codes to the same passage. **↑/↓** chooses a
   suggestion, **Tab** completes it, **Esc** cancels.
   Type `Level 1 code > Level 2 code` (more levels work too, and `›` is accepted) to create a
@@ -39,6 +41,15 @@ npm run build      # produces a single self-contained dist/index.html
   subcode's name still suggests it.
   If the passage overlaps a segment that already has the same code, no new segment is created:
   the existing segment is extended to cover both.
+  Type `?` or click **?** in the box for a short help on this syntax and the keys.
+- **Memos**: start the text in the box with `memo:` (e.g. `memo: follow up in round 2`) to
+  attach a memo to the passage instead of a code; `code:` forces a code (the default anyway).
+  A badge in the box shows whether you are about to create a **Code** or a **Memo**. Memos
+  appear as sticky notes in a *Memos* column next to the text (next to their passage; they can
+  be moved and resized like the other columns) and in the side list, and their passages are
+  underlined with dots. Click a sticky note to edit it (**Enter** saves, **Shift+Enter** adds a
+  line, **Esc** cancels; emptying it deletes the memo). The table CSV export has a *Memos*
+  column when a document has memos.
 - **Display**: coded passages are highlighted in the code's color. The column next to the text
   shows a bracket per segment spanning its first to last line; the right panel lists each
   segment with its line range (e.g. `L6–L8`) and text. Hover to highlight, click to jump.
@@ -124,6 +135,7 @@ notifies `renderApp`, which re-renders the views.
 | `model/coding.ts`, `segmentOps.ts` | Applying codes to passages (including extending overlapping segments) |
 | `model/layers.ts` | Which coding is active: yours or the open document's consolidation |
 | `model/coders.ts` | Other people's imported coding |
+| `model/memos.ts` | Memos (notes on passages) |
 | `model/table.ts` | Which coder columns are shown, and their order |
 | `model/consolidation.ts` | Per-document consolidation |
 | `model/codebookEntries.ts` | The codebook in portable form (codebook import/export) |
@@ -132,7 +144,8 @@ notifies `renderApp`, which re-renders the views.
 | **`src/controller/`** | User actions: ask and confirm, update the model, report the outcome |
 | `controller/documents.ts` | Adding, moving, renaming and deleting documents and folders |
 | `controller/codes.ts` | Codebook actions and the code details dialog's checks |
-| `controller/coding.ts` | Coding passages, removing segments |
+| `controller/coding.ts` | Reading what was typed in the code box (`memo:`, `code:`, `?`), coding passages |
+| `controller/memos.ts` | Adding, editing and deleting memos |
 | `controller/comparison.ts` | Other coders, consolidation, column order and widths |
 | `controller/transfer.ts` | All imports and exports |
 | `controller/preferences.ts`, `history.ts` | Coder name, theme, layout; undo/redo |

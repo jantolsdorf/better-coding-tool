@@ -36,6 +36,7 @@ function loadUI(): UIState {
     sidebarWidth: null,
     segmentsWidth: null,
     codeTarget: 'mine',
+    codeBoxHelp: false,
   };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(UI_KEY) ?? '{}') };

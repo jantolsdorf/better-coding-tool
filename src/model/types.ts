@@ -37,6 +37,21 @@ export interface Segment {
   source?: string;
 }
 
+/** A note attached to a passage of text, shown as a sticky note. */
+export interface Memo {
+  id: string;
+  docId: string;
+  /** Character offsets into Doc.content, end exclusive. */
+  start: number;
+  end: number;
+  /** The passage the memo is attached to. */
+  text: string;
+  /** The memo itself. */
+  note: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 /** The coding of another person, imported for side-by-side comparison. */
 export interface ExternalCoding {
   id: string;
@@ -54,6 +69,8 @@ export interface Project {
   docs: Doc[];
   codes: Code[];
   segments: Segment[];
+  /** Your memos (notes on passages). */
+  memos: Memo[];
   externalCodings: ExternalCoding[];
   /**
    * Agreed codings built from all coders, one per document being consolidated (keyed by
@@ -102,4 +119,6 @@ export interface UIState {
   segmentsWidth: number | null;
   /** Which coding new codes go into while a consolidation is in progress. */
   codeTarget: 'mine' | 'consolidated';
+  /** Whether the help section of the code box is open. */
+  codeBoxHelp: boolean;
 }

@@ -87,6 +87,7 @@ export function renameFolder(id: string, name: string) {
 function removeDocsData(docIds: Set<string>) {
   project.docs = project.docs.filter((d) => !docIds.has(d.id));
   project.segments = project.segments.filter((s) => !docIds.has(s.docId));
+  project.memos = project.memos.filter((m) => !docIds.has(m.docId));
   for (const id of docIds) delete project.consolidations[id];
   for (const x of project.externalCodings) x.segments = x.segments.filter((s) => !docIds.has(s.docId));
   if (ui.selectedDocId && docIds.has(ui.selectedDocId)) ui.selectedDocId = null;

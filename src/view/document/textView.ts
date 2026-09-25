@@ -4,6 +4,7 @@
 import { codeById } from '../../model/codes';
 import { layerSegments } from '../../model/layers';
 import { lineOf, lineStartsOf } from '../../model/lines';
+import { memosOf } from '../../model/memos';
 import { TEXT_KEY } from '../../model/table';
 import type { Doc } from '../../model/types';
 import { h, hexToRgba } from '../dom';
@@ -150,6 +151,14 @@ export function applyHighlights(doc: Doc | null) {
     css += `::highlight(${name}){background-color:${hexToRgba(code.color, 0.3)};}\n`;
   });
   dynStyle.textContent = css;
+  // Passages with a memo are underlined (styled in style.css), so they don't clash with code colors.
+  const memoRanges = memosOf(doc.id)
+    .filter((m) => m.end <= doc.content.length)
+    .map((m) => rangeFor(m.start, m.end));
+  if (memoRanges.length) {
+    registry!.set('qc-memo', new HighlightCtor!(...memoRanges));
+    hlNames.push('qc-memo');
+  }
 }
 
 export function setHoverRange(start: number | null, end = 0) {

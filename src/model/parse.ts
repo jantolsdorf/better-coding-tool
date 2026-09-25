@@ -1,6 +1,6 @@
 // Creating and validating projects (e.g. from files or local storage).
 
-import type { Code, Doc, ExternalCoding, Folder, Project, Segment } from './types';
+import type { Code, Doc, ExternalCoding, Folder, Memo, Project, Segment } from './types';
 
 export function emptyProject(coderName = ''): Project {
   return {
@@ -11,6 +11,7 @@ export function emptyProject(coderName = ''): Project {
     docs: [],
     codes: [],
     segments: [],
+    memos: [],
     externalCodings: [],
     consolidations: {},
   };
@@ -22,8 +23,10 @@ export function parseProject(data: unknown): Project {
   const d = data as Record<string, unknown>;
   if (d.format !== 'bct-project') throw new Error('This file is not a Better Coding Tool export.');
   const arr = <T>(x: unknown): T[] => (Array.isArray(x) ? (x as T[]) : []);
-  const validSegment = (s: Segment) =>
-    s && typeof s.docId === 'string' && Number.isInteger(s.start) && Number.isInteger(s.end) && s.start >= 0 && s.end > s.start;
+  // A passage of a document: [start, end) with start < end.
+  const validRange = (r: { docId: unknown; start: unknown; end: unknown } | null) =>
+    !!r && typeof r.docId === 'string' && Number.isInteger(r.start) && Number.isInteger(r.end) && (r.start as number) >= 0 && (r.end as number) > (r.start as number);
+  const validSegment = (s: Segment) => validRange(s);
   const externalCodings = arr<ExternalCoding>(d.externalCodings).map((x) => ({
     ...x,
     codes: arr<Code>(x.codes),
@@ -37,6 +40,7 @@ export function parseProject(data: unknown): Project {
     docs: arr<Doc>(d.docs).filter((doc) => typeof doc?.content === 'string'),
     codes: arr<Code>(d.codes),
     segments: arr<Segment>(d.segments).filter(validSegment),
+    memos: arr<Memo>(d.memos).filter((m) => validRange(m) && typeof m.note === 'string'),
     externalCodings,
     consolidations: parseConsolidations(d, validSegment),
   };

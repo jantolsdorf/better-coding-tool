@@ -10,14 +10,16 @@ import {
   setColumnWidth,
 } from '../../controller/comparison';
 import { removeSegment } from '../../controller/coding';
+import { editMemo, removeMemo } from '../../controller/memos';
 import { codePathParts } from '../../model/codes';
 import { isConsolidated } from '../../model/consolidation';
 import { currentDoc } from '../../model/documents';
 import { activeLayer, consolidationOf } from '../../model/layers';
 import { lineLabel } from '../../model/lines';
 import { ui } from '../../model/state';
-import { columnKeysInOrder, tableColumns, TEXT_KEY } from '../../model/table';
-import type { Code, ColumnKey, Doc, Segment, TableColumn } from '../../model/types';
+import { memosOf } from '../../model/memos';
+import { columnKeysInOrder, MEMOS_KEY, tableColumns, TEXT_KEY } from '../../model/table';
+import type { Code, ColumnKey, Doc, Memo, Segment, TableColumn } from '../../model/types';
 import { h, hexToRgba } from '../dom';
 import { focusSegment, gridEl, rangeFor, renderedContent, renderedDocId, setHoverRange } from './textView';
 
@@ -31,10 +33,12 @@ interface Column {
 const COLUMN_DND_TYPE = 'application/x-bct-column';
 
 let columns: Column[] = [];
+let memoBody: HTMLElement | null = null;
 let layoutQueued = false;
 
 export function buildColumns(doc: Doc) {
   gridEl.querySelectorAll('.coder-col').forEach((c) => c.remove());
+  memoBody = null;
   columns = tableColumns().map((col) => {
     const segs = col.segments.filter((s) => s.docId === doc.id);
     const codes = new Map(col.codes.map((c) => [c.id, c]));
@@ -60,6 +64,7 @@ export function buildColumns(doc: Doc) {
     gridEl.append(el);
     return { col, segs, codes, body };
   });
+  buildMemoColumn(doc);
   // Visual order (the DOM keeps the text first); the text stays pinned while it is the first column.
   const keys = columnKeysInOrder();
   for (const el of gridEl.querySelectorAll<HTMLElement>('.text-col, .coder-col')) {
@@ -214,6 +219,119 @@ export function layoutColumns() {
     flush();
     col.body.replaceChildren(...boxes);
   }
+  layoutMemos(doc);
+}
+
+// ---------- memos (sticky notes) ----------
+
+/** The column with the document's memos; only shown when there are any. */
+function buildMemoColumn(doc: Doc) {
+  const memos = memosOf(doc.id);
+  if (!memos.length) return;
+  memoBody = h('div', { class: 'col-body' });
+  const el = h(
+    'div',
+    { class: 'coder-col memo-col', 'data-key': MEMOS_KEY },
+    h(
+      'div',
+      { class: 'col-head', title: 'Memos — drag to reorder', draggable: true },
+      h('span', { class: 'grip' }, '⋮⋮'),
+      h('span', { class: 'col-name' }, 'Memos'),
+      h('span', { class: 'badge' }, String(memos.length)),
+    ),
+    memoBody,
+    h('div', { class: 'col-resizer', title: 'Drag to resize' }),
+  );
+  const width = ui.columnWidths[MEMOS_KEY];
+  if (width) setFixedWidth(el, width);
+  makeColumnDraggable(el, MEMOS_KEY);
+  makeResizable(el, (w) => setColumnWidth(MEMOS_KEY, w), 120, 700);
+  gridEl.append(el);
+}
+
+/** Places each sticky note next to its passage, pushing notes down so they never overlap. */
+function layoutMemos(doc: Doc) {
+  if (!memoBody) return;
+  const body = memoBody;
+  const base = body.getBoundingClientRect().top;
+  const notes = memosOf(doc.id)
+    .filter((m) => m.end <= renderedContent.length)
+    .map((m) => ({ m, top: rangeFor(m.start, m.end).getBoundingClientRect().top - base }))
+    .sort((a, b) => a.top - b.top);
+  body.replaceChildren(...notes.map(({ m }) => stickyNote(doc, m)));
+  let bottom = 0;
+  notes.forEach(({ top }, i) => {
+    const el = body.children[i] as HTMLElement;
+    const y = Math.max(top, bottom + (i ? 6 : 0));
+    el.style.top = `${y}px`;
+    bottom = y + el.offsetHeight;
+  });
+}
+
+function stickyNote(doc: Doc, m: Memo): HTMLElement {
+  const text = h('div', { class: 'sticky-text', title: 'Click to edit' }, m.note);
+  const note = h(
+    'div',
+    {
+      class: 'sticky',
+      onMouseenter: () => setHoverRange(m.start, m.end),
+      onMouseleave: () => setHoverRange(null),
+    },
+    h(
+      'div',
+      { class: 'sticky-head' },
+      h('button', { class: 'sticky-lines', title: 'Show the passage', onClick: () => focusSegment(m.start, m.end) }, lineLabel(doc, m.start, m.end)),
+      h(
+        'button',
+        {
+          class: 'stripe-btn',
+          title: 'Delete memo',
+          onClick: (e: MouseEvent) => {
+            e.stopPropagation();
+            setHoverRange(null);
+            removeMemo(m.id);
+          },
+        },
+        '✕',
+      ),
+    ),
+    text,
+  );
+  text.addEventListener('click', () => editInPlace(note, text, m));
+  return note;
+}
+
+/** Turns a sticky note's text into a text field: Enter saves, Shift+Enter adds a line, Esc cancels. */
+function editInPlace(note: HTMLElement, text: HTMLElement, m: Memo) {
+  if (note.querySelector('textarea')) return;
+  const area = h('textarea', { class: 'sticky-edit', rows: 3 });
+  area.value = m.note;
+  const grow = () => {
+    area.style.height = 'auto';
+    area.style.height = `${area.scrollHeight}px`;
+  };
+  let done = false;
+  const finish = (save: boolean) => {
+    if (done) return;
+    done = true;
+    if (save && area.value.trim() !== m.note) editMemo(m.id, area.value);
+    else area.replaceWith(text);
+  };
+  area.addEventListener('input', grow);
+  area.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      finish(true);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      finish(false);
+    }
+  });
+  area.addEventListener('blur', () => finish(true));
+  text.replaceWith(area);
+  grow();
+  area.focus();
+  area.setSelectionRange(area.value.length, area.value.length);
 }
 
 function boxActions(col: Column, s: Segment, code: Code | undefined): HTMLElement | null {

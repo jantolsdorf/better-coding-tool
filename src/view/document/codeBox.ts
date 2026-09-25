@@ -1,6 +1,9 @@
-// The box that opens below a text selection to type (or choose) a code for it.
+// The box that opens below a text selection. Typing a name applies a code (existing codes are
+// suggested); "memo: …" adds a memo instead, and "code: …" forces a code. Everything works from
+// the keyboard, so coding a passage takes no clicks beyond the selection.
 
-import { codePassage, setCodeTarget } from '../../controller/coding';
+import { codePassage, inVivoName, parseEntry, setCodeBoxHelp, setCodeTarget, type Entry } from '../../controller/coding';
+import { addMemoToPassage } from '../../controller/memos';
 import {
   codeById,
   codePath,
@@ -16,7 +19,8 @@ import {
 import { currentDoc } from '../../model/documents';
 import { activeLayer, consolidationOf, layerSegments } from '../../model/layers';
 import { lineLabel } from '../../model/lines';
-import { project } from '../../model/state';
+import { memosOf } from '../../model/memos';
+import { project, ui } from '../../model/state';
 import type { Code, Doc } from '../../model/types';
 import { h, hexToRgba } from '../dom';
 import { gridEl, pointToOffset, rangeFor, renderedDocId, setNamedHighlight, textBody } from './textView';
@@ -28,9 +32,15 @@ interface Popup {
   end: number;
   input: HTMLInputElement;
   color: HTMLInputElement;
+  kind: HTMLElement;
   list: HTMLUListElement;
   applied: HTMLElement;
   target: HTMLElement;
+  help: HTMLElement;
+  hint: HTMLElement;
+  entry: Entry;
+  /** The name an in-vivo code would get (the passage's own words), used when nothing is typed. */
+  inVivo: string;
   items: Code[];
   exact: Code | undefined;
   /** Whether a code exists at exactly the typed path (then no "Create" option is shown). */
@@ -74,7 +84,7 @@ function openCodeBox(doc: Doc, start: number, end: number) {
   const input = h('input', {
     type: 'text',
     class: 'popup-input',
-    placeholder: 'Type a code…  (Parent > Child for a subcode)',
+    placeholder: 'Type a code, or memo: …   (? for help)',
     autocomplete: 'off',
     spellcheck: 'false',
   });
@@ -85,18 +95,42 @@ function openCodeBox(doc: Doc, start: number, end: number) {
     title: 'Color for a new code (subcodes use their level 1 code’s color)',
   });
   color.addEventListener('input', renderList);
+  const kind = h('span', { class: 'entry-kind' });
   const list = h('ul', { class: 'popup-list' });
   const applied = h('div', { class: 'popup-applied' });
   const target = h('div', { class: 'popup-target' });
+  const help = helpSection(() => {
+    // Typing "?" also opens the help; closing it clears that.
+    if (popup?.entry.help) input.value = '';
+    setCodeBoxHelp(false);
+    refreshSuggestions();
+    input.focus({ preventScroll: true });
+  });
+  const hint = h('div', { class: 'popup-hint' });
+  const helpToggle = h(
+    'button',
+    {
+      class: 'icon-btn help-toggle',
+      title: 'Show or hide help (or type ?)',
+      onMousedown: (e: MouseEvent) => {
+        e.preventDefault();
+        setCodeBoxHelp(!ui.codeBoxHelp);
+        renderHelp();
+        input.focus({ preventScroll: true });
+      },
+    },
+    '?',
+  );
   const el = h(
     'div',
     { class: 'code-popup' },
-    h('div', { class: 'popup-meta' }, `${lineLabel(doc, start, end)} · ${end - start} characters`),
+    h('div', { class: 'popup-meta' }, kind, h('span', { class: 'grow' }, `${lineLabel(doc, start, end)} · ${end - start} characters`), helpToggle),
     target,
     h('div', { class: 'popup-row' }, color, input),
     list,
     applied,
-    h('div', { class: 'popup-hint' }, '↵ apply · ⇧↵ apply & add another · ↑↓ choose · Esc cancel'),
+    help,
+    hint,
   );
   gridEl.append(el);
 
@@ -106,7 +140,11 @@ function openCodeBox(doc: Doc, start: number, end: number) {
   el.style.left = `${Math.max(8, Math.min(last.left - grid.left, grid.width - width - 8))}px`;
   el.style.top = `${last.bottom - grid.top + 8}px`;
 
-  popup = { el, docId: doc.id, start, end, input, color, list, applied, target, items: [], exact: undefined, pathExists: false, active: -1, counts: segmentCounts() };
+  popup = {
+    el, docId: doc.id, start, end, input, color, kind, list, applied, target, help, hint,
+    entry: parseEntry(''), inVivo: inVivoName(doc.content.slice(start, end)),
+    items: [], exact: undefined, pathExists: false, active: -1, counts: segmentCounts(),
+  };
   setNamedHighlight('qc-pending', range, 10);
   input.addEventListener('input', refreshSuggestions);
   input.addEventListener('keydown', onKey);
@@ -122,6 +160,62 @@ export function closeCodeBox() {
   popup.el.remove();
   popup = null;
   setNamedHighlight('qc-pending', null, 0);
+}
+
+/** Explains what can be typed in the box. */
+function helpSection(onClose: () => void): HTMLElement {
+  const row = (syntax: string, meaning: string) => h('div', { class: 'help-row' }, h('code', {}, syntax), h('span', {}, meaning));
+  return h(
+    'div',
+    { class: 'popup-help' },
+    h(
+      'button',
+      {
+        class: 'icon-btn help-close',
+        title: 'Close help',
+        onMousedown: (e: MouseEvent) => {
+          e.preventDefault();
+          onClose();
+        },
+      },
+      '✕',
+    ),
+    h('div', { class: 'help-title' }, 'What you can type'),
+    row('(nothing)', 'an in-vivo code: the highlighted words become the code'),
+    row('code', 'apply a code (existing codes are suggested as you type)'),
+    row('parent code > subcode', 'a subcode; missing parent codes are created, and it takes the parent code’s color'),
+    row('parent code >', 'list the subcodes of a code'),
+    row('memo: note', 'add a memo (a sticky note) instead of a code'),
+    row('code: memo…', 'force a code, e.g. one whose name starts with “memo”'),
+    h('div', { class: 'help-title' }, 'Keys'),
+    row('↵', 'apply the code or save the memo, and close'),
+    row('⇧↵', 'apply and keep the box open to add another code or memo'),
+    row('↑ ↓', 'choose a suggestion'),
+    row('Tab', 'complete the suggestion, or (with nothing typed) put the highlighted words in the box to edit them'),
+    row('Esc', 'close without changes'),
+  );
+}
+
+function renderHelp() {
+  const p = popup;
+  if (!p) return;
+  p.help.hidden = !(ui.codeBoxHelp || p.entry.help);
+}
+
+/** Shows whether the box currently creates a code or a memo. */
+function renderKind() {
+  const p = popup;
+  if (!p) return;
+  const memo = p.entry.kind === 'memo';
+  p.kind.textContent = memo ? 'Memo' : 'Code';
+  p.kind.className = 'entry-kind ' + (memo ? 'memo' : 'code');
+  p.kind.title = memo ? 'Saves a memo (sticky note). Remove “memo:” to apply a code.' : 'Applies a code. Start with “memo:” to add a memo instead.';
+  p.el.classList.toggle('memo-mode', memo);
+  p.hint.textContent = memo
+    ? '↵ save memo · ⇧↵ save & add another · Esc cancel'
+    : p.entry.text.trim()
+      ? '↵ apply · ⇧↵ apply & add another · ↑↓ choose · Esc cancel'
+      : '↵ in-vivo code · type to find or create a code · ? help · Esc cancel';
 }
 
 /** While consolidating, lets the user choose whether the code goes into their coding or the consolidated one. */
@@ -151,9 +245,20 @@ function renderTarget() {
 }
 
 function refreshSuggestions() {
-  if (!popup) return;
+  const p = popup;
+  if (!p) return;
+  p.entry = parseEntry(p.input.value);
+  renderKind();
+  renderHelp();
+  if (p.entry.kind === 'memo' || p.entry.help) {
+    p.items = [];
+    p.exact = undefined;
+    p.pathExists = false;
+    p.active = -1;
+    return renderList();
+  }
   // Codes can be found by name ("dist") or by path ("trust > dist"); "trust >" lists Trust's subcodes.
-  const typed = popup.input.value;
+  const typed = p.entry.text;
   const parts = splitCodePath(typed);
   const trailing = /[>›]\s*$/.test(typed);
   const last = trailing ? '' : (parts.at(-1) ?? '').toLowerCase();
@@ -162,29 +267,41 @@ function refreshSuggestions() {
     const n = c.name.toLowerCase();
     return c === exactPath ? 0 : n === last ? 1 : n.startsWith(last) ? 2 : 3;
   };
-  popup.items = project.codes
+  p.items = project.codes
     .filter((c) => matchesCodeQuery(c, typed))
     .sort((a, b) => rank(a) - rank(b) || codePath(a).localeCompare(codePath(b)))
     // All matches are listed; the list scrolls. The cap only keeps huge codebooks responsive.
     .slice(0, 300);
-  popup.pathExists = !!exactPath;
+  p.pathExists = !!exactPath;
   // A single name also picks an existing subcode of that name by default (it stays findable),
   // while "Create" is still offered for a new top-level code.
-  popup.exact = exactPath ?? (parts.length === 1 && !trailing ? popup.items.find((c) => c.name.toLowerCase() === last) : undefined);
-  popup.active = popup.exact ? popup.items.indexOf(popup.exact) : -1;
+  p.exact = exactPath ?? (parts.length === 1 && !trailing ? p.items.find((c) => c.name.toLowerCase() === last) : undefined);
+  p.active = p.exact ? p.items.indexOf(p.exact) : -1;
   renderList();
 }
 
 function renderList() {
   const p = popup;
   if (!p) return;
-  const q = p.input.value.trim();
+  const q = p.entry.text.trim();
   const pick = (i: number) => (e: MouseEvent) => {
     e.preventDefault();
     p.active = i;
     apply(e.shiftKey);
   };
+  if (p.entry.help) return p.list.replaceChildren();
+  if (p.entry.kind === 'memo') {
+    p.list.replaceChildren(
+      q
+        ? h('li', { class: 'create memo active', onMousedown: pick(-1) }, h('span', { class: 'swatch memo-swatch' }), h('span', { class: 'grow' }, `Add memo “${q}”`))
+        : h('li', { class: 'empty' }, 'Type your memo after “memo:”.'),
+    );
+    return;
+  }
+  // Nothing typed: Enter uses the highlighted words as an in-vivo code.
+  const inVivo = !q && p.inVivo ? inVivoRow(p, pick(-1)) : null;
   p.list.replaceChildren(
+    ...(inVivo ? [inVivo] : []),
     ...p.items.map((c, i) =>
       h(
         'li',
@@ -222,34 +339,55 @@ function renderList() {
     );
   }
   if (!p.items.length && !q) {
-    p.list.append(h('li', { class: 'empty' }, 'No codes yet — type a name to create one, or “Parent > Child” for a subcode.'));
+    p.list.append(h('li', { class: 'empty' }, 'Or type a code name, “parent code > subcode”, or “memo: …”. Type ? for help.'));
   }
   p.list.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
 }
 
+/** The "in-vivo code" option: the highlighted words as the code name (reusing such a code if it exists). */
+function inVivoRow(p: Popup, onPick: (e: MouseEvent) => void): HTMLElement {
+  const existing = findChildCode(null, p.inVivo);
+  return h(
+    'li',
+    { class: 'create invivo' + (p.active === -1 ? ' active' : ''), onMousedown: onPick, title: 'Press Enter to use the highlighted words as the code' },
+    h('span', { class: 'swatch', style: { background: existing?.color ?? p.color.value } }),
+    h('span', { class: 'grow' }, `${existing ? 'Apply' : 'Create'} in-vivo code “${p.inVivo}”`),
+    h('kbd', {}, '↵'),
+  );
+}
+
+/** Codes and memos already on the whole selected passage (possibly as part of a larger one). */
 function renderApplied() {
   const p = popup;
   if (!p) return;
-  // Codes already covering the whole selected passage (possibly as part of a larger segment).
-  const here = layerSegments().filter((s) => s.docId === p.docId && s.start <= p.start && s.end >= p.end);
+  const covers = (x: { start: number; end: number }) => x.start <= p.start && x.end >= p.end;
+  const here = layerSegments().filter((s) => s.docId === p.docId && covers(s));
+  const memos = memosOf(p.docId).filter(covers);
   p.applied.replaceChildren(
-    ...(here.length ? [h('span', { class: 'muted' }, 'Already coded: ')] : []),
+    ...(here.length || memos.length ? [h('span', { class: 'muted' }, 'Already here: ')] : []),
     ...here.map((s) => {
       const c = codeById(s.codeId);
       return c ? h('span', { class: 'chip', style: { background: hexToRgba(c.color, 0.25) } }, c.name) : '';
     }),
+    ...memos.map((m) => h('span', { class: 'chip memo-chip', title: m.note }, m.note.length > 40 ? m.note.slice(0, 40) + '…' : m.note)),
   );
 }
 
 function apply(keepOpen: boolean) {
   const p = popup;
   if (!p) return;
-  // A chosen suggestion is applied by its full path, so codes with the same name stay distinct.
-  const chosen = p.active >= 0 ? p.items[p.active] : undefined;
-  const name = chosen ? codePath(chosen) : p.input.value.trim();
-  if (!splitCodePath(name).length) return;
-  codePassage(p.docId, p.start, p.end, name, p.color.value);
+  if (p.entry.kind === 'memo') {
+    if (!addMemoToPassage(p.docId, p.start, p.end, p.entry.text)) return;
+  } else {
+    // A chosen suggestion is applied by its full path, so codes with the same name stay distinct.
+    const chosen = p.active >= 0 ? p.items[p.active] : undefined;
+    // Nothing typed and no suggestion chosen: an in-vivo code from the highlighted words.
+    const name = chosen ? codePath(chosen) : p.entry.text.trim() || p.inVivo;
+    if (!splitCodePath(name).length) return;
+    codePassage(p.docId, p.start, p.end, name, p.color.value);
+  }
   if (!keepOpen) return closeCodeBox();
+  // Ready for the next code (a memo prefix is not kept: codes are the default).
   p.input.value = '';
   p.color.value = nextColor();
   p.counts = segmentCounts();
@@ -271,7 +409,12 @@ function onKey(e: KeyboardEvent) {
     renderList();
   } else if (e.key === 'Tab' && p.active >= 0) {
     e.preventDefault();
-    p.input.value = p.items[p.active].name;
+    p.input.value = p.entry.prefix + p.items[p.active].name;
+    refreshSuggestions();
+  } else if (e.key === 'Tab' && p.entry.kind === 'code' && !p.entry.text.trim() && p.inVivo) {
+    // Put the in-vivo name into the box to edit it before applying.
+    e.preventDefault();
+    p.input.value = p.entry.prefix + p.inVivo;
     refreshSuggestions();
   } else if (e.key === 'Enter') {
     e.preventDefault();
