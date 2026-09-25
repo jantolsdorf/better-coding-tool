@@ -22,6 +22,7 @@ import {
   replaceProject,
   tableColumns,
 } from './store';
+import { buildQdpx, isQdpx, parseQdpx } from './refi';
 import type { Code, Doc, Project, Segment } from './types';
 import { byName, downloadFile, lineSpan, pickFiles, safeFileName, toast } from './util';
 
@@ -29,19 +30,70 @@ const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
-const PROJECT_FILES = '.zip,.json,application/zip,application/json';
+const PROJECT_FILES = '.zip,.json,.qdpx,application/zip,application/json';
 const PROJECT_JSON = 'project.json';
 
-/** Reads a project from an exported .zip (via its project.json) or a plain .json file. */
-async function readProjectFile(file: File): Promise<Project> {
-  return parseProject(await readJsonFile(file));
+const isZip = (bytes: Uint8Array) => bytes[0] === 0x50 && bytes[1] === 0x4b;
+
+/** File names inside a zip, without unpacking it. */
+function zipNames(bytes: Uint8Array): string[] {
+  const names: string[] = [];
+  try {
+    unzipSync(bytes, {
+      filter: (f) => {
+        names.push(f.name);
+        return false;
+      },
+    });
+  } catch {
+    throw new Error('The zip file could not be read.');
+  }
+  return names;
+}
+
+/** Thrown when the user cancels a question during import; not reported as an error. */
+class ImportCancelled extends Error {}
+
+const importFailed = (file: File, e: unknown) => {
+  if (!(e instanceof ImportCancelled)) alert(`Could not import “${file.name}”: ${(e as Error).message}`);
+};
+
+/** Why a REFI-QDA project is being read: to open it, or to compare with one of its coders. */
+type QdpxPurpose = 'open' | 'compare';
+
+/** Reads a project: an exported .zip (via its project.json), a plain .json, or a REFI-QDA .qdpx. */
+async function readProjectFile(file: File, purpose: QdpxPurpose = 'open'): Promise<Project> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (isZip(bytes) && isQdpx(zipNames(bytes))) return readQdpx(bytes, file.name, purpose);
+  return parseProject(readJson(bytes));
+}
+
+/** Converts a REFI-QDA project, asking whose coding to use when several people coded it. */
+function readQdpx(bytes: Uint8Array, fileName: string, purpose: QdpxPurpose): Project {
+  const { project: p, skipped } = parseQdpx(bytes, (users) => {
+    const list = users.map((u, i) => `${i + 1}) ${u.name} — ${u.codings} coding${u.codings === 1 ? '' : 's'}`).join('\n');
+    const question =
+      purpose === 'open'
+        ? `“${fileName}” contains coding by ${users.length} people. Which one are you?\n` +
+          'Everyone else is added under “Other coders” for comparison.\n\n' +
+          `${list}\n\nEnter a number (or 0 if you are none of them):`
+        : `“${fileName}” contains coding by ${users.length} people. Whose coding do you want to compare with yours?\n\n` +
+          `${list}\n\nEnter a number:`;
+    const answer = prompt(question, '1');
+    if (answer === null) throw new ImportCancelled();
+    return users[Number(answer) - 1]?.guid ?? null;
+  });
+  if (skipped.sources) {
+    toast(`Skipped ${skipped.sources} source(s) that are not text documents (e.g. PDFs, images, audio or video).`, 6000);
+  }
+  if (skipped.selections) toast(`Skipped ${skipped.selections} coding(s) that refer to a code missing from the codebook.`, 6000);
+  return p;
 }
 
 /** Parses a .json file, or the project.json inside an exported .zip. */
-async function readJsonFile(file: File): Promise<unknown> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
+function readJson(bytes: Uint8Array): unknown {
   let text: string;
-  if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
+  if (isZip(bytes)) {
     let entries: Record<string, Uint8Array>;
     try {
       entries = unzipSync(bytes, { filter: (f) => f.name.split('/').pop() === PROJECT_JSON });
@@ -119,14 +171,20 @@ export async function importCodebookUI() {
   if (!file) return;
   let entries: CodebookEntry[];
   try {
-    const data = await readJsonFile(file);
-    const d = data as { format?: string; codes?: unknown };
-    entries =
-      d?.format === CODEBOOK_FORMAT && Array.isArray(d.codes)
-        ? (d.codes as CodebookEntry[])
-        : codebookEntries(parseProject(data).codes);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (isZip(bytes) && isQdpx(zipNames(bytes))) {
+      // Only the codebook of a REFI-QDA project is needed, so no coder has to be chosen.
+      entries = codebookEntries(parseQdpx(bytes, () => null).project.codes);
+    } else {
+      const data = readJson(bytes);
+      const d = data as { format?: string; codes?: unknown };
+      entries =
+        d?.format === CODEBOOK_FORMAT && Array.isArray(d.codes)
+          ? (d.codes as CodebookEntry[])
+          : codebookEntries(parseProject(data).codes);
+    }
   } catch (e) {
-    return alert(`Could not import “${file.name}”: ${(e as Error).message}`);
+    return importFailed(file, e);
   }
   if (!entries.length) return toast('The codebook is empty.');
   const valid = entries.filter((e) => typeof e?.name === 'string');
@@ -147,6 +205,12 @@ export async function importCodebookUI() {
  * The whole project as a zip: project.json (everything, re-importable), every text file in its
  * folder structure under documents/, and the codebook as CSV.
  */
+/** The project in the REFI-QDA exchange format, for MAXQDA, NVivo, ATLAS.ti and others. */
+export function exportQdpx() {
+  const who = safeFileName(project.coderName || 'project');
+  downloadFile(`coding-${who}-${today()}.qdpx`, buildQdpx(), 'application/zip');
+}
+
 export function exportProject() {
   const files: Record<string, Uint8Array> = {
     [PROJECT_JSON]: strToU8(JSON.stringify(project, null, 1)),
@@ -205,7 +269,7 @@ export async function importProjectUI() {
     replaceProject(p);
     toast(`Loaded ${p.docs.length} document(s), ${p.codes.length} code(s), ${p.segments.length} segment(s).`);
   } catch (e) {
-    alert(`Could not import “${file.name}”: ${(e as Error).message}`);
+    importFailed(file, e);
   }
 }
 
@@ -220,9 +284,9 @@ export async function importCoderUI() {
   for (const file of files) {
     let src: Project;
     try {
-      src = await readProjectFile(file);
+      src = await readProjectFile(file, 'compare');
     } catch (e) {
-      alert(`Could not import “${file.name}”: ${(e as Error).message}`);
+      importFailed(file, e);
       continue;
     }
     const suggested = src.coderName || file.name.replace(/\.(json|zip)$/i, '');

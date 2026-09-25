@@ -4,6 +4,7 @@ import { renderCoders } from './coders';
 import {
   exportCodebook,
   exportProject,
+  exportQdpx,
   exportSegmentsCSV,
   exportTableCSV,
   importCodebookUI,
@@ -41,6 +42,8 @@ $('btn-import-coder-top').addEventListener('click', importCoderUI);
 $('btn-import-codebook-top').addEventListener('click', importCodebookUI);
 $('btn-export-project').addEventListener('click', exportProject);
 $('btn-import-project').addEventListener('click', importProjectUI);
+$('btn-import-qdpx').addEventListener('click', importProjectUI);
+$('btn-export-qdpx').addEventListener('click', exportQdpx);
 
 const codeSearch = $<HTMLInputElement>('code-search');
 const codeSort = $<HTMLSelectElement>('code-sort');

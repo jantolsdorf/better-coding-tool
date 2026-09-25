@@ -68,7 +68,19 @@ npm run build      # produces a single self-contained dist/index.html
 
   **Import ▾ → Project** replaces the current project with such a `.zip` (or a `.json` from older
   versions).
-- **Export CSV ▾**
+- **REFI-QDA (.qdpx)**, the open exchange standard supported by MAXQDA, NVivo, ATLAS.ti,
+  QualCoder and others:
+  - *Other formats ▾ → REFI-QDA project* exports all documents, the codebook (with hierarchy,
+    colors and descriptions) and the coding of every coder as separate users. Other coders'
+    codes are merged into one codebook by path; folders become sets named by their path.
+  - *Import ▾ → REFI-QDA project* opens a `.qdpx` (in MAXQDA: *Home → Save Project As →
+    REFI-QDA Project*). If several people coded it, you choose which one you are; everyone
+    else appears under *Other coders*. Sets become folders (a document goes into its first
+    set). Only text documents are imported; PDFs, images and media are skipped with a note.
+  - *Other coder's coding* and *Codebook only* accept `.qdpx` files too.
+  - Positions are converted between REFI-QDA's Unicode code points and this app, and
+    Windows line endings in imported texts are handled, so passages stay exact.
+- **Other formats ▾**
   - *Export table to CSV* (this document / all documents): one row per line of text with the
     columns `file, line, text` and then one column per coder, in the order of the comparison
     view. Each cell lists the codes on that line, separated by semicolons.
@@ -100,8 +112,11 @@ npm run build      # produces a single self-contained dist/index.html
 | `src/tree.ts` | Document/folder tree with drag & drop |
 | `src/codebook.ts` | Codebook list and code details dialog |
 | `src/segments.ts` | Coded segments panel |
+| `src/welcome.ts` | First-use dialog asking for the coder's name |
+| `src/splitters.ts` | Resizable sidebar panels |
 | `src/coders.ts` | Other coders panel |
 | `src/io.ts` | JSON/CSV export and import |
+| `src/refi.ts` | REFI-QDA (.qdpx) export and import |
 
 Segments are stored as character offsets into the document text; line numbers are derived
 from them. Colored highlights use the CSS Custom Highlight API (current Chrome, Edge, Safari
