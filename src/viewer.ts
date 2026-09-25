@@ -4,6 +4,14 @@ import {
   applyCode,
   codeById,
   codePath,
+  consolidationOf,
+  codePathParts,
+  findChildCode,
+  findCodeByPath,
+  matchesCodeQuery,
+  missingInPath,
+  type AcceptItem,
+  splitCodePath,
   commitUI,
   currentDoc,
   deleteSegment,
@@ -21,6 +29,7 @@ import {
   tableColumns,
   ui,
 } from './store';
+import { importCoderUI } from './io';
 import type { Code, ColumnKey, Doc, Segment, TableColumn } from './types';
 import { h, hexToRgba, lineLabel, lineOf, lineStartsOf, toast } from './util';
 
@@ -53,6 +62,8 @@ interface Popup {
   target: HTMLElement;
   items: Code[];
   exact: Code | undefined;
+  /** Whether a code exists at exactly the typed path (then no "Create" option is shown). */
+  pathExists: boolean;
   /** Index into items, or -1 for "use the typed text". */
   active: number;
   counts: Map<string, number>;
@@ -143,13 +154,22 @@ function renderHeader(doc: Doc) {
     h(
       'div',
       { class: 'vh-actions' },
-      !project.consolidated && project.externalCodings.length
+      h(
+        'button',
+        {
+          class: 'btn small',
+          title: 'Import another person’s exported project and show their coding as a column next to yours',
+          onClick: importCoderUI,
+        },
+        '＋ Compare with coder…',
+      ),
+      !consolidationOf(doc.id) && project.externalCodings.length
         ? h(
             'button',
             {
               class: 'btn small',
-              title: 'Build an agreed coding by accepting segments from each coder’s column',
-              onClick: startConsolidation,
+              title: 'Build an agreed coding of this document by accepting segments from each coder’s column',
+              onClick: () => startConsolidation(doc.id),
             },
             'Start consolidation',
           )
@@ -300,7 +320,7 @@ function buildColumns(doc: Doc) {
         h('span', { class: 'grip' }, '⋮⋮'),
         h('span', { class: 'col-name' }, col.name),
         h('span', { class: 'badge' }, String(segs.length)),
-        ...columnActions(col, segs, codes),
+        ...columnActions(doc, col, segs, codes),
       ),
       body,
       h('div', { class: 'col-resizer', title: 'Drag to resize' }),
@@ -313,21 +333,21 @@ function buildColumns(doc: Doc) {
   });
 }
 
-function columnActions(col: TableColumn, segs: Segment[], codes: Map<string, Code>): HTMLElement[] {
-  if (!project.consolidated) return [];
+function columnActions(doc: Doc, col: TableColumn, segs: Segment[], codes: Map<string, Code>): HTMLElement[] {
+  if (!consolidationOf(doc.id)) return [];
   if (col.kind === 'consolidated') {
     return [
       h(
         'button',
         {
           class: 'icon-btn head-btn',
-          title: 'Finish: make the consolidated coding your coding',
+          title: 'Finish: make the consolidated coding your coding of this document',
           onClick: () => {
             const ok = confirm(
-              'Finish the consolidation?\n\nThe consolidated coding becomes your coding. Your current coding is kept under ' +
-                '“Other coders” so you can still compare against it.',
+              `Finish the consolidation of “${doc.name}”?\n\nThe consolidated coding becomes your coding of this document. ` +
+                'Your current coding of it is kept under “Other coders” so you can still compare against it. Other documents are not changed.',
             );
-            if (ok) toast(`Done. Your previous coding is kept as “${finishConsolidation()}”.`, 5000);
+            if (ok) toast(`Done. Your previous coding of this document is kept as “${finishConsolidation(doc.id)}”.`, 5000);
           },
         },
         '✓ Finish',
@@ -336,9 +356,9 @@ function columnActions(col: TableColumn, segs: Segment[], codes: Map<string, Cod
         'button',
         {
           class: 'icon-btn head-btn',
-          title: 'Discard the consolidated coding',
+          title: 'Discard the consolidated coding of this document',
           onClick: () => {
-            if (confirm('Discard the consolidated coding? This cannot be undone.')) discardConsolidation();
+            if (confirm(`Discard the consolidated coding of “${doc.name}”? Your own coding is not changed.`)) discardConsolidation(doc.id);
           },
         },
         '✕',
@@ -354,7 +374,7 @@ function columnActions(col: TableColumn, segs: Segment[], codes: Map<string, Cod
         onClick: () => {
           const items = segs.flatMap((seg) => {
             const code = codes.get(seg.codeId);
-            return code ? [{ seg, code, source: col.name }] : [];
+            return code ? [acceptItem(col, seg, code)] : [];
           });
           const n = acceptIntoConsolidated(items);
           toast(n ? `Accepted ${n} segment${n === 1 ? '' : 's'} from ${col.name}.` : 'Nothing new to accept.');
@@ -497,20 +517,24 @@ function boxActions(col: Column, s: Segment, code: Code | undefined): HTMLElemen
       },
       label,
     );
-  if (kind === 'consolidated' || (kind === 'mine' && !project.consolidated)) {
+  const consolidating = !!consolidationOf(s.docId);
+  if (kind === 'consolidated' || (kind === 'mine' && !consolidating)) {
     return h('span', { class: 'stripe-actions' }, btn('✕', 'Remove this segment', () => deleteSegment(s.id)));
   }
-  if (!project.consolidated || !code) return null;
-  if (isConsolidated(s, code.name)) {
+  if (!consolidating || !code) return null;
+  if (isConsolidated(s, codePathParts(code, col.col.codes))) {
     return h('span', { class: 'stripe-actions always', title: 'Already in the consolidated coding' }, h('span', { class: 'stripe-ok' }, '✓'));
   }
   return h(
     'span',
     { class: 'stripe-actions' },
-    btn('＋', 'Accept into the consolidated coding', () =>
-      acceptIntoConsolidated([{ seg: s, code, source: col.col.name }]),
-    ),
+    btn('＋', 'Accept into the consolidated coding', () => acceptIntoConsolidated([acceptItem(col.col, s, code)])),
   );
+}
+
+/** A segment of a coder's column, with its code identified by path in that coder's codebook. */
+function acceptItem(col: TableColumn, seg: Segment, code: Code): AcceptItem {
+  return { seg, path: codePathParts(code, col.codes), color: code.color, source: col.name };
 }
 
 function makeBox(doc: Doc, col: Column, s: Segment, top: number, bottom: number, lane: number, lanes: number) {
@@ -572,11 +596,17 @@ function openPopup(doc: Doc, start: number, end: number) {
   const input = h('input', {
     type: 'text',
     class: 'popup-input',
-    placeholder: 'Type a code…',
+    placeholder: 'Type a code…  (Parent > Child for a subcode)',
     autocomplete: 'off',
     spellcheck: 'false',
   });
-  const color = h('input', { type: 'color', class: 'popup-color', value: nextColor(), title: 'Color for a new code' });
+  const color = h('input', {
+    type: 'color',
+    class: 'popup-color',
+    value: nextColor(),
+    title: 'Color for a new code (subcodes use their level 1 code’s color)',
+  });
+  color.addEventListener('input', renderPopupList);
   const list = h('ul', { class: 'popup-list' });
   const applied = h('div', { class: 'popup-applied' });
   const target = h('div', { class: 'popup-target' });
@@ -598,7 +628,7 @@ function openPopup(doc: Doc, start: number, end: number) {
   el.style.left = `${Math.max(8, Math.min(last.left - grid.left, grid.width - width - 8))}px`;
   el.style.top = `${last.bottom - grid.top + 8}px`;
 
-  popup = { el, docId: doc.id, start, end, input, color, list, applied, target, items: [], exact: undefined, active: -1, counts: segmentCounts() };
+  popup = { el, docId: doc.id, start, end, input, color, list, applied, target, items: [], exact: undefined, pathExists: false, active: -1, counts: segmentCounts() };
   setNamedHighlight('qc-pending', range, 10);
   input.addEventListener('input', refreshSuggestions);
   input.addEventListener('keydown', onPopupKey);
@@ -613,7 +643,7 @@ function openPopup(doc: Doc, start: number, end: number) {
 function renderTarget() {
   const p = popup;
   if (!p) return;
-  if (!project.consolidated) return p.target.replaceChildren();
+  if (!consolidationOf(p.docId)) return p.target.replaceChildren();
   const option = (value: 'mine' | 'consolidated', label: string) =>
     h(
       'button',
@@ -645,16 +675,24 @@ export function closePopup() {
 
 function refreshSuggestions() {
   if (!popup) return;
-  const q = popup.input.value.trim().toLowerCase();
+  // Codes can be found by name ("dist") or by path ("trust > dist"); "trust >" lists Trust's subcodes.
+  const typed = popup.input.value;
+  const parts = splitCodePath(typed);
+  const trailing = /[>›]\s*$/.test(typed);
+  const last = trailing ? '' : (parts.at(-1) ?? '').toLowerCase();
+  const exactPath = !trailing && parts.length ? findCodeByPath(parts) : undefined;
   const rank = (c: Code) => {
     const n = c.name.toLowerCase();
-    return n === q ? 0 : n.startsWith(q) ? 1 : 2;
+    return c === exactPath ? 0 : n === last ? 1 : n.startsWith(last) ? 2 : 3;
   };
   popup.items = project.codes
-    .filter((c) => c.name.toLowerCase().includes(q))
-    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+    .filter((c) => matchesCodeQuery(c, typed))
+    .sort((a, b) => rank(a) - rank(b) || codePath(a).localeCompare(codePath(b)))
     .slice(0, 8);
-  popup.exact = q ? popup.items.find((c) => c.name.toLowerCase() === q) : undefined;
+  popup.pathExists = !!exactPath;
+  // A single name also picks an existing subcode of that name by default (it stays findable),
+  // while "Create" is still offered for a new top-level code.
+  popup.exact = exactPath ?? (parts.length === 1 && !trailing ? popup.items.find((c) => c.name.toLowerCase() === last) : undefined);
   popup.active = popup.exact ? popup.items.indexOf(popup.exact) : -1;
   renderPopupList();
 }
@@ -678,23 +716,36 @@ function renderPopupList() {
           'span',
           { class: 'grow' },
           c.name,
-          c.parentId ? h('span', { class: 'code-parent' }, ` in ${codePath(c).split(' › ').slice(0, -1).join(' › ')}`) : null,
+          c.parentId ? h('span', { class: 'code-parent' }, ` in ${codePathParts(c).slice(0, -1).join(' > ')}`) : null,
         ),
         h('span', { class: 'muted' }, String(p.counts.get(c.id) ?? 0)),
       ),
     ),
   );
-  if (q && !p.exact) {
+  const parts = splitCodePath(q);
+  const typingSubcode = /[>›]\s*$/.test(q);
+  if (parts.length && !typingSubcode && !p.pathExists) {
+    const name = parts.at(-1)!;
+    const parents = parts.slice(0, -1);
+    const newParents = missingInPath(parts).slice(0, -1);
+    // Subcodes take the color of the level 1 code.
+    const color = parents.length ? (findChildCode(null, parents[0])?.color ?? p.color.value) : p.color.value;
+    const label = parents.length
+      ? `Create subcode “${name}” in ${parents.join(' > ')}` +
+        (newParents.length ? ` (also creates ${newParents.map((n) => `“${n}”`).join(', ')})` : '')
+      : `Create new code “${name}”`;
     p.list.append(
       h(
         'li',
         { class: 'create' + (p.active === -1 ? ' active' : ''), onMousedown: pick(-1) },
-        h('span', { class: 'swatch', style: { background: p.color.value } }),
-        h('span', { class: 'grow' }, `Create new code “${q}”`),
+        h('span', { class: 'swatch', style: { background: color } }),
+        h('span', { class: 'grow' }, label),
       ),
     );
   }
-  if (!p.items.length && !q) p.list.append(h('li', { class: 'empty' }, 'No codes yet — type a name to create one.'));
+  if (!p.items.length && !q) {
+    p.list.append(h('li', { class: 'empty' }, 'No codes yet — type a name to create one, or “Parent > Child” for a subcode.'));
+  }
   p.list.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
 }
 
@@ -715,8 +766,10 @@ function renderApplied() {
 function applyFromPopup(keepOpen: boolean) {
   const p = popup;
   if (!p) return;
-  const name = p.active >= 0 ? p.items[p.active].name : p.input.value.trim();
-  if (!name) return;
+  // A chosen suggestion is applied by its full path, so codes with the same name stay distinct.
+  const chosen = p.active >= 0 ? p.items[p.active] : undefined;
+  const name = chosen ? codePath(chosen) : p.input.value.trim();
+  if (!splitCodePath(name).length) return;
   const res = applyCode(p.docId, p.start, p.end, name, p.color.value);
   if (res?.result === 'extended') toast(`Extended the existing “${res.code.name}” segment to include this passage.`);
   if (res?.result === 'contained') toast(`This passage is already part of a “${res.code.name}” segment.`);

@@ -16,7 +16,20 @@
       <span class="grow"></span>
       <button id="btn-undo" class="btn icon" title="Undo (⌘Z / Ctrl+Z)" disabled>↶ Undo</button>
       <button id="btn-redo" class="btn icon" title="Redo (⇧⌘Z / Ctrl+Y)" disabled>↷ Redo</button>
-      <button id="btn-import-project" class="btn" title="Replace the current project with an exported project file">Import project</button>
+      <div class="menu">
+        <button class="btn menu-toggle" aria-haspopup="true">Import ▾</button>
+        <div class="menu-list" hidden>
+          <button id="btn-import-coder-top" title="Add another person's exported project as a column next to yours, to compare and consolidate">
+            <strong>Other coder’s coding</strong> — compare side by side…
+          </button>
+          <button id="btn-import-project" title="Replace the current project with an exported project file (.zip or .json)">
+            Project — replaces the current project…
+          </button>
+          <button id="btn-import-codebook-top" title="Add codes from an exported codebook or project, without any documents or coding">
+            Codebook only — adds codes…
+          </button>
+        </div>
+      </div>
       <button id="btn-export-project" class="btn primary" title="Download the whole project as a zip: all folders and text files, the codebook, and all coding">Export project</button>
       <div class="menu">
         <button class="btn menu-toggle" aria-haspopup="true">Export CSV ▾</button>
@@ -30,6 +43,7 @@
           <button id="btn-export-segments" title="One row per coded segment, for every coder">Export segments to CSV</button>
         </div>
       </div>
+      <button id="btn-theme" class="btn icon" title="Color theme"></button>
       <button id="btn-new-project" class="btn ghost-danger" title="Start over with an empty project">New</button>
     </header>
 
@@ -43,6 +57,7 @@
           </div>
           <div id="tree" class="panel-body"></div>
         </section>
+        <div class="splitter" title="Drag to resize · double-click to reset"></div>
         <section class="panel codes">
           <div class="panel-head">
             <span class="grow">Codebook</span>
@@ -60,8 +75,20 @@
               </div>
             </div>
           </div>
+          <div class="panel-tools">
+            <input id="code-search" type="search" placeholder="Filter codes…" autocomplete="off" spellcheck="false" />
+            <select id="code-view" title="Show subcodes indented, or as “Parent > Child” paths">
+              <option value="tree">Indented</option>
+              <option value="path">A &gt; B</option>
+            </select>
+            <select id="code-sort" title="Sort codes">
+              <option value="name">A–Z</option>
+              <option value="recent">Last edited</option>
+            </select>
+          </div>
           <div id="codebook" class="panel-body"></div>
         </section>
+        <div class="splitter" title="Drag to resize · double-click to reset"></div>
         <section class="panel coders">
           <div class="panel-head">
             <span class="grow">Other coders</span>

@@ -167,6 +167,7 @@ function docRow(d: Doc, depth: number) {
     h('span', { class: 'caret' }),
     h('span', { class: 'tree-icon' }, '📄'),
     h('span', { class: 'tree-name' }, d.name),
+    project.consolidations[d.id] ? h('span', { class: 'badge ok', title: 'Consolidation in progress' }, 'consolidating') : null,
     count ? h('span', { class: 'badge accent', title: 'Coded segments' }, String(count)) : null,
     h(
       'span',

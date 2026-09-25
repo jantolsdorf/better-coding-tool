@@ -1,5 +1,5 @@
 import './style.css';
-import { addCodeUI, renderCodebook } from './codebook';
+import { addCodeUI, renderCodebook, setCodebookFilter } from './codebook';
 import { renderCoders } from './coders';
 import {
   exportCodebook,
@@ -13,10 +13,12 @@ import {
 } from './io';
 import { SAMPLE_NAME, SAMPLE_TEXT } from './sample';
 import { initSegments, renderSegments } from './segments';
-import { addDocs, canRedo, canUndo, commit, project, redo, savedBytes, subscribe, ui, undo } from './store';
+import { applyPanelSizes, initSplitters } from './splitters';
+import { addDocs, canRedo, canUndo, commit, commitUI, project, redo, savedBytes, subscribe, ui, undo } from './store';
 import { toast } from './util';
 import { addFilesUI, addFolderUI, initTree, renderTree } from './tree';
 import { initViewer, renderViewer } from './viewer';
+import { askCoderName } from './welcome';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -35,8 +37,46 @@ $('btn-add-files').addEventListener('click', addFilesUI);
 $('btn-add-folder').addEventListener('click', () => addFolderUI());
 $('btn-add-code').addEventListener('click', addCodeUI);
 $('btn-import-coder').addEventListener('click', importCoderUI);
+$('btn-import-coder-top').addEventListener('click', importCoderUI);
+$('btn-import-codebook-top').addEventListener('click', importCodebookUI);
 $('btn-export-project').addEventListener('click', exportProject);
 $('btn-import-project').addEventListener('click', importProjectUI);
+
+const codeSearch = $<HTMLInputElement>('code-search');
+const codeSort = $<HTMLSelectElement>('code-sort');
+codeSearch.addEventListener('input', () => setCodebookFilter(codeSearch.value));
+codeSearch.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  codeSearch.value = '';
+  setCodebookFilter('');
+});
+codeSort.addEventListener('change', () => {
+  ui.codeSort = codeSort.value as typeof ui.codeSort;
+  commitUI();
+});
+const codeView = $<HTMLSelectElement>('code-view');
+codeView.addEventListener('change', () => {
+  ui.codeView = codeView.value as typeof ui.codeView;
+  commitUI();
+});
+
+const sidebar = document.querySelector<HTMLElement>('.sidebar')!;
+initSplitters(sidebar);
+
+// Theme: follow the system, or a fixed light/dark choice.
+const THEMES = { auto: '◐ Auto', light: '☀ Light', dark: '☾ Dark' } as const;
+const themeBtn = $<HTMLButtonElement>('btn-theme');
+themeBtn.addEventListener('click', () => {
+  const order = Object.keys(THEMES) as (keyof typeof THEMES)[];
+  ui.theme = order[(order.indexOf(ui.theme) + 1) % order.length];
+  commitUI();
+});
+function applyTheme() {
+  if (ui.theme === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = ui.theme;
+  themeBtn.textContent = THEMES[ui.theme] ?? THEMES.auto;
+  themeBtn.title = 'Color theme (click to switch between automatic, light and dark)';
+}
 // Dropdown menus: a .menu-toggle button opens the .menu-list next to it; any click closes them.
 const menuLists = [...document.querySelectorAll<HTMLElement>('.menu-list')];
 for (const toggle of document.querySelectorAll<HTMLElement>('.menu-toggle')) {
@@ -81,7 +121,10 @@ $('btn-new-project').addEventListener('click', newProjectUI);
 $('btn-empty-add').addEventListener('click', addFilesUI);
 $('btn-sample').addEventListener('click', () => addDocs([{ name: SAMPLE_NAME, content: SAMPLE_TEXT }], ui.selectedFolderId));
 coderInput.addEventListener('change', () => {
-  project.coderName = coderInput.value.trim();
+  const name = coderInput.value.trim();
+  // The coder always needs a name; clearing the field keeps the previous one.
+  if (!name) return void (coderInput.value = project.coderName);
+  project.coderName = name;
   commit();
 });
 
@@ -96,6 +139,10 @@ function keepScroll(el: HTMLElement, fn: () => void) {
 }
 
 function render() {
+  applyTheme();
+  applyPanelSizes(sidebar);
+  codeSort.value = ui.codeSort;
+  codeView.value = ui.codeView;
   document.querySelector('.layout')!.classList.toggle('segments-hidden', ui.segmentsHidden);
   keepScroll(treeEl, () => renderTree(treeEl));
   keepScroll(codebookEl, () => renderCodebook(codebookEl));
@@ -111,3 +158,4 @@ function render() {
 
 subscribe(render);
 commit();
+if (!project.coderName) askCoderName();

@@ -1,12 +1,14 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import {
   addExternalCoding,
+  allConsolidated,
   childCodes,
   codebookEntries,
   codeById,
   codePath,
   currentDoc,
-  findCodeByName,
+  codebookEntryPath,
+  findCodeByPath,
   importCodebook,
   type CodebookEntry,
   docsInTreeOrder,
@@ -84,7 +86,7 @@ function codebookCSV(): string {
   const mine = new Map<string, number>();
   const consolidated = new Map<string, number>();
   for (const s of project.segments) mine.set(s.codeId, (mine.get(s.codeId) ?? 0) + 1);
-  for (const s of project.consolidated ?? []) consolidated.set(s.codeId, (consolidated.get(s.codeId) ?? 0) + 1);
+  for (const s of allConsolidated()) consolidated.set(s.codeId, (consolidated.get(s.codeId) ?? 0) + 1);
   const rows: (string | number)[][] = [['code', 'path', 'parent', 'color', 'description', 'segments', 'consolidated_segments']];
   const parentName = (c: Code) => (c.parentId && codeById(c.parentId)?.name) || '';
   for (const c of codesInTreeOrder()) {
@@ -126,14 +128,15 @@ export async function importCodebookUI() {
   } catch (e) {
     return alert(`Could not import “${file.name}”: ${(e as Error).message}`);
   }
-  const existing = entries.filter((e) => typeof e?.name === 'string' && findCodeByName(e.name)).length;
-  const fresh = entries.length - existing;
   if (!entries.length) return toast('The codebook is empty.');
+  const valid = entries.filter((e) => typeof e?.name === 'string');
+  const existing = valid.filter((e) => findCodeByPath(codebookEntryPath(e, valid))).length;
+  const fresh = entries.length - existing;
   let update = false;
   if (existing) {
     update = confirm(
-      `“${file.name}” has ${entries.length} code(s): ${fresh} new, ${existing} with the same name as one of yours.\n\n` +
-        'OK: also update color, description and position of those existing codes.\nCancel: only add the new codes.',
+      `“${file.name}” has ${entries.length} code(s): ${fresh} new, ${existing} already in your codebook (same name at the same place).\n\n` +
+        'OK: also update color and description of those existing codes.\nCancel: only add the new codes.',
     );
   }
   const res = importCodebook(entries, update);
@@ -189,6 +192,15 @@ export async function importProjectUI() {
       !confirm(`Replace your current project (${current}) with “${file.name}”?\n\nExport your current project first if you want to keep it.`)
     ) {
       return;
+    }
+    const me = project.coderName;
+    if (!p.coderName) p.coderName = me;
+    else if (me && p.coderName !== me) {
+      const stayMe = confirm(
+        `This project was coded by “${p.coderName}”. Who will continue coding it?\n\n` +
+          `OK: “${me}” (the existing coding is then labelled as yours).\nCancel: “${p.coderName}”.`,
+      );
+      if (stayMe) p.coderName = me;
     }
     replaceProject(p);
     toast(`Loaded ${p.docs.length} document(s), ${p.codes.length} code(s), ${p.segments.length} segment(s).`);
@@ -253,12 +265,13 @@ export async function importCoderUI() {
 export function exportTableCSV(scope: 'current' | 'all') {
   const docs = scope === 'current' ? [currentDoc()].filter((d): d is Doc => !!d) : docsInTreeOrder();
   if (!docs.length) return toast(scope === 'current' ? 'Open a document first.' : 'There are no documents.');
-  const cols = tableColumns();
+  const cols = tableColumns(docs.map((d) => d.id));
   const rows: (string | number)[][] = [['file', 'line', 'text', ...cols.map((c) => c.name)]];
   for (const doc of docs) {
     const lines = doc.content.split('\n');
     const cells = cols.map((col) => {
-      const names = new Map(col.codes.map((c) => [c.id, c.name]));
+      // Full paths, since the same name can occur under different parent codes.
+      const names = new Map(col.codes.map((c) => [c.id, codePath(c, col.codes)]));
       const perLine = lines.map(() => new Set<string>());
       const segs = col.segments.filter((s) => s.docId === doc.id).sort((a, b) => a.start - b.start);
       for (const s of segs) {
@@ -281,7 +294,7 @@ export function exportSegmentsCSV() {
     ['coder', 'folder', 'document', 'code', 'start_line', 'end_line', 'start_offset', 'end_offset', 'text'],
   ];
   const add = (coder: string, codes: Code[], segments: Segment[]) => {
-    const byId = new Map(codes.map((c) => [c.id, c.name]));
+    const byId = new Map(codes.map((c) => [c.id, codePath(c, codes)]));
     for (const s of segments) {
       const doc = getDoc(s.docId);
       if (!doc) continue;
@@ -290,7 +303,7 @@ export function exportSegmentsCSV() {
     }
   };
   add(project.coderName || 'me', project.codes, project.segments);
-  if (project.consolidated) add('Consolidated', project.codes, project.consolidated);
+  add('Consolidated', project.codes, allConsolidated());
   for (const x of project.externalCodings) add(x.coderName, x.codes, x.segments);
   downloadFile(`segments-${safeFileName(project.coderName || 'project')}-${today()}.csv`, toCSV(rows), 'text/csv');
 }

@@ -20,6 +20,8 @@ export interface Code {
   description?: string;
   /** Parent code in the code hierarchy (null/undefined = top level). */
   parentId?: string | null;
+  /** When the code was last created, changed or applied (ISO date). */
+  updatedAt?: string;
 }
 
 export interface Segment {
@@ -54,10 +56,11 @@ export interface Project {
   segments: Segment[];
   externalCodings: ExternalCoding[];
   /**
-   * The agreed coding built from all coders during consolidation (null = not started).
-   * Uses the same codebook as Project.codes.
+   * Agreed codings built from all coders, one per document being consolidated (keyed by
+   * document id; a document without an entry is not being consolidated). They use the same
+   * codebook as Project.codes.
    */
-  consolidated: Segment[] | null;
+  consolidations: Record<string, Segment[]>;
 }
 
 /** 'me', 'consolidated', or the id of an ExternalCoding. */
@@ -85,6 +88,12 @@ export interface UIState {
   /** Width of the text column in px (null = automatic). */
   textWidth: number | null;
   collapsedCodes: string[];
+  codeSort: 'name' | 'recent';
+  /** Codebook as an indented tree, or as a flat list of "Parent > Child" paths. */
+  codeView: 'tree' | 'path';
+  theme: 'auto' | 'light' | 'dark';
+  /** Relative heights of the sidebar panels (documents, codebook, other coders); null = default. */
+  panelFlex: number[] | null;
   /** Which coding new codes go into while a consolidation is in progress. */
   codeTarget: 'mine' | 'consolidated';
 }
