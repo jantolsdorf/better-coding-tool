@@ -16,7 +16,11 @@ npm run build      # produces a single self-contained dist/index.html
 
 ## Features
 
-- **Getting started**: on first use the tool asks for your name. It labels your coding in
+- **Getting started**: on first use the tool asks whether to start a new project or open a
+  project file (this app's `.zip`/`.json`, or a REFI-QDA `.qdpx`). Your name is only asked for a
+  new project, or when the opened file does not say who coded it. **New** in
+  the top bar offers the same choice, says what would be replaced, and offers to download a copy
+  first if the current project has changes that were not downloaded. It labels your coding in
   exports and in other people's comparison view; change it any time in the top bar. When you
   open a project coded under another name, you're asked who continues coding it.
 - **Layout**: arrange the three areas (documents & codebook, text, coded segments) in any
@@ -62,9 +66,10 @@ npm run build      # produces a single self-contained dist/index.html
 - **Codebook**: change a code's color with its swatch; click its name to rename it, add a
   description, set its parent code, see every segment coded with it across all documents,
   merge it into another code, or delete it.
-  - **Hierarchy**: drag a code onto another code. The target shows two options: **⤷ Subcode**
-    (nests it, no confirmation) and **⇢ Merge** (moves all its segments and subcodes into the
-    target after confirmation). Drop on *Drop here to move to the top level* to un-nest.
+  - **Hierarchy**: drag a code onto another code. Below the target's name, two buttons appear:
+    **⤷ Subcode** (nests it, no confirmation) and **⇢ Merge into** (moves all its segments and
+    subcodes into the target after confirmation). While a subcode is dragged, *Drop here to move
+    to the top level* appears right above its level 1 code.
     Counts read “own · including subcodes”.
   - **Display**: *Indented* shows subcodes indented under their parents; *A > B* shows a flat
     list of full paths such as `Trust > Distrust`.
@@ -164,7 +169,7 @@ notifies `renderApp`, which re-renders the views.
 | `view/app.ts` | Sets up all views and re-renders them |
 | `view/document/` | The document area: text and highlights, coder and memo columns, code box, View menu |
 | `view/tree.ts`, `codebookList.ts`, `codeDialog.ts`, `segmentList.ts`, `coderList.ts` | The panels and the code details dialog |
-| `view/topbar.ts`, `welcome.ts` | Top bar, menus, keyboard shortcuts; first-use dialog |
+| `view/topbar.ts`, `startDialog.ts` | Top bar, menus, keyboard shortcuts; the start dialog (new project or open a file) |
 | `view/leaveGuard.ts` | Warning before closing the tab, with an offer to download a copy |
 | `view/layout.ts`, `splitters.ts` | Rearranging and resizing the main areas and sidebar panels |
 | `view/dom.ts`, `feedback.ts`, `files.ts` | DOM helpers; messages and questions; file picking and downloads |

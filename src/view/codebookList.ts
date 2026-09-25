@@ -5,6 +5,7 @@ import { mergeDroppedCode, moveCode, recolorCode, setCodeCollapsed } from '../co
 import {
   childCodes,
   codeById,
+  codeChain,
   codePath,
   codePathParts,
   isCodeInSubtree,
@@ -84,7 +85,25 @@ export function renderCodebook(container: HTMLElement) {
     if (draggedCodeId) moveCode(draggedCodeId, null);
   });
   const rows = ui.codeView === 'path' ? pathRows(state, edited) : codeRows(null, 0, state);
-  container.replaceChildren(...rows, topLevel);
+  container.replaceChildren(topLevel, ...rows);
+}
+
+/**
+ * While a subcode is dragged, shows "Drop here to move to the top level" right above its level 1
+ * code. If the strip can stay fully visible, the list scrolls by its height so the rows below it
+ * stay under the cursor.
+ */
+function showTopLevelDrop(list: HTMLElement, dragged: Code) {
+  const strip = list.querySelector<HTMLElement>('.code-top-drop');
+  if (!strip) return;
+  const rootId = codeChain(dragged)[0].id;
+  const rootRow = list.querySelector<HTMLElement>(`.code-row[data-id="${rootId}"]`);
+  (rootRow ?? list.firstElementChild)?.before(strip);
+  list.classList.add('dragging-code');
+  const style = getComputedStyle(strip);
+  const height = strip.offsetHeight + parseFloat(style.marginTop) + parseFloat(style.marginBottom);
+  const stripTopInView = strip.getBoundingClientRect().top - list.getBoundingClientRect().top;
+  if (stripTopInView - height >= 0) list.scrollTop += height;
 }
 
 function codeRows(parentId: string | null, depth: number, state: ListState): HTMLElement[] {
@@ -155,9 +174,9 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
   const total = hasChildren ? subtreeCount(c.id, state.counts) : own;
   const parents = showPath ? codePathParts(c).slice(0, -1) : [];
 
-  // Shown while another code is dragged over this row.
+  // Shown below this row while another code is dragged over it.
   const asSub = h('div', { class: 'drop-opt', title: `Make it a subcode of “${c.name}”` }, '⤷ Subcode');
-  const asMerge = h('div', { class: 'drop-opt merge', title: `Merge it into “${c.name}”` }, '⇢ Merge');
+  const asMerge = h('div', { class: 'drop-opt merge', title: `Merge it into “${c.name}”` }, '⇢ Merge into');
   onDrop(asSub, () => {
     if (draggedCodeId) moveCode(draggedCodeId, c.id);
   });
@@ -168,7 +187,7 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
   const isContext = !!state.visible && !state.matches.has(c.id);
   const row = h(
     'div',
-    { class: 'code-row' + (isContext ? ' context' : ''), draggable: true, style: { paddingLeft: `${6 + depth * 16}px` } },
+    { class: 'code-row' + (isContext ? ' context' : ''), 'data-id': c.id, draggable: true, style: { paddingLeft: `${6 + depth * 16}px` } },
     h(
       'div',
       { class: 'code-main' },
@@ -214,7 +233,8 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
     // Deferred so the drag image is taken before the list changes appearance.
     requestAnimationFrame(() => {
       row.classList.add('dragging');
-      row.closest('.panel-body')?.classList.add('dragging-code');
+      const list = row.closest<HTMLElement>('.panel-body');
+      if (list && c.parentId) showTopLevelDrop(list, c);
     });
   });
   row.addEventListener('dragend', () => {

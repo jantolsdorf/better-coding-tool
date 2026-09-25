@@ -8,7 +8,7 @@ import './view/style.css';
 import { commit, onSaveError, project, subscribe } from './model/state';
 import { initApp, renderApp } from './view/app';
 import { notify } from './view/feedback';
-import { askCoderName } from './view/welcome';
+import { openStartDialog } from './view/startDialog';
 
 onSaveError(() =>
   notify('Saving to local storage failed (the browser storage is probably full). Export your project now so you do not lose work.'),
@@ -16,4 +16,5 @@ onSaveError(() =>
 initApp();
 subscribe(renderApp);
 commit();
-if (!project.coderName) askCoderName();
+// First use: ask for the coder's name, and whether to start a new project or open one.
+if (!project.coderName) openStartDialog({ firstUse: true });

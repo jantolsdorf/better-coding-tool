@@ -83,18 +83,23 @@ export function hasChangesNotDownloaded(): boolean {
 
 // ---------- projects ----------
 
-/** Replaces the current project with an exported project or a REFI-QDA project. */
-export async function importProjectInteractive() {
+/**
+ * Replaces the current project with an exported project or a REFI-QDA project. Asks before
+ * replacing a non-empty project unless the caller already made that clear (`confirmReplace`).
+ * Returns whether a project was opened.
+ */
+export async function importProjectInteractive({ confirmReplace = true } = {}): Promise<boolean> {
   const [file] = await pickFiles(PROJECT_FILE_TYPES, false);
-  if (!file) return;
+  if (!file) return false;
   try {
     const p = await readProjectFile(file);
     const current = `${project.docs.length} document(s), ${project.segments.length} segment(s)`;
     if (
+      confirmReplace &&
       (project.docs.length || project.codes.length) &&
       !confirmAction(`Replace your current project (${current}) with “${file.name}”?\n\nExport your current project first if you want to keep it.`)
     ) {
-      return;
+      return false;
     }
     const me = project.coderName;
     if (!p.coderName) p.coderName = me;
@@ -108,13 +113,15 @@ export async function importProjectInteractive() {
     replaceProject(p);
     markBackedUp();
     toast(`Loaded ${p.docs.length} document(s), ${p.codes.length} code(s), ${p.segments.length} segment(s).`);
+    return true;
   } catch (e) {
     importFailed(file, e);
+    return false;
   }
 }
 
-export function newProjectInteractive() {
-  if (!confirmAction('Start a new, empty project? The current project is removed from this browser.\n\nExport it first if you want to keep it.')) return;
+/** Replaces the current project with an empty one (the start dialog explains what is replaced). */
+export function startNewProject() {
   replaceProject(emptyProject(project.coderName));
 }
 

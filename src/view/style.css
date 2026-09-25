@@ -596,8 +596,21 @@ mark {
 .code-row.context .code-name {
   color: var(--muted);
 }
-dialog.welcome {
-  width: min(460px, 92vw);
+dialog.start {
+  width: min(520px, 92vw);
+}
+.start-choice {
+  margin-top: 16px;
+}
+.start-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--danger-soft);
+  color: var(--warn);
+  font-size: 13px;
 }
 
 /* ---------- document tree ---------- */
@@ -685,14 +698,12 @@ dialog.welcome {
   background: var(--accent-soft);
   outline: 1px solid var(--accent-border);
 }
-/* Two drop targets cover a code while another code is dragged over it (no layout shift). */
+/* Two drop targets appear below a code while another code is dragged over it; the code's name
+   stays visible above them. */
 .drop-opts {
   display: none;
-  position: absolute;
-  inset: 0;
-  gap: 3px;
-  padding: 1px;
-  z-index: 2;
+  gap: 6px;
+  padding: 5px 0 3px 17px;
 }
 .code-row.drag-over .drop-opts {
   display: flex;
@@ -702,7 +713,10 @@ dialog.welcome {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   border: 1px dashed var(--accent-border);
@@ -727,10 +741,10 @@ dialog.welcome {
   opacity: 0.35;
   cursor: not-allowed;
 }
-/* Last item of the code list while a code is dragged; in the flow so it never covers codes. */
+/* Shown above the dragged code's level 1 code while a subcode is dragged. */
 .code-top-drop {
   display: none;
-  margin: 6px 4px 0;
+  margin: 4px 4px 4px;
   padding: 6px;
   border: 1px dashed var(--border);
   border-radius: 5px;

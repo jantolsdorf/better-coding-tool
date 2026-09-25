@@ -15,11 +15,11 @@ import {
   importCodebookInteractive,
   importCoderInteractive,
   importProjectInteractive,
-  newProjectInteractive,
 } from '../controller/transfer';
 import { canRedo, canUndo, project, savedBytes, ui } from '../model/state';
 import type { UIState } from '../model/types';
 import { setCodebookFilter } from './codebookList';
+import { openStartDialog } from './startDialog';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const onClick = (id: string, fn: () => void) => $(id).addEventListener('click', fn);
@@ -67,7 +67,7 @@ export function initTopbar() {
   onClick('btn-export-segments', exportSegmentsCSV);
   onClick('btn-export-codebook', () => exportCodebook('json'));
   onClick('btn-export-codebook-csv', () => exportCodebook('csv'));
-  onClick('btn-new-project', newProjectInteractive);
+  onClick('btn-new-project', () => openStartDialog({ firstUse: false }));
 
   // Codebook filter, sort and display
   const codeSearch = $<HTMLInputElement>('code-search');
