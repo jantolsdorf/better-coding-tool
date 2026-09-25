@@ -3,17 +3,12 @@
 // Text selections count Unicode code points from 0, with an exclusive end position.
 
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
-import {
-  codePathParts,
-  docsInTreeOrder,
-  emptyProject,
-  folderChain,
-  normalizeText,
-  project,
-  uid,
-} from './store';
-import type { Code, Doc, ExternalCoding, Folder, Project, Segment } from './types';
-import { PALETTE } from './util';
+import { codePathParts } from '../codes';
+import { docsInTreeOrder, folderChain, normalizeText } from '../documents';
+import { emptyProject } from '../parse';
+import { project } from '../state';
+import type { Code, Doc, ExternalCoding, Folder, Project, Segment } from '../types';
+import { PALETTE, uid } from '../util';
 
 const NS = 'urn:QDA-XML:project:1.0';
 

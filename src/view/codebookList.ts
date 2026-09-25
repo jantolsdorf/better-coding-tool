@@ -1,51 +1,27 @@
+// The codebook panel: codes as an indented tree or as "Parent > Child" paths, with filtering,
+// sorting, and dragging a code onto another to nest or merge it.
+
+import { mergeDroppedCode, moveCode, recolorCode, setCodeCollapsed } from '../controller/codes';
 import {
   childCodes,
   codeById,
   codePath,
   codePathParts,
-  commitUI,
-  createCode,
-  deleteCode,
-  findChildCode,
-  findCodeByPath,
-  matchesCodeQuery,
-  folderPath,
-  getDoc,
   isCodeInSubtree,
   lastEditedByCode,
-  mergeCode,
-  project,
+  matchesCodeQuery,
   segmentCounts,
-  setCodeParent,
-  splitCodePath,
-  ui,
-  updateCode,
-} from './store';
-import type { Code } from './types';
-import { byName, h, hexToRgba, lineLabel, toast } from './util';
-import { focusSegment } from './viewer';
-
-export function addCodeUI() {
-  const name = prompt('New code name (use “Parent > Child” to create a subcode):');
-  const parts = splitCodePath(name ?? '');
-  if (!parts.length) return;
-  if (findCodeByPath(parts)) return alert(`“${parts.join(' > ')}” already exists.`);
-  createCode(name!);
-}
-
-/** Moves a code and explains why when that is not possible. */
-function moveCode(id: string, parentId: string | null) {
-  const res = setCodeParent(id, parentId);
-  if (res === 'cycle') toast('A code cannot become a subcode of its own subcode.');
-  if (res === 'duplicate') {
-    const where = parentId ? `“${codeById(parentId)?.name}” already has a subcode` : 'There is already a top-level code';
-    toast(`${where} named “${codeById(id)?.name}”. Drop on “Merge” to combine them instead.`, 5000);
-  }
-}
+} from '../model/codes';
+import { project, ui } from '../model/state';
+import type { Code } from '../model/types';
+import { byName } from '../model/util';
+import { openCodeDialog } from './codeDialog';
+import { h } from './dom';
 
 // The dragged code's id; dataTransfer contents cannot be read during dragover.
 let draggedCodeId: string | null = null;
 
+// The filter is a transient view setting (not saved).
 let filterText = '';
 let lastContainer: HTMLElement | null = null;
 
@@ -186,28 +162,22 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
     if (draggedCodeId) moveCode(draggedCodeId, c.id);
   });
   onDrop(asMerge, () => {
-    const from = draggedCodeId ? codeById(draggedCodeId) : undefined;
-    if (!from) return;
-    const n = project.segments.filter((s) => s.codeId === from.id).length;
-    if (confirm(`Merge “${from.name}” into “${c.name}”?\n\nIts ${n} segment(s) and any subcodes move to “${c.name}”, and “${from.name}” is removed.`)) {
-      mergeCode(from.id, c.id);
-    }
+    if (draggedCodeId) mergeDroppedCode(draggedCodeId, c.id);
   });
 
   const isContext = !!state.visible && !state.matches.has(c.id);
   const row = h(
     'div',
     { class: 'code-row' + (isContext ? ' context' : ''), draggable: true, style: { paddingLeft: `${6 + depth * 16}px` } },
-    h('div', { class: 'code-main' },
+    h(
+      'div',
+      { class: 'code-main' },
       h(
         'span',
         {
           class: 'caret',
           onClick: () => {
-            if (!hasChildren) return;
-            ui.collapsedCodes = ui.collapsedCodes.filter((x) => x !== c.id);
-            if (!collapsed) ui.collapsedCodes.push(c.id);
-            commitUI();
+            if (hasChildren) setCodeCollapsed(c.id, !collapsed);
           },
         },
         hasChildren ? (collapsed ? '▸' : '▾') : '',
@@ -217,7 +187,7 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
         class: 'swatch-input',
         value: c.color,
         title: 'Change color',
-        onChange: (e: Event) => updateCode(c.id, { color: (e.target as HTMLInputElement).value }),
+        onChange: (e: Event) => recolorCode(c.id, (e.target as HTMLInputElement).value),
       }),
       h(
         'button',
@@ -226,7 +196,7 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
           title:
             (c.description ? c.description + '\n\n' : '') +
             `Last edited: ${formatDate(state.recent.get(c.id) ?? '')}\nClick for details · drag onto another code to nest or merge`,
-          onClick: () => openCodeModal(c.id),
+          onClick: () => openCodeDialog(c.id),
         },
         parents.length ? h('span', { class: 'code-parent' }, `${parents.join(' > ')} > `) : null,
         ...nameWithMatch(c.name),
@@ -269,151 +239,4 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
   });
   row.addEventListener('drop', (e) => e.preventDefault());
   return row;
-}
-
-/** Code details: rename, recolor, describe, merge, delete, and retrieve all coded segments. */
-export function openCodeModal(codeId: string) {
-  const code = codeById(codeId);
-  if (!code) return;
-  const dlg = h('dialog', { class: 'modal' });
-  const close = () => dlg.close();
-  dlg.addEventListener('close', () => dlg.remove());
-
-  const nameInput = h('input', { type: 'text', class: 'field', value: code.name });
-  const colorInput = h('input', { type: 'color', class: 'swatch-input big', value: code.color });
-  const desc = h('textarea', { class: 'field', rows: 3, placeholder: 'Definition / when to apply this code…' });
-  desc.value = code.description ?? '';
-
-  const segs = project.segments.filter((s) => s.codeId === codeId && getDoc(s.docId));
-  const byDoc = new Map<string, typeof segs>();
-  for (const s of segs) {
-    if (!byDoc.has(s.docId)) byDoc.set(s.docId, []);
-    byDoc.get(s.docId)!.push(s);
-  }
-  const segList = [...byDoc].map(([docId, list]) => {
-    const doc = getDoc(docId)!;
-    const path = folderPath(doc.folderId);
-    return h(
-      'div',
-      { class: 'retrieval-doc' },
-      h('div', { class: 'retrieval-title' }, path ? `${path} / ${doc.name}` : doc.name, h('span', { class: 'badge' }, String(list.length))),
-      ...list
-        .sort((a, b) => a.start - b.start)
-        .map((s) =>
-          h(
-            'button',
-            {
-              class: 'retrieval-seg',
-              title: 'Show in document',
-              style: { borderLeftColor: code.color },
-              onClick: () => {
-                close();
-                ui.selectedDocId = doc.id;
-                commitUI();
-                requestAnimationFrame(() => focusSegment(s.start, s.end));
-              },
-            },
-            h('span', { class: 'seg-lines' }, lineLabel(doc, s.start, s.end)),
-            h('span', { class: 'seg-text' }, s.text),
-          ),
-        ),
-    );
-  });
-
-  const others = project.codes.filter((c) => c.id !== codeId).sort(byName);
-  const mergeSelect = h(
-    'select',
-    { class: 'field merge-select', title: 'Merge this code into another code' },
-    h('option', { value: '' }, 'Merge into…'),
-    ...others.map((c) => h('option', { value: c.id }, codePath(c))),
-  );
-  // A code can be nested under any code outside its own subtree.
-  const parentSelect = h(
-    'select',
-    { class: 'field', style: { width: '100%' } },
-    h('option', { value: '' }, '(top level)'),
-    ...others
-      .filter((c) => !isCodeInSubtree(c.id, codeId))
-      .sort((a, b) => codePath(a).localeCompare(codePath(b)))
-      .map((c) => h('option', { value: c.id, selected: c.id === code.parentId }, codePath(c))),
-  );
-
-  const save = () => {
-    const name = nameInput.value.trim();
-    if (!name) return alert('The code name cannot be empty.');
-    if (/[>›]/.test(name)) return alert('A code name cannot contain “>”; it separates a code from its subcodes.');
-    // Names only need to be unique among the codes with the same parent.
-    const parentId = parentSelect.value || null;
-    const clash = findChildCode(parentId, name);
-    if (clash && clash.id !== codeId) {
-      const where = parentId ? `under “${codeById(parentId)?.name}”` : 'at the top level';
-      return alert(`A code named “${name}” already exists ${where}. Use “Merge into…” to combine them.`);
-    }
-    updateCode(codeId, { name, color: colorInput.value, description: desc.value.trim() || undefined, parentId });
-    close();
-  };
-
-  dlg.append(
-    h(
-      'div',
-      { class: 'modal-inner' },
-      h(
-        'div',
-        { class: 'modal-head' },
-        h('span', { class: 'swatch', style: { background: code.color } }),
-        h('strong', {}, 'Code details'),
-        h('span', { class: 'grow' }),
-        h('button', { class: 'btn', title: 'Close without saving changes (Esc)', onClick: close }, 'Discard & close'),
-        h('button', { class: 'btn primary', title: 'Save changes and close (Enter in the name field)', onClick: save }, 'Save & close'),
-      ),
-      h(
-        'div',
-        { class: 'modal-body' },
-        h('label', { class: 'label' }, 'Name'),
-        h('div', { class: 'row' }, colorInput, nameInput),
-        h('label', { class: 'label' }, 'Parent code'),
-        parentSelect,
-        h('label', { class: 'label' }, 'Description'),
-        desc,
-        h('label', { class: 'label' }, `Coded segments (${segs.length})`),
-        segList.length ? h('div', { class: 'retrieval', style: { background: hexToRgba(code.color, 0.04) } }, ...segList) : h('p', { class: 'muted' }, 'This code has not been applied yet.'),
-      ),
-      h(
-        'div',
-        { class: 'modal-foot' },
-        h('button', {
-          class: 'btn danger',
-          onClick: () => {
-            if (confirm(`Delete code “${code.name}” and remove it from ${segs.length} segment(s)?`)) {
-              deleteCode(codeId);
-              close();
-            }
-          },
-        }, 'Delete code'),
-        others.length ? mergeSelect : null,
-        others.length
-          ? h('button', {
-              class: 'btn',
-              onClick: () => {
-                const target = codeById(mergeSelect.value);
-                if (!target) return;
-                if (confirm(`Merge “${code.name}” into “${target.name}”? All segments and subcodes move to “${target.name}” and “${code.name}” is removed.`)) {
-                  mergeCode(codeId, target.id);
-                  close();
-                }
-              },
-            }, 'Merge')
-          : null,
-      ),
-    ),
-  );
-  nameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      save();
-    }
-  });
-  document.body.append(dlg);
-  dlg.showModal();
-  nameInput.focus();
 }

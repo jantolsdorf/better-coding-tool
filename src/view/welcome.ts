@@ -1,5 +1,7 @@
-import { commit, project } from './store';
-import { h } from './util';
+// First-use dialog asking for the coder's name.
+
+import { setCoderName } from '../controller/preferences';
+import { h } from './dom';
 
 /**
  * Asks for the coder's name before anything else, because it labels this person's coding
@@ -24,10 +26,7 @@ export function askCoderName(onDone?: () => void) {
         method: 'dialog',
         onSubmit: (e: Event) => {
           e.preventDefault();
-          const name = input.value.trim();
-          if (!name) return;
-          project.coderName = name;
-          commit();
+          if (!setCoderName(input.value)) return;
           dlg.close();
           onDone?.();
         },

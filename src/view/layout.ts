@@ -1,5 +1,8 @@
-import { commitUI, ui } from './store';
-import type { MainArea } from './types';
+// The three main areas (documents & codebook, text, coded segments): their order and widths.
+
+import { moveArea, setAreaWidth } from '../controller/preferences';
+import { ui } from '../model/state';
+import type { MainArea } from '../model/types';
 
 const AREA_DND_TYPE = 'application/x-bct-area';
 const AREAS: MainArea[] = ['sidebar', 'viewer', 'segments'];
@@ -54,11 +57,7 @@ export function initMainLayout(layout: HTMLElement) {
       e.stopPropagation();
       const after = el.classList.contains('area-drop-after');
       clear();
-      if (dragged === area) return;
-      const next = order().filter((a) => a !== dragged);
-      next.splice(next.indexOf(area) + (after ? 1 : 0), 0, dragged);
-      ui.mainOrder = next;
-      commitUI();
+      moveArea(dragged, area, after, order());
     });
 
     const handle = el.querySelector<HTMLElement>('.area-resizer');
@@ -67,11 +66,7 @@ export function initMainLayout(layout: HTMLElement) {
 }
 
 function makeAreaResizable(el: HTMLElement, handle: HTMLElement, area: 'sidebar' | 'segments') {
-  const save = (w: number | null) => {
-    if (area === 'sidebar') ui.sidebarWidth = w;
-    else ui.segmentsWidth = w;
-    commitUI();
-  };
+  const save = (w: number | null) => setAreaWidth(area, w);
   handle.addEventListener('dblclick', () => save(null));
   handle.addEventListener('mousedown', (e) => {
     e.preventDefault();

@@ -107,20 +107,43 @@ npm run build      # produces a single self-contained dist/index.html
 
 ## Code layout
 
-| File | Purpose |
+The code follows the model–view–controller pattern. Dependencies point one way:
+views read the model and send user actions to controllers; controllers update the model and
+give feedback through the view; the model knows nothing about either. Every committed change
+notifies `renderApp`, which re-renders the views.
+
+| Folder / file | Purpose |
 | --- | --- |
-| `src/types.ts` | Data model (documents, folders, codes, segments, other coders) |
-| `src/store.ts` | State, persistence to `localStorage`, all mutations |
-| `src/viewer.ts` | Document view, text selection, code box, highlights, coder columns |
-| `src/tree.ts` | Document/folder tree with drag & drop |
-| `src/codebook.ts` | Codebook list and code details dialog |
-| `src/segments.ts` | Coded segments panel |
-| `src/welcome.ts` | First-use dialog asking for the coder's name |
-| `src/splitters.ts` | Resizable sidebar panels |
-| `src/layout.ts` | Order and widths of the three main areas |
-| `src/coders.ts` | Other coders panel |
-| `src/io.ts` | JSON/CSV export and import |
-| `src/refi.ts` | REFI-QDA (.qdpx) export and import |
+| `src/main.ts` | Entry point: wires the model's change notifications to the views |
+| **`src/model/`** | Data and rules; no DOM rendering and no dialogs |
+| `model/types.ts` | Data types (documents, folders, codes, segments, other coders, view state) |
+| `model/state.ts` | The project and view state, persistence in `localStorage`, change notification, undo/redo |
+| `model/parse.ts` | Creating and validating projects |
+| `model/documents.ts` | Documents and folders |
+| `model/codes.ts` | Codebook: codes, hierarchy, lookup by path, create/edit/merge/delete |
+| `model/coding.ts`, `segmentOps.ts` | Applying codes to passages (including extending overlapping segments) |
+| `model/layers.ts` | Which coding is active: yours or the open document's consolidation |
+| `model/coders.ts` | Other people's imported coding |
+| `model/table.ts` | Which coder columns are shown, and their order |
+| `model/consolidation.ts` | Per-document consolidation |
+| `model/codebookEntries.ts` | The codebook in portable form (codebook import/export) |
+| `model/lines.ts` | Line numbers from character offsets |
+| `model/formats/` | File formats: project zip/json and codebook files, CSV, REFI-QDA (.qdpx) |
+| **`src/controller/`** | User actions: ask and confirm, update the model, report the outcome |
+| `controller/documents.ts` | Adding, moving, renaming and deleting documents and folders |
+| `controller/codes.ts` | Codebook actions and the code details dialog's checks |
+| `controller/coding.ts` | Coding passages, removing segments |
+| `controller/comparison.ts` | Other coders, consolidation, column order and widths |
+| `controller/transfer.ts` | All imports and exports |
+| `controller/preferences.ts`, `history.ts` | Coder name, theme, layout; undo/redo |
+| **`src/view/`** | Rendering and DOM events |
+| `view/app.ts` | Sets up all views and re-renders them |
+| `view/document/` | The document area: text and highlights, coder columns, code box |
+| `view/tree.ts`, `codebookList.ts`, `codeDialog.ts`, `segmentList.ts`, `coderList.ts` | The panels and the code details dialog |
+| `view/topbar.ts`, `welcome.ts` | Top bar, menus, keyboard shortcuts; first-use dialog |
+| `view/layout.ts`, `splitters.ts` | Rearranging and resizing the main areas and sidebar panels |
+| `view/dom.ts`, `feedback.ts`, `files.ts` | DOM helpers; messages and questions; file picking and downloads |
+| `view/style.css` | Styles, including the light and dark themes |
 
 Segments are stored as character offsets into the document text; line numbers are derived
 from them. Colored highlights use the CSS Custom Highlight API (current Chrome, Edge, Safari

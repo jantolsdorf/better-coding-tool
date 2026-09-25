@@ -1,9 +1,15 @@
-import { activeLayer, codeById, currentDoc, deleteSegment, layerSegments } from './store';
-import { h, hexToRgba, lineLabel } from './util';
-import { openCodeModal } from './codebook';
-import { focusSegment, setHoverRange } from './viewer';
+// The coded segments panel: the passages of the open document in the active coding.
 
-export function initSegments(container: HTMLElement) {
+import { removeSegment } from '../controller/coding';
+import { codeById } from '../model/codes';
+import { currentDoc } from '../model/documents';
+import { activeLayer, layerSegments } from '../model/layers';
+import { lineLabel } from '../model/lines';
+import { openCodeDialog } from './codeDialog';
+import { focusSegment, setHoverRange } from './document/textView';
+import { h, hexToRgba } from './dom';
+
+export function initSegmentList(container: HTMLElement) {
   // Clicking a bracket in the text margin highlights the matching card here.
   document.addEventListener('bct:segment-selected', (e) => {
     const card = container.querySelector<HTMLElement>(`[data-id="${(e as CustomEvent<string>).detail}"]`);
@@ -15,7 +21,7 @@ export function initSegments(container: HTMLElement) {
   });
 }
 
-export function renderSegments(container: HTMLElement, countEl: HTMLElement, titleEl: HTMLElement) {
+export function renderSegmentList(container: HTMLElement, countEl: HTMLElement, titleEl: HTMLElement) {
   titleEl.textContent = activeLayer() === 'consolidated' ? 'Consolidated segments' : 'Coded segments';
   const doc = currentDoc();
   if (!doc) {
@@ -56,7 +62,7 @@ export function renderSegments(container: HTMLElement, countEl: HTMLElement, tit
               title: 'Open code details',
               onClick: (e: MouseEvent) => {
                 e.stopPropagation();
-                if (code) openCodeModal(code.id);
+                if (code) openCodeDialog(code.id);
               },
             },
             code?.name ?? '(unknown code)',
@@ -70,7 +76,7 @@ export function renderSegments(container: HTMLElement, countEl: HTMLElement, tit
               onClick: (e: MouseEvent) => {
                 e.stopPropagation();
                 setHoverRange(null);
-                deleteSegment(s.id);
+                removeSegment(s.id);
               },
             },
             '✕',

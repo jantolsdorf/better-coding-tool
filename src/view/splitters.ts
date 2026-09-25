@@ -1,4 +1,7 @@
-import { commitUI, ui } from './store';
+// Resizable heights of the sidebar panels (documents, codebook, other coders).
+
+import { setPanelSizes } from '../controller/preferences';
+import { ui } from '../model/state';
 
 const MIN_PANEL = 70;
 
@@ -9,10 +12,7 @@ const MIN_PANEL = 70;
 export function initSplitters(sidebar: HTMLElement) {
   const panels = () => [...sidebar.querySelectorAll<HTMLElement>(':scope > .panel')];
   for (const splitter of sidebar.querySelectorAll<HTMLElement>(':scope > .splitter')) {
-    splitter.addEventListener('dblclick', () => {
-      ui.panelFlex = null;
-      commitUI();
-    });
+    splitter.addEventListener('dblclick', () => setPanelSizes(null));
     splitter.addEventListener('mousedown', (e) => {
       e.preventDefault();
       const all = panels();
@@ -33,8 +33,7 @@ export function initSplitters(sidebar: HTMLElement) {
         window.removeEventListener('mousemove', move);
         window.removeEventListener('mouseup', up);
         document.body.classList.remove('resizing-rows');
-        ui.panelFlex = panels().map((p) => p.offsetHeight);
-        commitUI();
+        setPanelSizes(panels().map((p) => p.offsetHeight));
       };
       document.body.classList.add('resizing-rows');
       window.addEventListener('mousemove', move);

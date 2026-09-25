@@ -1,42 +1,24 @@
+// The document list: folders and documents, with drag and drop to move them or add files.
+
 import {
-  addDocs,
-  addFolder,
-  commitUI,
-  deleteDoc,
-  deleteFolder,
-  folderContents,
-  moveDoc,
-  moveFolder,
-  project,
-  renameDoc,
-  renameFolder,
-  ui,
-} from './store';
-import type { Doc, Folder } from './types';
-import { byName, h, pickFiles, toast } from './util';
+  addTextFiles,
+  createFolder,
+  deleteDocInteractive,
+  deleteFolderInteractive,
+  moveItem,
+  openDocument,
+  renameDocInteractive,
+  renameFolderInteractive,
+  selectFolder,
+  setFolderCollapsed,
+} from '../controller/documents';
+import { folderContents } from '../model/documents';
+import { project, ui } from '../model/state';
+import type { Doc, Folder } from '../model/types';
+import { byName } from '../model/util';
+import { h } from './dom';
 
 const DND_TYPE = 'application/x-bct-item';
-
-export async function addTextFiles(files: File[], folderId: string | null) {
-  const txt = files.filter((f) => /\.txt$/i.test(f.name) || f.type === 'text/plain');
-  const skipped = files.length - txt.length;
-  if (txt.length) {
-    const contents = await Promise.all(txt.map(async (f) => ({ name: f.name, content: await f.text() })));
-    addDocs(contents, folderId);
-    toast(`Added ${txt.length} document${txt.length === 1 ? '' : 's'}.`);
-  }
-  if (skipped) toast(`Skipped ${skipped} file${skipped === 1 ? '' : 's'} that ${skipped === 1 ? 'is' : 'are'} not .txt.`);
-}
-
-export async function addFilesUI() {
-  const files = await pickFiles('.txt,text/plain', true);
-  if (files.length) await addTextFiles(files, ui.selectedFolderId);
-}
-
-export function addFolderUI(parentId: string | null = ui.selectedFolderId) {
-  const name = prompt('Folder name:');
-  if (name?.trim()) addFolder(name, parentId);
-}
 
 export function initTree(container: HTMLElement) {
   // Dropping on empty space in the tree moves things to the top level.
@@ -49,10 +31,7 @@ export function renderTree(container: HTMLElement) {
     {
       class: 'tree-row root' + (ui.selectedFolderId === null ? ' selected' : ''),
       style: { paddingLeft: '8px' },
-      onClick: () => {
-        ui.selectedFolderId = null;
-        commitUI();
-      },
+      onClick: () => selectFolder(null),
     },
     h('span', { class: 'tree-icon' }, '🗂️'),
     h('span', { class: 'tree-name' }, 'All documents'),
@@ -93,12 +72,6 @@ function action(label: string, title: string, fn: () => void) {
   );
 }
 
-function toggleCollapsed(id: string, collapsed: boolean) {
-  ui.collapsed = ui.collapsed.filter((x) => x !== id);
-  if (collapsed) ui.collapsed.push(id);
-  commitUI();
-}
-
 function folderRow(f: Folder, depth: number) {
   const collapsed = ui.collapsed.includes(f.id);
   const count = folderContents(f.id).docs.length;
@@ -109,11 +82,7 @@ function folderRow(f: Folder, depth: number) {
       style: { paddingLeft: pad(depth) },
       draggable: true,
       title: 'New files and folders are added to the selected folder',
-      onClick: () => {
-        ui.selectedFolderId = f.id;
-        ui.collapsed = ui.collapsed.filter((x) => x !== f.id);
-        commitUI();
-      },
+      onClick: () => selectFolder(f.id),
     },
     h(
       'span',
@@ -121,7 +90,7 @@ function folderRow(f: Folder, depth: number) {
         class: 'caret',
         onClick: (e: MouseEvent) => {
           e.stopPropagation();
-          toggleCollapsed(f.id, !collapsed);
+          setFolderCollapsed(f.id, !collapsed);
         },
       },
       collapsed ? '▸' : '▾',
@@ -132,16 +101,9 @@ function folderRow(f: Folder, depth: number) {
     h(
       'span',
       { class: 'tree-actions' },
-      action('＋', 'New subfolder', () => addFolderUI(f.id)),
-      action('✎', 'Rename folder', () => {
-        const name = prompt('Rename folder:', f.name);
-        if (name?.trim()) renameFolder(f.id, name);
-      }),
-      action('🗑', 'Delete folder', () => {
-        const c = folderContents(f.id);
-        const what = c.docs.length || c.folders ? ` with ${c.folders} subfolder(s) and ${c.docs.length} document(s) including their coding` : '';
-        if (confirm(`Delete folder “${f.name}”${what}?`)) deleteFolder(f.id);
-      }),
+      action('＋', 'New subfolder', () => createFolder(f.id)),
+      action('✎', 'Rename folder', () => renameFolderInteractive(f)),
+      action('🗑', 'Delete folder', () => deleteFolderInteractive(f)),
     ),
   );
   row.addEventListener('dragstart', (e) => e.dataTransfer?.setData(DND_TYPE, JSON.stringify({ type: 'folder', id: f.id })));
@@ -158,11 +120,7 @@ function docRow(d: Doc, depth: number) {
       style: { paddingLeft: pad(depth) },
       draggable: true,
       title: d.name,
-      onClick: () => {
-        ui.selectedDocId = d.id;
-        ui.selectedFolderId = d.folderId;
-        commitUI();
-      },
+      onClick: () => openDocument(d),
     },
     h('span', { class: 'caret' }),
     h('span', { class: 'tree-icon' }, '📄'),
@@ -172,13 +130,8 @@ function docRow(d: Doc, depth: number) {
     h(
       'span',
       { class: 'tree-actions' },
-      action('✎', 'Rename document', () => {
-        const name = prompt('Rename document:', d.name);
-        if (name?.trim()) renameDoc(d.id, name);
-      }),
-      action('🗑', 'Delete document', () => {
-        if (confirm(`Delete “${d.name}”${count ? ` and its ${count} coded segment(s)` : ''}?`)) deleteDoc(d.id);
-      }),
+      action('✎', 'Rename document', () => renameDocInteractive(d)),
+      action('🗑', 'Delete document', () => deleteDocInteractive(d, count)),
     ),
   );
   row.addEventListener('dragstart', (e) => e.dataTransfer?.setData(DND_TYPE, JSON.stringify({ type: 'doc', id: d.id })));
@@ -199,12 +152,7 @@ function makeDropTarget(el: HTMLElement, folderId: string | null) {
     e.stopPropagation();
     el.classList.remove('drop');
     const raw = e.dataTransfer?.getData(DND_TYPE);
-    if (raw) {
-      const item = JSON.parse(raw) as { type: 'doc' | 'folder'; id: string };
-      if (item.type === 'doc') moveDoc(item.id, folderId);
-      else if (item.id !== folderId && !moveFolder(item.id, folderId)) toast('A folder cannot be moved into itself.');
-    } else if (e.dataTransfer?.files.length) {
-      await addTextFiles([...e.dataTransfer.files], folderId);
-    }
+    if (raw) moveItem(JSON.parse(raw) as { type: 'doc' | 'folder'; id: string }, folderId);
+    else if (e.dataTransfer?.files.length) await addTextFiles([...e.dataTransfer.files], folderId);
   });
 }
