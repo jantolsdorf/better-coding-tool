@@ -1,7 +1,6 @@
 // The document area: header, text with highlights, coder columns, and the code box.
 
-import { startConsolidationOf, setTextWidth, toggleSegmentList } from '../../controller/comparison';
-import { importCoderInteractive } from '../../controller/transfer';
+import { setTextColored, setTextWidth, startConsolidationOf } from '../../controller/comparison';
 import { currentDoc, folderPath } from '../../model/documents';
 import { activeLayer, consolidationOf, layerSegments } from '../../model/layers';
 import { project, ui } from '../../model/state';
@@ -9,7 +8,6 @@ import { TEXT_KEY } from '../../model/table';
 import type { Doc } from '../../model/types';
 import { h } from '../dom';
 import { closeCodeBox, initCodeBox } from './codeBox';
-import { initViewMenu, viewMenu } from './viewMenu';
 import { buildColumns, layoutColumns, makeColumnDraggable, makeResizable, scheduleLayout, setFixedWidth } from './columns';
 import {
   applyHighlights,
@@ -22,6 +20,7 @@ import {
   renderText,
   textBody,
   textCol,
+  textHeadActions,
 } from './textView';
 
 let root: HTMLElement;
@@ -34,7 +33,6 @@ export function initDocumentView(el: HTMLElement, empty: HTMLElement) {
   makeColumnDraggable(textCol, TEXT_KEY);
   makeResizable(textCol, setTextWidth);
   initCodeBox();
-  initViewMenu();
   new ResizeObserver(scheduleLayout).observe(textBody);
 }
 
@@ -51,10 +49,33 @@ export function renderDocumentView() {
     renderText(doc);
   }
   renderHeader(doc);
+  renderTextHead();
   setFixedWidth(textCol, ui.textWidth);
   buildColumns(doc);
   applyHighlights(doc);
   layoutColumns();
+}
+
+/** The text column's header button that colors all coded text (otherwise only on hover). */
+function renderTextHead() {
+  const on = ui.colorText && ui.showCodes;
+  textHeadActions.replaceChildren(
+    h(
+      'button',
+      {
+        class: 'icon-btn head-btn toggle' + (on ? ' on' : ''),
+        'aria-pressed': String(on),
+        disabled: !ui.showCodes,
+        title: ui.showCodes
+          ? on
+            ? 'Coded text is colored · click to show plain text (passages are then highlighted on hover)'
+            : 'Color all coded text in its code’s color (otherwise only the passage under the mouse is highlighted)'
+          : 'Codes are hidden (View ▾)',
+        onClick: () => setTextColored(!ui.colorText),
+      },
+      'Highlight coded segments',
+    ),
+  );
 }
 
 function renderHeader(doc: Doc) {
@@ -72,16 +93,6 @@ function renderHeader(doc: Doc) {
     h(
       'div',
       { class: 'vh-actions' },
-      viewMenu(),
-      h(
-        'button',
-        {
-          class: 'btn small',
-          title: 'Import another person’s exported project and show their coding as a column next to yours',
-          onClick: importCoderInteractive,
-        },
-        '＋ Compare with coder…',
-      ),
       !consolidationOf(doc.id) && project.externalCodings.length
         ? h(
             'button',
@@ -93,11 +104,6 @@ function renderHeader(doc: Doc) {
             'Start consolidation',
           )
         : null,
-      h(
-        'button',
-        { class: 'btn small', title: 'Show or hide the list of coded segments', onClick: toggleSegmentList },
-        ui.segmentsHidden ? 'Show segment list' : 'Hide segment list',
-      ),
     ),
   );
   if (!hlSupported) {

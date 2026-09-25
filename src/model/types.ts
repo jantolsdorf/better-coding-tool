@@ -113,6 +113,8 @@ export interface UIState {
   /** Master switches: show codes (highlights, brackets, list) and memos (notes, underlines, list). */
   showCodes: boolean;
   showMemos: boolean;
+  /** Color the coded passages in the text (off: they are highlighted only while hovering a code). */
+  colorText: boolean;
   segmentsHidden: boolean;
   /** Order of the coder columns in the comparison view. */
   columnOrder: ColumnKey[];

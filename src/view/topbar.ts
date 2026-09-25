@@ -1,4 +1,4 @@
-// The top bar (coder name, undo/redo, import/export menus, theme) and the page-wide buttons,
+// The top bar (coder name, undo/redo, view menu, import/export menus, theme) and the page-wide buttons,
 // menus and keyboard shortcuts.
 
 import { addCodeFromPrompt, setCodeSort, setCodeView } from '../controller/codes';
@@ -20,6 +20,7 @@ import { canRedo, canUndo, project, savedBytes, ui } from '../model/state';
 import type { UIState } from '../model/types';
 import { setCodebookFilter } from './codebookList';
 import { openStartDialog } from './startDialog';
+import { closeViewMenu, initViewMenu, viewMenu } from './viewMenu';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const onClick = (id: string, fn: () => void) => $(id).addEventListener('click', fn);
@@ -34,6 +35,7 @@ let redoBtn: HTMLButtonElement;
 let themeBtn: HTMLButtonElement;
 let codeSort: HTMLSelectElement;
 let codeView: HTMLSelectElement;
+let viewMenuSlot: HTMLElement;
 
 export function initTopbar() {
   coderInput = $<HTMLInputElement>('coder-name');
@@ -45,6 +47,8 @@ export function initTopbar() {
   themeBtn = $<HTMLButtonElement>('btn-theme');
   codeSort = $<HTMLSelectElement>('code-sort');
   codeView = $<HTMLSelectElement>('code-view');
+  viewMenuSlot = $('view-menu-slot');
+  initViewMenu();
 
   // Documents, codebook, other coders
   onClick('btn-add-files', addFilesFromPicker);
@@ -56,6 +60,7 @@ export function initTopbar() {
 
   // Import and export
   onClick('btn-import-coder-top', importCoderInteractive);
+  onClick('btn-compare-coder', importCoderInteractive);
   onClick('btn-import-project', importProjectInteractive);
   onClick('btn-import-qdpx', importProjectInteractive);
   onClick('btn-import-codebook-top', importCodebookInteractive);
@@ -110,6 +115,7 @@ export function initTopbar() {
       const list = toggle.nextElementSibling as HTMLElement;
       const open = list.hidden;
       menuLists.forEach((m) => (m.hidden = true));
+      closeViewMenu();
       list.hidden = !open;
     });
   }
@@ -123,6 +129,7 @@ export function renderTopbar() {
   themeBtn.title = 'Color theme (click to switch between automatic, light and dark)';
   codeSort.value = ui.codeSort;
   codeView.value = ui.codeView;
+  viewMenuSlot.replaceChildren(viewMenu());
   if (document.activeElement !== coderInput) coderInput.value = project.coderName;
   undoBtn.disabled = !canUndo();
   redoBtn.disabled = !canRedo();

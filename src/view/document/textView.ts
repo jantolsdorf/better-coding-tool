@@ -23,6 +23,9 @@ export let gridEl: HTMLElement;
 export let textCol: HTMLElement;
 export let textBody: HTMLElement;
 let dynStyle: HTMLStyleElement;
+let hoverStyle: HTMLStyleElement;
+/** Buttons in the text column's header, filled on every render of the document view. */
+export let textHeadActions: HTMLElement;
 
 export let renderedDocId: string | null = null;
 export let renderedContent = '';
@@ -34,8 +37,10 @@ let flashTimer = 0;
 /** Creates the scrolling area with the text column; coder columns are added next to it. */
 export function createTextArea(): HTMLElement {
   dynStyle = h('style');
-  document.head.append(dynStyle);
+  hoverStyle = h('style');
+  document.head.append(dynStyle, hoverStyle);
   textBody = h('div', { class: 'text-body' });
+  textHeadActions = h('span', { class: 'col-head-actions' });
   textCol = h(
     'div',
     { class: 'text-col', 'data-key': TEXT_KEY },
@@ -44,6 +49,7 @@ export function createTextArea(): HTMLElement {
       { class: 'col-head', title: 'Text — drag to move among the coder columns', draggable: true },
       h('span', { class: 'grip' }, '⋮⋮'),
       'Text',
+      textHeadActions,
     ),
     textBody,
     h('div', { class: 'col-resizer', title: 'Drag to resize · double-click for automatic width' }),
@@ -136,8 +142,9 @@ export function applyHighlights(doc: Doc | null) {
     return;
   }
   const byCode = new Map<string, Range[]>();
-  // The Codes switch turns off the code colors (the text is then plain to read).
-  for (const s of ui.showCodes ? layerSegments() : []) {
+  // Coded passages are only colored if asked for (View ▾ → Color coded text); otherwise the text
+  // stays plain to read and a passage is highlighted while its code is hovered.
+  for (const s of ui.showCodes && ui.colorText ? layerSegments() : []) {
     if (s.docId !== doc.id) continue;
     if (!byCode.has(s.codeId)) byCode.set(s.codeId, []);
     byCode.get(s.codeId)!.push(rangeFor(s.start, s.end));
@@ -164,8 +171,11 @@ export function applyHighlights(doc: Doc | null) {
   }
 }
 
-export function setHoverRange(start: number | null, end = 0) {
-  setNamedHighlight('qc-hover', start == null || !renderedDocId ? null : rangeFor(start, end), 20);
+/** Highlights a passage while something is hovered, in the given (code) color or the default. */
+export function setHoverRange(start: number | null, end = 0, color?: string) {
+  const range = start == null || !renderedDocId ? null : rangeFor(start, end);
+  hoverStyle.textContent = range && color ? `::highlight(qc-hover){background-color:${hexToRgba(color, 0.38)};}` : '';
+  setNamedHighlight('qc-hover', range, 20);
 }
 
 /** Scrolls a passage of the open document into view and flashes it. */

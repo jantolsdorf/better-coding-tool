@@ -99,7 +99,7 @@ function segmentCard(doc: Doc, s: Segment): HTMLElement {
       class: 'seg-card',
       'data-id': s.id,
       style: { borderLeftColor: color },
-      onMouseenter: () => setHoverRange(s.start, s.end),
+      onMouseenter: () => setHoverRange(s.start, s.end, color),
       onMouseleave: () => setHoverRange(null),
       onClick: () => focusSegment(s.start, s.end),
     },

@@ -3,6 +3,7 @@
 import {
   addDocs,
   addFolder,
+  currentDoc,
   deleteDoc,
   deleteFolder,
   folderContents,
@@ -25,7 +26,8 @@ const expand = (folderId: string | null) => {
 function addDocuments(files: { name: string; content: string }[], folderId: string | null) {
   expand(folderId);
   const docs = addDocs(files, folderId);
-  if (!ui.selectedDocId && docs.length) {
+  // Open the first new document if none is open (a saved selection may point to a removed one).
+  if (!currentDoc() && docs.length) {
     ui.selectedDocId = docs[0].id;
     commitUI();
   }

@@ -55,14 +55,18 @@ npm run build      # produces a single self-contained dist/index.html
   line, **Esc** cancels; emptying it deletes the memo). The table CSV export has a *Memos*
   column when a document has memos. Memos of other coders are imported with their coding and
   shown in their own read-only column.
-- **View ▾** (above the text): switch all **Codes** (colors, brackets and list) or all **Memos**
-  (sticky notes, underlines and list) on or off, and tick which columns to show: your codes and
+- **View ▾** (top bar): switch all **Codes** (brackets and list), **Color coded text**, or all **Memos**
+  (sticky notes, underlines and list) on or off, show or hide the **Segment list** panel, and tick which columns to show: your codes and
   memos, the consolidated coding, and each other coder's codes and memos. The menu stays open
   while you tick boxes. Hidden columns are also left out of the table CSV export; the two
   switches only affect the screen.
-- **Display**: coded passages are highlighted in the code's color. The column next to the text
-  shows a bracket per segment spanning its first to last line; the right panel lists each
-  segment with its line range (e.g. `L6–L8`) and text. Hover to highlight, click to jump.
+- **Display**: the text stays plain and readable. The column next to it shows a thin
+  bracket in the code's color for each coded segment, spanning its lines and open towards the
+  text, and a line from its middle to the code's name (overlapping codes get brackets side by
+  side; their names are stacked). Hovering a bracket or name highlights the passage in the
+  code's color; clicking jumps to it. The right panel lists each segment with its line range
+  (e.g. `L6–L8`) and text. To color all coded passages at once, press **Highlight coded segments** in the
+  header of the text column (or tick *View ▾ → Color coded text*); press it again to go back to plain text.
 - **Codebook**: change a code's color with its swatch; click its name to rename it, add a
   description, set its parent code, see every segment coded with it across all documents,
   merge it into another code, or delete it.
@@ -117,7 +121,7 @@ npm run build      # produces a single self-contained dist/index.html
     view. Each cell lists the codes on that line, separated by semicolons.
   - *Export segments to CSV*: one row per coded segment, for every coder.
 - **Comparing coders**: choose **Import ▾ → Other coder's coding** in the top bar (or
-  **＋ Compare with coder…** above the document, or *Other coders → Import…*) and pick another
+  **＋ Compare with coder…** in the top bar, or *Other coders → Import…*) and pick another
   person's exported project. Their coding appears as an extra column next to the text; each additional coder gets
   another column. Documents are matched by identical text. Use the checkboxes to show or hide
   coders. Drag a column header, including the *Text* column's, to reorder columns; while the

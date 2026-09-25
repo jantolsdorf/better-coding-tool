@@ -25,6 +25,7 @@ function loadUI(): UIState {
     hiddenColumns: [],
     showCodes: true,
     showMemos: true,
+    colorText: false,
     segmentsHidden: false,
     columnOrder: [],
     columnWidths: {},

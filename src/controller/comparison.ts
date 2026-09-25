@@ -38,6 +38,12 @@ export function setCodesShown(shown: boolean) {
   commitUI();
 }
 
+/** Whether coded passages are colored in the text, or only highlighted while their code is hovered. */
+export function setTextColored(colored: boolean) {
+  ui.colorText = colored;
+  commitUI();
+}
+
 /** Master switch for all memos on screen: sticky notes, underlines and memo cards. */
 export function setMemosShown(shown: boolean) {
   ui.showMemos = shown;
@@ -112,7 +118,8 @@ export function setTextWidth(width: number | null) {
   commitUI();
 }
 
-export function toggleSegmentList() {
-  ui.segmentsHidden = !ui.segmentsHidden;
+/** Shows or hides the list of coded segments next to the document. */
+export function setSegmentListShown(shown: boolean) {
+  ui.segmentsHidden = !shown;
   commitUI();
 }

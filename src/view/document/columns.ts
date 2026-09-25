@@ -19,7 +19,7 @@ import { lineLabel } from '../../model/lines';
 import { ui } from '../../model/state';
 import { columnKeysInOrder, memoColumns, tableColumns, TEXT_KEY } from '../../model/table';
 import type { Code, ColumnKey, Doc, Memo, MemoColumn, Segment, TableColumn } from '../../model/types';
-import { h, hexToRgba } from '../dom';
+import { h } from '../dom';
 import { focusSegment, gridEl, rangeFor, renderedContent, renderedDocId, setHoverRange } from './textView';
 
 interface Column {
@@ -179,47 +179,156 @@ export function scheduleLayout() {
   });
 }
 
-/** Positions each coded segment as a bracket next to the lines it spans, using lanes for overlaps. */
+/** Width of one bracket lane; overlapping codes get brackets side by side. */
+const LANE_WIDTH = 8;
+/** Height of one code name; names that would collide are stacked below each other. */
+const LABEL_HEIGHT = 17;
+/** Space between the brackets and the names (the connecting line runs here). */
+const GAP = 10;
+
+/**
+ * Shows each coded segment as a bracket spanning its lines, open towards the text, with a line
+ * from its middle to the code's name. Overlapping segments get their brackets side by side (the
+ * first next to the text); the names use the rest of the column, centered on their bracket's
+ * middle and stacked when they would collide.
+ */
 export function layoutColumns() {
   const doc = currentDoc();
   if (!doc) return;
+  const keys = columnKeysInOrder();
+  const textAt = keys.indexOf(TEXT_KEY);
   for (const col of columns) {
+    // Mirror everything when the column is left of the text, so brackets still open towards it.
+    const textOnLeft = keys.indexOf(col.col.key) > textAt;
     const base = col.body.getBoundingClientRect().top;
     const items = col.segs
       .filter((s) => s.start < s.end && s.end <= renderedContent.length)
       .map((s) => {
         const r = rangeFor(s.start, s.end).getBoundingClientRect();
         const top = r.top - base;
-        return { s, top, bottom: Math.max(r.bottom - base, top + 18) };
+        return { s, top, bottom: Math.max(r.bottom - base, top + 14), lane: 0, labelTop: 0 };
       })
       .sort((a, b) => a.top - b.top || b.bottom - a.bottom);
 
-    const boxes: HTMLElement[] = [];
-    let cluster: typeof items = [];
-    let clusterEnd = -Infinity;
-    const flush = () => {
-      const laneEnds: number[] = [];
-      const lanes = cluster.map((it) => {
-        let lane = laneEnds.findIndex((end) => end <= it.top);
-        if (lane === -1) lane = laneEnds.push(0) - 1;
-        laneEnds[lane] = it.bottom + 2;
-        return lane;
-      });
-      cluster.forEach((it, i) => boxes.push(makeBox(doc, col, it.s, it.top, it.bottom, lanes[i], laneEnds.length)));
-      cluster = [];
-    };
+    // Lanes for the brackets: a bracket takes the first lane that is free at its top.
+    const laneEnds: number[] = [];
     for (const it of items) {
-      if (it.top >= clusterEnd) {
-        flush();
-        clusterEnd = -Infinity;
-      }
-      cluster.push(it);
-      clusterEnd = Math.max(clusterEnd, it.bottom + 2);
+      let lane = laneEnds.findIndex((end) => end <= it.top);
+      if (lane === -1) lane = laneEnds.push(0) - 1;
+      laneEnds[lane] = it.bottom + 2;
+      it.lane = lane;
     }
-    flush();
-    col.body.replaceChildren(...boxes);
+    const lanesWidth = 4 + Math.max(1, laneEnds.length) * LANE_WIDTH;
+    const labelStart = lanesWidth + GAP;
+
+    // Names are centered on their bracket's middle, but never overlap the previous name.
+    const byMiddle = [...items].sort((a, b) => a.top + a.bottom - (b.top + b.bottom));
+    let labelBottom = -Infinity;
+    for (const it of byMiddle) {
+      it.labelTop = Math.max((it.top + it.bottom) / 2 - LABEL_HEIGHT / 2, labelBottom);
+      labelBottom = it.labelTop + LABEL_HEIGHT;
+    }
+
+    const lines = document.createElementNS(SVG_NS, 'svg');
+    lines.classList.add('code-lines');
+    // Distances from the text side become x positions (mirrored when the text is on the right).
+    const width = col.body.clientWidth;
+    const toX = (fromText: number) => (textOnLeft ? fromText : width - fromText);
+    const parts: Element[] = [lines];
+    for (const it of items) {
+      parts.push(...codeMark(doc, col, it, textOnLeft, lanesWidth, labelStart, lines, toX));
+    }
+    lines.setAttribute('height', String(Math.max(labelBottom, ...items.map((i) => i.bottom), 0) + 4));
+    col.body.replaceChildren(...parts);
   }
   for (const { col, body } of memoCols) layoutMemos(doc, col, body);
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+interface MarkItem {
+  s: Segment;
+  top: number;
+  bottom: number;
+  lane: number;
+  labelTop: number;
+}
+
+/**
+ * The bracket, the connecting line and the name of one coded segment. Positions are measured
+ * from the side facing the text; hovering the bracket or the name highlights all three and the
+ * passage.
+ */
+function codeMark(
+  doc: Doc,
+  col: Column,
+  it: MarkItem,
+  textOnLeft: boolean,
+  lanesWidth: number,
+  labelStart: number,
+  lines: SVGSVGElement,
+  toX: (fromText: number) => number,
+): Element[] {
+  const { s, top, bottom, lane, labelTop } = it;
+  const code = col.codes.get(s.codeId);
+  const color = code?.color ?? '#9ca3af';
+  const name = code?.name ?? '(unknown code)';
+  const lineLabelText = lineLabel(doc, s.start, s.end);
+  const excerpt = s.text.length > 300 ? s.text.slice(0, 300) + '…' : s.text;
+  const from = s.source ? ` · from ${s.source}` : '';
+  const title = `${name} · ${lineLabelText}${from}\n\n${excerpt}`;
+  const near = textOnLeft ? 'left' : 'right';
+  const far = textOnLeft ? 'right' : 'left';
+
+  // The bracket: top, bottom and the side away from the text; open towards the text.
+  const bracketFrom = 4 + lane * LANE_WIDTH;
+  const bracketWidth = LANE_WIDTH - 2;
+  const brace = h('div', {
+    class: `brace open-${near}`,
+    title,
+    style: { top: `${top}px`, height: `${bottom - top}px`, [near]: `${bracketFrom}px`, width: `${bracketWidth}px`, borderColor: color },
+  });
+
+  // The line from the bracket's middle to the middle of the name (with a bend if the name moved).
+  const mid = (top + bottom) / 2;
+  const nameMid = labelTop + LABEL_HEIGHT / 2;
+  const tip = bracketFrom + bracketWidth;
+  const bend = lanesWidth + GAP / 2;
+  const points: [number, number][] = [[tip, mid], [bend, mid], [bend, nameMid], [labelStart, nameMid]];
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', points.map(([d, y], i) => `${i ? 'L' : 'M'}${toX(d)} ${y}`).join(' '));
+  path.setAttribute('stroke', color);
+  path.classList.add('code-line');
+  lines.append(path);
+
+  const label = h(
+    'div',
+    {
+      class: `code-label ${near}`,
+      title,
+      style: { top: `${labelTop}px`, [near]: `${labelStart}px`, [far]: '4px' },
+    },
+    h('span', { class: 'code-label-name' }, name),
+    boxActions(col, s, code),
+  );
+  label.style.setProperty('--code-color', color);
+
+  const hover = (on: boolean) => {
+    brace.classList.toggle('hot', on);
+    label.classList.toggle('hot', on);
+    path.classList.toggle('hot', on);
+    setHoverRange(on ? s.start : null, s.end, color);
+  };
+  const select = () => {
+    focusSegment(s.start, s.end);
+    if (col.col.kind === activeLayer()) document.dispatchEvent(new CustomEvent('bct:segment-selected', { detail: s.id }));
+  };
+  for (const el of [brace, label]) {
+    el.addEventListener('mouseenter', () => hover(true));
+    el.addEventListener('mouseleave', () => hover(false));
+    el.addEventListener('click', select);
+  }
+  return [brace, label];
 }
 
 // ---------- memos (sticky notes) ----------
@@ -362,38 +471,5 @@ function boxActions(col: Column, s: Segment, code: Code | undefined): HTMLElemen
     'span',
     { class: 'stripe-actions' },
     btn('＋', 'Accept into the consolidated coding', () => acceptSegment(col.col, s, code)),
-  );
-}
-
-function makeBox(doc: Doc, col: Column, s: Segment, top: number, bottom: number, lane: number, lanes: number) {
-  const code = col.codes.get(s.codeId);
-  const color = code?.color ?? '#9ca3af';
-  const name = code?.name ?? '(unknown code)';
-  const lines = lineLabel(doc, s.start, s.end);
-  const excerpt = s.text.length > 300 ? s.text.slice(0, 300) + '…' : s.text;
-  const from = s.source ? ` · from ${s.source}` : '';
-  return h(
-    'div',
-    {
-      class: 'stripe',
-      title: `${name} · ${lines}${from}\n\n${excerpt}`,
-      style: {
-        top: `${top}px`,
-        height: `${bottom - top}px`,
-        left: `calc(4px + (100% - 8px) * ${lane / lanes})`,
-        width: `calc((100% - 8px) / ${lanes} - 2px)`,
-        borderColor: color,
-        background: hexToRgba(color, 0.14),
-      },
-      onMouseenter: () => setHoverRange(s.start, s.end),
-      onMouseleave: () => setHoverRange(null),
-      onClick: () => {
-        focusSegment(s.start, s.end);
-        if (col.col.kind === activeLayer()) document.dispatchEvent(new CustomEvent('bct:segment-selected', { detail: s.id }));
-      },
-    },
-    boxActions(col, s, code),
-    h('span', { class: 'stripe-label' }, name),
-    bottom - top >= 34 ? h('span', { class: 'stripe-lines' }, lines) : null,
   );
 }

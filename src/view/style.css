@@ -1013,6 +1013,26 @@ dialog.start {
 .text-col .col-head {
   cursor: grab;
 }
+.col-head-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.head-btn.toggle {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: var(--muted);
+}
+.head-btn.toggle.on {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.head-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .coder-col.dragging,
 .text-col.dragging {
   opacity: 0.45;
@@ -1045,35 +1065,78 @@ body.resizing {
 .col-body {
   position: relative;
 }
-.stripe {
+/* A coded segment: a bracket spanning its lines, open towards the text, and a line from its
+   middle to the code's name. */
+.brace {
   position: absolute;
-  border: 1px solid;
-  border-left-width: 3px;
-  border-radius: 3px;
-  padding: 1px 4px;
-  overflow: hidden;
+  box-sizing: border-box;
+  border: 1.5px solid;
   cursor: pointer;
-  font-size: 11px;
-  line-height: 14px;
+  opacity: 0.9;
+}
+.brace.open-left {
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+}
+.brace.open-right {
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+}
+.brace.hot {
+  opacity: 1;
+  border-width: 2.5px;
+}
+.code-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.code-line {
+  fill: none;
+  stroke-width: 1.2;
+  opacity: 0.7;
+}
+.code-line.hot {
+  stroke-width: 2;
+  opacity: 1;
+}
+.code-label {
+  position: absolute;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 11.5px;
+  line-height: 17px;
   color: var(--text);
-}
-.stripe:hover {
-  z-index: 2;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
-}
-.stripe-label {
-  display: block;
-  font-weight: 600;
+  cursor: pointer;
   white-space: nowrap;
+}
+.code-label.right {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.code-label-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.code-label.hot {
+  z-index: 2;
+  background: color-mix(in srgb, var(--code-color) 22%, transparent);
+  font-weight: 600;
+}
 .stripe-actions {
   display: none;
-  float: right;
-  margin: -1px -3px 0 2px;
+  flex: none;
 }
-.stripe:hover .stripe-actions,
+.code-label:hover .stripe-actions,
 .stripe-actions.always {
   display: inline-flex;
 }
@@ -1094,12 +1157,6 @@ body.resizing {
   color: var(--ok);
   font-weight: 700;
   font-size: 11px;
-}
-.stripe-lines {
-  display: block;
-  color: var(--muted);
-  font-size: 10px;
-  white-space: nowrap;
 }
 
 /* ---------- code popup ---------- */
