@@ -67,8 +67,10 @@ npm run build      # produces a single self-contained dist/index.html
   description, set its parent code, see every segment coded with it across all documents,
   merge it into another code, or delete it.
   - **Hierarchy**: drag a code onto another code. Below the target's name, two buttons appear:
-    **⤷ Subcode** (nests it, no confirmation) and **⇢ Merge into** (moves all its segments and
-    subcodes into the target after confirmation). While a subcode is dragged, *Drop here to move
+    **⤷ Subcode** (nests it, no confirmation; it and its own subcodes take the new parent's
+    color — Undo keeps the old colors) and **⇢ Merge into** (moves all its segments and subcodes
+    into the target after confirmation). In the code details, **Give subcodes this color** colors
+    a whole branch at once. While a subcode is dragged, *Drop here to move
     to the top level* appears right above its level 1 code.
     Counts read “own · including subcodes”.
   - **Display**: *Indented* shows subcodes indented under their parents; *A > B* shows a flat

@@ -8,7 +8,9 @@ import {
   findCodeByPath,
   mergeCode,
   setCodeParent,
+  setSubtreeColor,
   splitCodePath,
+  subtreeOf,
   updateCode,
 } from '../model/codes';
 import { commitUI, project, ui } from '../model/state';
@@ -24,11 +26,18 @@ export function addCodeFromPrompt() {
   createCode(name!);
 }
 
-/** Moves a code under another code (null = top level) and explains why when that is not possible. */
+/**
+ * Moves a dragged code under another code (null = top level) and explains why when that is not
+ * possible. As a subcode it takes its new parent's color, like subcodes created by typing.
+ */
 export function moveCode(id: string, parentId: string | null) {
   // Show the new subcode by expanding its parent.
   if (parentId) ui.collapsedCodes = ui.collapsedCodes.filter((x) => x !== parentId);
-  const res = setCodeParent(id, parentId);
+  const code = codeById(id);
+  const parent = parentId ? codeById(parentId) : undefined;
+  const recolors = !!code && !!parent && subtreeOf(id).some((c) => c.color.toLowerCase() !== parent.color.toLowerCase());
+  const res = setCodeParent(id, parentId, { adoptParentColor: true });
+  if (res === 'ok' && recolors) toast(`“${code!.name}” now has the color of “${parent!.name}”. Undo keeps its own color.`, 4500);
   if (res === 'cycle') toast('A code cannot become a subcode of its own subcode.');
   if (res === 'duplicate') {
     const where = parentId ? `“${codeById(parentId)?.name}” already has a subcode` : 'There is already a top-level code';
@@ -67,6 +76,13 @@ export function deleteCodeInteractive(code: Code, segments: number): boolean {
 
 export function recolorCode(id: string, color: string) {
   updateCode(id, { color });
+}
+
+/** Gives a code and all its subcodes the same color. */
+export function colorSubcodesLike(id: string, color: string) {
+  const n = subtreeOf(id).length - 1;
+  setSubtreeColor(id, color);
+  toast(`Gave ${n} subcode${n === 1 ? '' : 's'} the same color.`);
 }
 
 /**

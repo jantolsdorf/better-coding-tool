@@ -1671,3 +1671,10 @@ dialog.backup {
 .sticky.readonly .sticky-text {
   cursor: default;
 }
+
+.btn.subcode-color {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

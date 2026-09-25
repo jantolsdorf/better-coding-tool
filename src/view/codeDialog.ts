@@ -1,12 +1,13 @@
 // Code details: rename, recolor, describe, nest, merge, delete, and retrieve all coded segments.
 
 import {
+  colorSubcodesLike,
   deleteCodeInteractive,
   goToSegment,
   mergeCodeInteractive,
   saveCodeDetails,
 } from '../controller/codes';
-import { codeById, codePath, isCodeInSubtree } from '../model/codes';
+import { codeById, codePath, isCodeInSubtree, subtreeOf } from '../model/codes';
 import { folderPath, getDoc } from '../model/documents';
 import { lineLabel } from '../model/lines';
 import { project } from '../model/state';
@@ -21,6 +22,8 @@ export function openCodeDialog(codeId: string) {
   dlg.addEventListener('close', () => dlg.remove());
 
   const nameInput = h('input', { type: 'text', class: 'field', value: code.name });
+  const subcodeCount = subtreeOf(codeId).length - 1;
+  const subcodeSwatch = h('span', { class: 'swatch', style: { background: code.color } });
   const colorInput = h('input', { type: 'color', class: 'swatch-input big', value: code.color });
   const desc = h('textarea', { class: 'field', rows: 3, placeholder: 'Definition / when to apply this code…' });
   desc.value = code.description ?? '';
@@ -105,6 +108,19 @@ export function openCodeDialog(codeId: string) {
         { class: 'modal-body' },
         h('label', { class: 'label' }, 'Name'),
         h('div', { class: 'row' }, colorInput, nameInput),
+        subcodeCount
+          ? h(
+              'button',
+              {
+                type: 'button',
+                class: 'btn small subcode-color',
+                title: 'Applies the color chosen here to this code and all its subcodes right away',
+                onClick: () => colorSubcodesLike(codeId, colorInput.value),
+              },
+              subcodeSwatch,
+              ` Give ${subcodeCount} subcode${subcodeCount === 1 ? '' : 's'} this color`,
+            )
+          : null,
         h('label', { class: 'label' }, 'Parent code'),
         parentSelect,
         h('label', { class: 'label' }, 'Description'),
@@ -133,6 +149,7 @@ export function openCodeDialog(codeId: string) {
       ),
     ),
   );
+  colorInput.addEventListener('input', () => (subcodeSwatch.style.background = colorInput.value));
   nameInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
