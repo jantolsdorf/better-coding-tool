@@ -14,6 +14,7 @@ import {
 } from './io';
 import { SAMPLE_NAME, SAMPLE_TEXT } from './sample';
 import { initSegments, renderSegments } from './segments';
+import { applyMainLayout, initMainLayout } from './layout';
 import { applyPanelSizes, initSplitters } from './splitters';
 import { addDocs, canRedo, canUndo, commit, commitUI, project, redo, savedBytes, subscribe, ui, undo } from './store';
 import { toast } from './util';
@@ -65,6 +66,7 @@ codeView.addEventListener('change', () => {
 
 const sidebar = document.querySelector<HTMLElement>('.sidebar')!;
 initSplitters(sidebar);
+initMainLayout(document.querySelector<HTMLElement>('.layout')!);
 
 // Theme: follow the system, or a fixed light/dark choice.
 const THEMES = { auto: '◐ Auto', light: '☀ Light', dark: '☾ Dark' } as const;
@@ -144,6 +146,7 @@ function keepScroll(el: HTMLElement, fn: () => void) {
 function render() {
   applyTheme();
   applyPanelSizes(sidebar);
+  applyMainLayout();
   codeSort.value = ui.codeSort;
   codeView.value = ui.codeView;
   document.querySelector('.layout')!.classList.toggle('segments-hidden', ui.segmentsHidden);

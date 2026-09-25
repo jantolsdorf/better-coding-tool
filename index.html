@@ -54,9 +54,10 @@
     </header>
 
     <main class="layout">
-      <aside class="sidebar">
+      <aside class="sidebar" data-area="sidebar">
         <section class="panel docs">
           <div class="panel-head">
+            <span class="area-grip" draggable="true" title="Drag to move this area">⋮⋮</span>
             <span class="grow">Documents</span>
             <button id="btn-add-files" class="btn small" title="Add .txt files to the selected folder">+ Files</button>
             <button id="btn-add-folder" class="btn small" title="Create a folder inside the selected folder">+ Folder</button>
@@ -102,9 +103,11 @@
           </div>
           <div id="coders" class="panel-body"></div>
         </section>
+        <div class="area-resizer" title="Drag to resize · double-click to reset"></div>
       </aside>
 
-      <section id="viewer" class="viewer">
+      <section id="viewer" class="viewer" data-area="viewer">
+        <span class="area-grip viewer-grip" draggable="true" title="Drag to move the text area">⋮⋮</span>
         <div id="viewer-empty" class="viewer-empty">
           <h2>Qualitative coding, in your browser</h2>
           <ol>
@@ -121,12 +124,14 @@
         </div>
       </section>
 
-      <aside class="segments">
+      <aside class="segments" data-area="segments">
         <div class="panel-head">
+          <span class="area-grip" draggable="true" title="Drag to move this area">⋮⋮</span>
           <span id="segments-title" class="grow">Coded segments</span>
           <span id="segments-count" class="badge"></span>
         </div>
         <div id="segments-list"></div>
+        <div class="area-resizer" title="Drag to resize · double-click to reset"></div>
       </aside>
     </main>
     <script type="module" src="/src/main.ts"></script>

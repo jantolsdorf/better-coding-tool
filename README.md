@@ -19,8 +19,10 @@ npm run build      # produces a single self-contained dist/index.html
 - **Getting started**: on first use the tool asks for your name. It labels your coding in
   exports and in other people's comparison view; change it any time in the top bar. When you
   open a project coded under another name, you're asked who continues coding it.
-- **Layout**: drag the handles between *Documents*, *Codebook* and *Other coders* to change
-  their heights (double-click to reset). The theme button in the top bar switches between
+- **Layout**: arrange the three areas (documents & codebook, text, coded segments) in any
+  order by dragging their ⋮⋮ grip onto another area, and change the width of the side areas
+  by dragging their inner edge. Drag the handles between *Documents*, *Codebook* and *Other
+  coders* to change their heights. Double-click any handle to reset it. The theme button in the top bar switches between
   automatic (follows the system), light and dark.
 - **Documents**: add `.txt` files with **+ Files** or by dropping them on the document list.
   Organise them in nested folders (**+ Folder**, or the ＋ on a folder). Drag documents and
@@ -89,8 +91,9 @@ npm run build      # produces a single self-contained dist/index.html
   **＋ Compare with coder…** above the document, or *Other coders → Import…*) and pick another
   person's exported project. Their coding appears as an extra column next to the text; each additional coder gets
   another column. Documents are matched by identical text. Use the checkboxes to show or hide
-  coders. Drag a column header to reorder columns; drag the right edge of any column, including
-  the text column, to resize it (double-click the edge to reset).
+  coders. Drag a column header, including the *Text* column's, to reorder columns; while the
+  text is the first column it stays in view when scrolling sideways. Drag the right edge of any
+  column to resize it (double-click the edge to reset).
 - **Consolidating** works per document. **Start consolidation** adds a *Consolidated* column
   for the open document only; documents with a consolidation in progress are marked
   *consolidating* in the document list. Hover a segment in any coder's column and click **＋**
@@ -114,6 +117,7 @@ npm run build      # produces a single self-contained dist/index.html
 | `src/segments.ts` | Coded segments panel |
 | `src/welcome.ts` | First-use dialog asking for the coder's name |
 | `src/splitters.ts` | Resizable sidebar panels |
+| `src/layout.ts` | Order and widths of the three main areas |
 | `src/coders.ts` | Other coders panel |
 | `src/io.ts` | JSON/CSV export and import |
 | `src/refi.ts` | REFI-QDA (.qdpx) export and import |

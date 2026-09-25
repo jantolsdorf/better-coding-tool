@@ -4,7 +4,9 @@ import {
   applyCode,
   codeById,
   codePath,
+  columnKeysInOrder,
   consolidationOf,
+  TEXT_KEY,
   codePathParts,
   findChildCode,
   findCodeByPath,
@@ -97,12 +99,18 @@ export function initViewer(el: HTMLElement, empty: HTMLElement) {
   textBody = h('div', { class: 'text-body' });
   const textCol = h(
     'div',
-    { class: 'text-col' },
-    h('div', { class: 'col-head' }, 'Text'),
+    { class: 'text-col', 'data-key': TEXT_KEY },
+    h(
+      'div',
+      { class: 'col-head', title: 'Text — drag to move among the coder columns', draggable: true },
+      h('span', { class: 'grip' }, '⋮⋮'),
+      'Text',
+    ),
     textBody,
     h('div', { class: 'col-resizer', title: 'Drag to resize · double-click for automatic width' }),
   );
   gridEl = h('div', { class: 'viewer-grid' }, textCol);
+  makeColumnDraggable(textCol, TEXT_KEY);
   makeResizable(textCol, (w) => {
     ui.textWidth = w && Math.round(w);
     commitUI();
@@ -328,9 +336,16 @@ function buildColumns(doc: Doc) {
     const width = ui.columnWidths[col.key];
     if (width) setFixedWidth(el, width);
     makeColumnDraggable(el, col.key);
+    makeResizable(el, (w) => setColumnWidth(col.key, w), 90, 700);
     gridEl.append(el);
     return { col, segs, codes, body };
   });
+  // Visual order (the DOM keeps the text first); the text stays pinned while it is the first column.
+  const keys = columnKeysInOrder();
+  for (const el of gridEl.querySelectorAll<HTMLElement>('.text-col, .coder-col')) {
+    el.style.order = String(keys.indexOf(el.dataset.key!));
+  }
+  gridEl.querySelector('.text-col')!.classList.toggle('pinned', keys[0] === TEXT_KEY);
 }
 
 function columnActions(doc: Doc, col: TableColumn, segs: Segment[], codes: Map<string, Code>): HTMLElement[] {
@@ -413,7 +428,6 @@ function makeColumnDraggable(el: HTMLElement, key: ColumnKey) {
     clear();
     moveColumn(dragged, key, after);
   });
-  makeResizable(el, (w) => setColumnWidth(key, w), 90, 700);
 }
 
 /** Lets the user drag the element's .col-resizer to set its width; double-click resets it (null). */
@@ -623,7 +637,7 @@ function openPopup(doc: Doc, start: number, end: number) {
   gridEl.append(el);
 
   // Place the box just below the end of the selection so the selected text stays visible.
-  const width = 320;
+  const width = Math.min(460, grid.width - 16);
   el.style.width = `${width}px`;
   el.style.left = `${Math.max(8, Math.min(last.left - grid.left, grid.width - width - 8))}px`;
   el.style.top = `${last.bottom - grid.top + 8}px`;
@@ -688,7 +702,8 @@ function refreshSuggestions() {
   popup.items = project.codes
     .filter((c) => matchesCodeQuery(c, typed))
     .sort((a, b) => rank(a) - rank(b) || codePath(a).localeCompare(codePath(b)))
-    .slice(0, 8);
+    // All matches are listed; the list scrolls. The cap only keeps huge codebooks responsive.
+    .slice(0, 300);
   popup.pathExists = !!exactPath;
   // A single name also picks an existing subcode of that name by default (it stays findable),
   // while "Create" is still offered for a new top-level code.

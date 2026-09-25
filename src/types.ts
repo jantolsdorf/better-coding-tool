@@ -74,6 +74,8 @@ export interface TableColumn {
   segments: Segment[];
 }
 
+export type MainArea = 'sidebar' | 'viewer' | 'segments';
+
 export interface UIState {
   selectedDocId: string | null;
   /** Target folder for new files and folders (null = top level). */
@@ -94,6 +96,10 @@ export interface UIState {
   theme: 'auto' | 'light' | 'dark';
   /** Relative heights of the sidebar panels (documents, codebook, other coders); null = default. */
   panelFlex: number[] | null;
+  /** Left-to-right order of the main areas, and the widths of the side areas (null = default). */
+  mainOrder: MainArea[];
+  sidebarWidth: number | null;
+  segmentsWidth: number | null;
   /** Which coding new codes go into while a consolidation is in progress. */
   codeTarget: 'mine' | 'consolidated';
 }

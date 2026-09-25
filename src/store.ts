@@ -88,6 +88,9 @@ function loadUI(): UIState {
     codeView: 'tree',
     theme: 'auto',
     panelFlex: null,
+    mainOrder: ['sidebar', 'viewer', 'segments'],
+    sidebarWidth: null,
+    segmentsWidth: null,
     codeTarget: 'mine',
   };
   try {
@@ -718,6 +721,8 @@ export function setExternalVisible(id: string, visible: boolean) {
 
 export const CONSOLIDATED_KEY = 'consolidated';
 export const MINE_KEY = 'me';
+/** The text column, which can be moved among the coder columns. */
+export const TEXT_KEY = 'text';
 
 /**
  * The coder columns shown next to the text, in the user's chosen order. The Consolidated column
@@ -746,10 +751,25 @@ export function tableColumns(docIds: (string | null)[] = [ui.selectedDocId]): Ta
     .map((x) => x.c);
 }
 
-/** Moves column `key` directly before (or after) column `target`. */
+/** Keys of all visible columns including the text column, in display order (text first by default). */
+export function columnKeysInOrder(): ColumnKey[] {
+  const keys = tableColumns().map((c) => c.key);
+  const textAt = ui.columnOrder.indexOf(TEXT_KEY);
+  if (textAt === -1) return [TEXT_KEY, ...keys];
+  // Put the text column right after the last column that comes before it in the saved order.
+  let pos = 0;
+  keys.forEach((k, i) => {
+    const saved = ui.columnOrder.indexOf(k);
+    if (saved !== -1 && saved < textAt) pos = i + 1;
+  });
+  keys.splice(pos, 0, TEXT_KEY);
+  return keys;
+}
+
+/** Moves column `key` (a coder column or the text column) directly before or after `target`. */
 export function moveColumn(key: ColumnKey, target: ColumnKey, after: boolean) {
   if (key === target) return;
-  const order = tableColumns().map((c) => c.key).filter((k) => k !== key);
+  const order = columnKeysInOrder().filter((k) => k !== key);
   const i = order.indexOf(target);
   if (i === -1) return;
   order.splice(after ? i + 1 : i, 0, key);

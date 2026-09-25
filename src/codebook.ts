@@ -323,7 +323,7 @@ export function openCodeModal(codeId: string) {
   const others = project.codes.filter((c) => c.id !== codeId).sort(byName);
   const mergeSelect = h(
     'select',
-    { class: 'field' },
+    { class: 'field merge-select', title: 'Merge this code into another code' },
     h('option', { value: '' }, 'Merge into…'),
     ...others.map((c) => h('option', { value: c.id }, codePath(c))),
   );
@@ -357,7 +357,15 @@ export function openCodeModal(codeId: string) {
     h(
       'div',
       { class: 'modal-inner' },
-      h('div', { class: 'modal-head' }, h('span', { class: 'swatch', style: { background: code.color } }), h('strong', {}, 'Code details'), h('span', { class: 'grow' }), h('button', { class: 'icon-btn', onClick: close }, '✕')),
+      h(
+        'div',
+        { class: 'modal-head' },
+        h('span', { class: 'swatch', style: { background: code.color } }),
+        h('strong', {}, 'Code details'),
+        h('span', { class: 'grow' }),
+        h('button', { class: 'btn', title: 'Close without saving changes (Esc)', onClick: close }, 'Discard & close'),
+        h('button', { class: 'btn primary', title: 'Save changes and close (Enter in the name field)', onClick: save }, 'Save & close'),
+      ),
       h(
         'div',
         { class: 'modal-body' },
@@ -396,12 +404,15 @@ export function openCodeModal(codeId: string) {
               },
             }, 'Merge')
           : null,
-        h('span', { class: 'grow' }),
-        h('button', { class: 'btn', onClick: close }, 'Cancel'),
-        h('button', { class: 'btn primary', onClick: save }, 'Save'),
       ),
     ),
   );
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      save();
+    }
+  });
   document.body.append(dlg);
   dlg.showModal();
   nameInput.focus();
