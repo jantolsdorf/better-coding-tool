@@ -1,6 +1,7 @@
 // The coding of other people, imported for comparison.
 
 import { commit, project, ui } from './state';
+import { memoColumnKey } from './table';
 import type { Doc, Project } from './types';
 import { now, uid } from './util';
 
@@ -35,16 +36,21 @@ export function addExternalCoding(src: Project, coderName: string, addMissingTo:
   const segments = src.segments
     .filter((s) => map.has(s.docId))
     .map((s) => ({ ...s, docId: map.get(s.docId)! }));
+  // Their own memos (not the ones they imported from others).
+  const memos = src.memos
+    .filter((m) => map.has(m.docId))
+    .map((m) => ({ ...m, docId: map.get(m.docId)! }));
   project.externalCodings = project.externalCodings.filter((x) => x.coderName !== coderName);
   project.externalCodings.push({
     id: uid('x'),
     coderName,
     codes: src.codes.map((c) => ({ ...c })),
     segments,
+    memos,
     importedAt: now(),
   });
   commit();
-  return { imported: segments.length, skipped: src.segments.length - segments.length };
+  return { imported: segments.length, memos: memos.length, skipped: src.segments.length - segments.length };
 }
 
 export const hasExternalCoder = (name: string) => project.externalCodings.some((x) => x.coderName === name);
@@ -58,7 +64,8 @@ export function renameExternal(id: string, name: string) {
 export function removeExternal(id: string) {
   project.externalCodings = project.externalCodings.filter((x) => x.id !== id);
   // Forget the view state of the removed coder's column.
-  ui.hiddenExternal = ui.hiddenExternal.filter((x) => x !== id);
-  ui.columnOrder = ui.columnOrder.filter((x) => x !== id);
+  const keys = [id, memoColumnKey(id)];
+  ui.hiddenColumns = ui.hiddenColumns.filter((k) => !keys.includes(k));
+  ui.columnOrder = ui.columnOrder.filter((k) => !keys.includes(k));
   commit();
 }

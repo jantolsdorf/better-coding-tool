@@ -4,9 +4,8 @@ import { codeById, codePath, codesInTreeOrder } from '../codes';
 import { folderChain, folderPath, getDoc } from '../documents';
 import { allConsolidated } from '../layers';
 import { lineSpan } from '../lines';
-import { memosOf } from '../memos';
 import { project } from '../state';
-import type { Code, Doc, Segment, TableColumn } from '../types';
+import type { Code, Doc, MemoColumn, Segment, TableColumn } from '../types';
 
 function csvCell(v: string | number): string {
   const s = String(v);
@@ -24,20 +23,21 @@ function docPath(doc: Doc): string {
 }
 
 /**
- * One row per line of text, with one column per coder in the given order. Each cell lists the
- * codes on that line (full paths), separated by semicolons. If any of the documents has memos,
- * a "Memos" column after the text lists the memos on each line.
+ * One row per line of text, with one column per memo column and per coder in the given order.
+ * Each cell lists the memos or codes (full paths) on that line, separated by semicolons.
  */
-export function tableCSV(docs: Doc[], cols: TableColumn[]): string {
-  const withMemos = project.memos.some((m) => docs.some((d) => d.id === m.docId));
-  const rows: (string | number)[][] = [['file', 'line', 'text', ...(withMemos ? ['Memos'] : []), ...cols.map((c) => c.name)]];
+export function tableCSV(docs: Doc[], cols: TableColumn[], memoCols: MemoColumn[]): string {
+  const rows: (string | number)[][] = [['file', 'line', 'text', ...memoCols.map((c) => c.name), ...cols.map((c) => c.name)]];
   for (const doc of docs) {
     const lines = doc.content.split('\n');
-    const memosPerLine = lines.map(() => [] as string[]);
-    for (const m of memosOf(doc.id)) {
-      const [a, b] = lineSpan(doc, m.start, m.end);
-      for (let i = a; i <= b; i++) memosPerLine[i - 1]?.push(m.note);
-    }
+    const memoCells = memoCols.map((col) => {
+      const perLine = lines.map(() => [] as string[]);
+      for (const m of col.memos.filter((x) => x.docId === doc.id).sort((a, b) => a.start - b.start)) {
+        const [a, b] = lineSpan(doc, m.start, m.end);
+        for (let i = a; i <= b; i++) perLine[i - 1]?.push(m.note);
+      }
+      return perLine;
+    });
     const cells = cols.map((col) => {
       // Full paths, since the same name can occur under different parent codes.
       const names = new Map(col.codes.map((c) => [c.id, codePath(c, col.codes)]));
@@ -52,7 +52,7 @@ export function tableCSV(docs: Doc[], cols: TableColumn[]): string {
     });
     const file = docPath(doc);
     lines.forEach((text, i) =>
-      rows.push([file, i + 1, text, ...(withMemos ? [memosPerLine[i].join('; ')] : []), ...cells.map((c) => [...c[i]].join('; '))]),
+      rows.push([file, i + 1, text, ...memoCells.map((c) => c[i].join('; ')), ...cells.map((c) => [...c[i]].join('; '))]),
     );
   }
   return toCSV(rows);

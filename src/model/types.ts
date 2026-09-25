@@ -58,6 +58,8 @@ export interface ExternalCoding {
   coderName: string;
   codes: Code[];
   segments: Segment[];
+  /** Their memos (read-only here). */
+  memos: Memo[];
   importedAt: string;
 }
 
@@ -83,6 +85,14 @@ export interface Project {
 /** 'me', 'consolidated', or the id of an ExternalCoding. */
 export type ColumnKey = string;
 
+/** A column of sticky notes: your memos or another coder's (read-only). */
+export interface MemoColumn {
+  key: ColumnKey;
+  name: string;
+  mine: boolean;
+  memos: Memo[];
+}
+
 export interface TableColumn {
   key: ColumnKey;
   kind: 'mine' | 'consolidated' | 'external';
@@ -98,8 +108,11 @@ export interface UIState {
   /** Target folder for new files and folders (null = top level). */
   selectedFolderId: string | null;
   collapsed: string[];
-  /** External codings that are hidden in the comparison view. */
-  hiddenExternal: string[];
+  /** Columns hidden in the comparison view (coder columns, memo columns, Consolidated). */
+  hiddenColumns: ColumnKey[];
+  /** Master switches: show codes (highlights, brackets, list) and memos (notes, underlines, list). */
+  showCodes: boolean;
+  showMemos: boolean;
   segmentsHidden: boolean;
   /** Order of the coder columns in the comparison view. */
   columnOrder: ColumnKey[];
@@ -121,4 +134,6 @@ export interface UIState {
   codeTarget: 'mine' | 'consolidated';
   /** Whether the help section of the code box is open. */
   codeBoxHelp: boolean;
+  /** Fingerprint and time of the project when a copy was last downloaded (or opened from a file). */
+  backedUp: { fingerprint: string; at: string } | null;
 }

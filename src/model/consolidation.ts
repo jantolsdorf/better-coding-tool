@@ -31,7 +31,7 @@ export function finishConsolidation(docId: string): { keptAs: ExternalCoding; cr
   let before = project.externalCodings.find((x) => x.coderName === name);
   const created = !before;
   if (!before) {
-    before = { id: uid('x'), coderName: name, codes: [], segments: [], importedAt: now() };
+    before = { id: uid('x'), coderName: name, codes: [], segments: [], memos: [], importedAt: now() };
     project.externalCodings.push(before);
   }
   // Keep every code the kept segments may refer to, including ones created since last time.

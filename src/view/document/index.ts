@@ -9,6 +9,7 @@ import { TEXT_KEY } from '../../model/table';
 import type { Doc } from '../../model/types';
 import { h } from '../dom';
 import { closeCodeBox, initCodeBox } from './codeBox';
+import { initViewMenu, viewMenu } from './viewMenu';
 import { buildColumns, layoutColumns, makeColumnDraggable, makeResizable, scheduleLayout, setFixedWidth } from './columns';
 import {
   applyHighlights,
@@ -33,6 +34,7 @@ export function initDocumentView(el: HTMLElement, empty: HTMLElement) {
   makeColumnDraggable(textCol, TEXT_KEY);
   makeResizable(textCol, setTextWidth);
   initCodeBox();
+  initViewMenu();
   new ResizeObserver(scheduleLayout).observe(textBody);
 }
 
@@ -70,6 +72,7 @@ function renderHeader(doc: Doc) {
     h(
       'div',
       { class: 'vh-actions' },
+      viewMenu(),
       h(
         'button',
         {

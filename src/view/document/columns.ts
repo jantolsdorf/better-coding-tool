@@ -17,9 +17,8 @@ import { currentDoc } from '../../model/documents';
 import { activeLayer, consolidationOf } from '../../model/layers';
 import { lineLabel } from '../../model/lines';
 import { ui } from '../../model/state';
-import { memosOf } from '../../model/memos';
-import { columnKeysInOrder, MEMOS_KEY, tableColumns, TEXT_KEY } from '../../model/table';
-import type { Code, ColumnKey, Doc, Memo, Segment, TableColumn } from '../../model/types';
+import { columnKeysInOrder, memoColumns, tableColumns, TEXT_KEY } from '../../model/table';
+import type { Code, ColumnKey, Doc, Memo, MemoColumn, Segment, TableColumn } from '../../model/types';
 import { h, hexToRgba } from '../dom';
 import { focusSegment, gridEl, rangeFor, renderedContent, renderedDocId, setHoverRange } from './textView';
 
@@ -33,13 +32,14 @@ interface Column {
 const COLUMN_DND_TYPE = 'application/x-bct-column';
 
 let columns: Column[] = [];
-let memoBody: HTMLElement | null = null;
+let memoCols: { col: MemoColumn; body: HTMLElement }[] = [];
 let layoutQueued = false;
 
 export function buildColumns(doc: Doc) {
   gridEl.querySelectorAll('.coder-col').forEach((c) => c.remove());
-  memoBody = null;
-  columns = tableColumns().map((col) => {
+  memoCols = [];
+  // The Codes switch hides all coder columns; the Memos switch all memo columns.
+  columns = (ui.showCodes ? tableColumns() : []).map((col) => {
     const segs = col.segments.filter((s) => s.docId === doc.id);
     const codes = new Map(col.codes.map((c) => [c.id, c]));
     const body = h('div', { class: 'col-body' });
@@ -64,7 +64,7 @@ export function buildColumns(doc: Doc) {
     gridEl.append(el);
     return { col, segs, codes, body };
   });
-  buildMemoColumn(doc);
+  if (ui.showMemos) memoColumns().forEach(buildMemoColumn);
   // Visual order (the DOM keeps the text first); the text stays pinned while it is the first column.
   const keys = columnKeysInOrder();
   for (const el of gridEl.querySelectorAll<HTMLElement>('.text-col, .coder-col')) {
@@ -219,46 +219,43 @@ export function layoutColumns() {
     flush();
     col.body.replaceChildren(...boxes);
   }
-  layoutMemos(doc);
+  for (const { col, body } of memoCols) layoutMemos(doc, col, body);
 }
 
 // ---------- memos (sticky notes) ----------
 
-/** The column with the document's memos; only shown when there are any. */
-function buildMemoColumn(doc: Doc) {
-  const memos = memosOf(doc.id);
-  if (!memos.length) return;
-  memoBody = h('div', { class: 'col-body' });
+/** A column of sticky notes: your memos, or another coder's (read-only). */
+function buildMemoColumn(col: MemoColumn) {
+  const body = h('div', { class: 'col-body' });
   const el = h(
     'div',
-    { class: 'coder-col memo-col', 'data-key': MEMOS_KEY },
+    { class: 'coder-col memo-col' + (col.mine ? ' mine' : ''), 'data-key': col.key },
     h(
       'div',
-      { class: 'col-head', title: 'Memos — drag to reorder', draggable: true },
+      { class: 'col-head', title: `${col.name} — drag to reorder`, draggable: true },
       h('span', { class: 'grip' }, '⋮⋮'),
-      h('span', { class: 'col-name' }, 'Memos'),
-      h('span', { class: 'badge' }, String(memos.length)),
+      h('span', { class: 'col-name' }, col.name),
+      h('span', { class: 'badge' }, String(col.memos.length)),
     ),
-    memoBody,
+    body,
     h('div', { class: 'col-resizer', title: 'Drag to resize' }),
   );
-  const width = ui.columnWidths[MEMOS_KEY];
+  const width = ui.columnWidths[col.key];
   if (width) setFixedWidth(el, width);
-  makeColumnDraggable(el, MEMOS_KEY);
-  makeResizable(el, (w) => setColumnWidth(MEMOS_KEY, w), 120, 700);
+  makeColumnDraggable(el, col.key);
+  makeResizable(el, (w) => setColumnWidth(col.key, w), 120, 700);
   gridEl.append(el);
+  memoCols.push({ col, body });
 }
 
 /** Places each sticky note next to its passage, pushing notes down so they never overlap. */
-function layoutMemos(doc: Doc) {
-  if (!memoBody) return;
-  const body = memoBody;
+function layoutMemos(doc: Doc, col: MemoColumn, body: HTMLElement) {
   const base = body.getBoundingClientRect().top;
-  const notes = memosOf(doc.id)
-    .filter((m) => m.end <= renderedContent.length)
+  const notes = col.memos
+    .filter((m) => m.docId === doc.id && m.end <= renderedContent.length)
     .map((m) => ({ m, top: rangeFor(m.start, m.end).getBoundingClientRect().top - base }))
     .sort((a, b) => a.top - b.top);
-  body.replaceChildren(...notes.map(({ m }) => stickyNote(doc, m)));
+  body.replaceChildren(...notes.map(({ m }) => stickyNote(doc, m, col.mine)));
   let bottom = 0;
   notes.forEach(({ top }, i) => {
     const el = body.children[i] as HTMLElement;
@@ -268,12 +265,13 @@ function layoutMemos(doc: Doc) {
   });
 }
 
-function stickyNote(doc: Doc, m: Memo): HTMLElement {
-  const text = h('div', { class: 'sticky-text', title: 'Click to edit' }, m.note);
+/** A sticky note; your own can be edited and deleted, other coders' are read-only. */
+function stickyNote(doc: Doc, m: Memo, editable: boolean): HTMLElement {
+  const text = h('div', { class: 'sticky-text', title: editable ? 'Click to edit' : null }, m.note);
   const note = h(
     'div',
     {
-      class: 'sticky',
+      class: 'sticky' + (editable ? '' : ' readonly'),
       onMouseenter: () => setHoverRange(m.start, m.end),
       onMouseleave: () => setHoverRange(null),
     },
@@ -281,23 +279,25 @@ function stickyNote(doc: Doc, m: Memo): HTMLElement {
       'div',
       { class: 'sticky-head' },
       h('button', { class: 'sticky-lines', title: 'Show the passage', onClick: () => focusSegment(m.start, m.end) }, lineLabel(doc, m.start, m.end)),
-      h(
-        'button',
-        {
-          class: 'stripe-btn',
-          title: 'Delete memo',
-          onClick: (e: MouseEvent) => {
-            e.stopPropagation();
-            setHoverRange(null);
-            removeMemo(m.id);
-          },
-        },
-        '✕',
-      ),
+      editable
+        ? h(
+            'button',
+            {
+              class: 'stripe-btn',
+              title: 'Delete memo',
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation();
+                setHoverRange(null);
+                removeMemo(m.id);
+              },
+            },
+            '✕',
+          )
+        : null,
     ),
     text,
   );
-  text.addEventListener('click', () => editInPlace(note, text, m));
+  if (editable) text.addEventListener('click', () => editInPlace(note, text, m));
   return note;
 }
 

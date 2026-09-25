@@ -8,6 +8,7 @@ import { cycleTheme, setCoderName } from '../controller/preferences';
 import {
   exportCodebook,
   exportProject,
+  hasChangesNotDownloaded,
   exportQdpx,
   exportSegmentsCSV,
   exportTableCSV,
@@ -27,6 +28,7 @@ const THEME_LABELS: Record<UIState['theme'], string> = { auto: '◐ Auto', light
 
 let coderInput: HTMLInputElement;
 let saveStatus: HTMLElement;
+let backupStatus: HTMLButtonElement;
 let undoBtn: HTMLButtonElement;
 let redoBtn: HTMLButtonElement;
 let themeBtn: HTMLButtonElement;
@@ -36,6 +38,8 @@ let codeView: HTMLSelectElement;
 export function initTopbar() {
   coderInput = $<HTMLInputElement>('coder-name');
   saveStatus = $('save-status');
+  backupStatus = $<HTMLButtonElement>('backup-status');
+  backupStatus.addEventListener('click', exportProject);
   undoBtn = $<HTMLButtonElement>('btn-undo');
   redoBtn = $<HTMLButtonElement>('btn-redo');
   themeBtn = $<HTMLButtonElement>('btn-theme');
@@ -124,4 +128,15 @@ export function renderTopbar() {
   redoBtn.disabled = !canRedo();
   const kb = savedBytes / 1024;
   saveStatus.textContent = savedBytes ? `Saved in browser · ${kb < 1024 ? `${kb.toFixed(0)} KB` : `${(kb / 1024).toFixed(1)} MB`}` : '';
+  // Whether the latest changes are also in a downloaded copy; clicking downloads one.
+  const pending = hasChangesNotDownloaded();
+  backupStatus.hidden = !pending && !ui.backedUp;
+  backupStatus.classList.toggle('pending', pending);
+  backupStatus.disabled = !pending;
+  backupStatus.textContent = pending
+    ? '● Not downloaded'
+    : `✓ Downloaded ${ui.backedUp ? new Date(ui.backedUp.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}`;
+  backupStatus.title = pending
+    ? 'Your latest changes are only saved in this browser. Click to download a copy of the project (.zip).'
+    : 'A downloaded copy contains all your changes.';
 }

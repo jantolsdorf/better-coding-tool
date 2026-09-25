@@ -49,7 +49,13 @@ npm run build      # produces a single self-contained dist/index.html
   be moved and resized like the other columns) and in the side list, and their passages are
   underlined with dots. Click a sticky note to edit it (**Enter** saves, **Shift+Enter** adds a
   line, **Esc** cancels; emptying it deletes the memo). The table CSV export has a *Memos*
-  column when a document has memos.
+  column when a document has memos. Memos of other coders are imported with their coding and
+  shown in their own read-only column.
+- **View ▾** (above the text): switch all **Codes** (colors, brackets and list) or all **Memos**
+  (sticky notes, underlines and list) on or off, and tick which columns to show: your codes and
+  memos, the consolidated coding, and each other coder's codes and memos. The menu stays open
+  while you tick boxes. Hidden columns are also left out of the table CSV export; the two
+  switches only affect the screen.
 - **Display**: coded passages are highlighted in the code's color. The column next to the text
   shows a bracket per segment spanning its first to last line; the right panel lists each
   segment with its line range (e.g. `L6–L8`) and text. Hover to highlight, click to jump.
@@ -71,6 +77,11 @@ npm run build      # produces a single self-contained dist/index.html
     Importing accepts a codebook file or any exported project and only adds codes (matched by
     path, i.e. name and position); you can choose whether existing codes take the imported color
     and description. Consolidation matches other coders' codes by path in the same way.
+- **Backups**: the top bar shows **● Not downloaded** while your latest changes exist only in
+  this browser (click it to download the project zip) and **✓ Downloaded** with the time once a
+  copy has them. Closing or reloading the tab with changes that were not downloaded triggers the
+  browser's “Leave site?” confirmation; if you choose to stay, a dialog offers **Download copy**.
+  (Browsers do not allow buttons in their own leave confirmation, hence the second step.)
 - **Undo / redo**: the ↶/↷ buttons or ⌘Z / ⇧⌘Z (Ctrl+Z / Ctrl+Y) undo any change to the
   project (last 50 steps, kept until the page is reloaded).
 - **Export project** downloads the whole project as a `.zip`:
@@ -151,9 +162,10 @@ notifies `renderApp`, which re-renders the views.
 | `controller/preferences.ts`, `history.ts` | Coder name, theme, layout; undo/redo |
 | **`src/view/`** | Rendering and DOM events |
 | `view/app.ts` | Sets up all views and re-renders them |
-| `view/document/` | The document area: text and highlights, coder columns, code box |
+| `view/document/` | The document area: text and highlights, coder and memo columns, code box, View menu |
 | `view/tree.ts`, `codebookList.ts`, `codeDialog.ts`, `segmentList.ts`, `coderList.ts` | The panels and the code details dialog |
 | `view/topbar.ts`, `welcome.ts` | Top bar, menus, keyboard shortcuts; first-use dialog |
+| `view/leaveGuard.ts` | Warning before closing the tab, with an offer to download a copy |
 | `view/layout.ts`, `splitters.ts` | Rearranging and resizing the main areas and sidebar panels |
 | `view/dom.ts`, `feedback.ts`, `files.ts` | DOM helpers; messages and questions; file picking and downloads |
 | `view/style.css` | Styles, including the light and dark themes |

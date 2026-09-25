@@ -7,6 +7,7 @@ import { currentDoc } from '../model/documents';
 import { activeLayer, layerSegments } from '../model/layers';
 import { lineLabel } from '../model/lines';
 import { memosOf } from '../model/memos';
+import { ui } from '../model/state';
 import type { Doc, Memo, Segment } from '../model/types';
 import { openCodeDialog } from './codeDialog';
 import { focusSegment, setHoverRange } from './document/textView';
@@ -32,13 +33,19 @@ export function renderSegmentList(container: HTMLElement, countEl: HTMLElement, 
     container.replaceChildren(h('p', { class: 'muted pad' }, 'Open a document to see its coded segments.'));
     return;
   }
-  const segs = layerSegments()
-    .filter((s) => s.docId === doc.id)
-    .sort((a, b) => a.start - b.start || a.end - b.end);
-  const memos = memosOf(doc.id);
+  const allSegs = layerSegments().filter((s) => s.docId === doc.id);
+  const allMemos = memosOf(doc.id);
+  // The Codes / Memos switches (View ▾) also apply to this list.
+  const segs = (ui.showCodes ? allSegs : []).sort((a, b) => a.start - b.start || a.end - b.end);
+  const memos = ui.showMemos ? allMemos : [];
   countEl.textContent = String(segs.length);
   if (!segs.length && !memos.length) {
-    container.replaceChildren(h('p', { class: 'muted pad' }, 'Nothing coded yet. Highlight a passage in the text and type a code (or “memo: …”).'));
+    const hidden = allSegs.length + allMemos.length > 0;
+    container.replaceChildren(
+      h('p', { class: 'muted pad' }, hidden
+        ? 'Codes and memos are hidden. Turn them on again under View ▾ above the text.'
+        : 'Nothing coded yet. Highlight a passage in the text and type a code (or “memo: …”).'),
+    );
     return;
   }
   // Segments and memos in text order; memos look like sticky notes.

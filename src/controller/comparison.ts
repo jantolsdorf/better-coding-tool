@@ -25,10 +25,22 @@ export function removeCoderInteractive(x: ExternalCoding) {
   if (confirmAction(`Remove the imported coding of “${x.coderName}”?`)) removeExternal(x.id);
 }
 
-/** Shows or hides a coder's column next to the text. */
-export function setCoderVisible(id: string, visible: boolean) {
-  ui.hiddenExternal = ui.hiddenExternal.filter((x) => x !== id);
-  if (!visible) ui.hiddenExternal.push(id);
+/** Shows or hides a column next to the text (a coder's codes or memos, or the consolidated coding). */
+export function setColumnVisible(key: ColumnKey, visible: boolean) {
+  ui.hiddenColumns = ui.hiddenColumns.filter((k) => k !== key);
+  if (!visible) ui.hiddenColumns.push(key);
+  commitUI();
+}
+
+/** Master switch for all codes on screen: highlights, brackets and code cards. */
+export function setCodesShown(shown: boolean) {
+  ui.showCodes = shown;
+  commitUI();
+}
+
+/** Master switch for all memos on screen: sticky notes, underlines and memo cards. */
+export function setMemosShown(shown: boolean) {
+  ui.showMemos = shown;
   commitUI();
 }
 
@@ -50,7 +62,7 @@ export function finishConsolidationInteractive(doc: Doc) {
   const res = finishConsolidation(doc.id);
   if (!res) return;
   // The kept coding is for reference; it starts hidden so it does not crowd the table.
-  if (res.created) setCoderVisible(res.keptAs.id, false);
+  if (res.created) setColumnVisible(res.keptAs.id, false);
   toast(`Done. Your previous coding of this document is kept as “${res.keptAs.coderName}”.`, 5000);
 }
 

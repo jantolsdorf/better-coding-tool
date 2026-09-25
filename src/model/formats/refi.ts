@@ -302,7 +302,7 @@ export function parseQdpx(bytes: Uint8Array, chooseUser: (users: QdpxUser[]) => 
   p.segments = mine ? (segmentsByUser.get(mine) ?? []) : [];
   p.externalCodings = users
     .filter((u) => u.guid !== mine)
-    .map((u): ExternalCoding => ({ id: uid('x'), coderName: u.name, codes: codes.map((c) => ({ ...c })), segments: segmentsByUser.get(u.guid)!, importedAt: new Date().toISOString() }));
+    .map((u): ExternalCoding => ({ id: uid('x'), coderName: u.name, codes: codes.map((c) => ({ ...c })), segments: segmentsByUser.get(u.guid)!, memos: [], importedAt: new Date().toISOString() }));
   return { project: p, skipped };
 }
 

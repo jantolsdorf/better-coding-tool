@@ -27,10 +27,12 @@ export function parseProject(data: unknown): Project {
   const validRange = (r: { docId: unknown; start: unknown; end: unknown } | null) =>
     !!r && typeof r.docId === 'string' && Number.isInteger(r.start) && Number.isInteger(r.end) && (r.start as number) >= 0 && (r.end as number) > (r.start as number);
   const validSegment = (s: Segment) => validRange(s);
+  const validMemo = (m: Memo) => validRange(m) && typeof m.note === 'string';
   const externalCodings = arr<ExternalCoding>(d.externalCodings).map((x) => ({
     ...x,
     codes: arr<Code>(x.codes),
     segments: arr<Segment>(x.segments).filter(validSegment),
+    memos: arr<Memo>(x.memos).filter(validMemo),
   }));
   return {
     format: 'bct-project',
@@ -40,7 +42,7 @@ export function parseProject(data: unknown): Project {
     docs: arr<Doc>(d.docs).filter((doc) => typeof doc?.content === 'string'),
     codes: arr<Code>(d.codes),
     segments: arr<Segment>(d.segments).filter(validSegment),
-    memos: arr<Memo>(d.memos).filter((m) => validRange(m) && typeof m.note === 'string'),
+    memos: arr<Memo>(d.memos).filter(validMemo),
     externalCodings,
     consolidations: parseConsolidations(d, validSegment),
   };

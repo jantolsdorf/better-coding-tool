@@ -4,8 +4,8 @@
 import { codeById } from '../../model/codes';
 import { layerSegments } from '../../model/layers';
 import { lineOf, lineStartsOf } from '../../model/lines';
-import { memosOf } from '../../model/memos';
-import { TEXT_KEY } from '../../model/table';
+import { ui } from '../../model/state';
+import { memoColumns, TEXT_KEY } from '../../model/table';
 import type { Doc } from '../../model/types';
 import { h, hexToRgba } from '../dom';
 
@@ -136,7 +136,8 @@ export function applyHighlights(doc: Doc | null) {
     return;
   }
   const byCode = new Map<string, Range[]>();
-  for (const s of layerSegments()) {
+  // The Codes switch turns off the code colors (the text is then plain to read).
+  for (const s of ui.showCodes ? layerSegments() : []) {
     if (s.docId !== doc.id) continue;
     if (!byCode.has(s.codeId)) byCode.set(s.codeId, []);
     byCode.get(s.codeId)!.push(rangeFor(s.start, s.end));
@@ -151,9 +152,11 @@ export function applyHighlights(doc: Doc | null) {
     css += `::highlight(${name}){background-color:${hexToRgba(code.color, 0.3)};}\n`;
   });
   dynStyle.textContent = css;
-  // Passages with a memo are underlined (styled in style.css), so they don't clash with code colors.
-  const memoRanges = memosOf(doc.id)
-    .filter((m) => m.end <= doc.content.length)
+  // Passages with a memo in a visible memo column are underlined (styled in style.css), so they
+  // don't clash with code colors.
+  const memoRanges = (ui.showMemos ? memoColumns([doc.id]) : [])
+    .flatMap((c) => c.memos)
+    .filter((m) => m.docId === doc.id && m.end <= doc.content.length)
     .map((m) => rangeFor(m.start, m.end));
   if (memoRanges.length) {
     registry!.set('qc-memo', new HighlightCtor!(...memoRanges));

@@ -14,10 +14,10 @@ import {
 } from '../model/formats/projectFile';
 import { buildQdpx, parseQdpx } from '../model/formats/refi';
 import { emptyProject, parseProject } from '../model/parse';
-import { project, replaceProject } from '../model/state';
-import { tableColumns } from '../model/table';
+import { commitUI, project, projectFingerprint, replaceProject, ui } from '../model/state';
+import { memoColumns, tableColumns } from '../model/table';
 import type { Doc, Project } from '../model/types';
-import { safeFileName } from '../model/util';
+import { now, safeFileName } from '../model/util';
 import { ask, confirmAction, notify, toast } from '../view/feedback';
 import { downloadFile, pickFiles } from '../view/files';
 
@@ -67,6 +67,20 @@ function readQdpx(bytes: Uint8Array, fileName: string, purpose: QdpxPurpose): Pr
   return p;
 }
 
+// ---------- backups ----------
+
+/** Remembers that the project as it is now exists as a file (downloaded or opened from one). */
+function markBackedUp() {
+  ui.backedUp = { fingerprint: projectFingerprint(), at: now() };
+  commitUI();
+}
+
+/** Whether the project has changes that are only in this browser, not in a downloaded copy. */
+export function hasChangesNotDownloaded(): boolean {
+  const empty = !project.docs.length && !project.codes.length && !project.memos.length;
+  return !empty && ui.backedUp?.fingerprint !== projectFingerprint();
+}
+
 // ---------- projects ----------
 
 /** Replaces the current project with an exported project or a REFI-QDA project. */
@@ -92,6 +106,7 @@ export async function importProjectInteractive() {
       if (stayMe) p.coderName = me;
     }
     replaceProject(p);
+    markBackedUp();
     toast(`Loaded ${p.docs.length} document(s), ${p.codes.length} code(s), ${p.segments.length} segment(s).`);
   } catch (e) {
     importFailed(file, e);
@@ -103,8 +118,10 @@ export function newProjectInteractive() {
   replaceProject(emptyProject(project.coderName));
 }
 
+/** Downloads the whole project as a zip (a complete copy that can be opened again). */
 export function exportProject() {
   downloadFile(`coding-${exportName()}-${today()}.zip`, buildProjectZip(), 'application/zip');
+  markBackedUp();
 }
 
 /** The project in the REFI-QDA exchange format, for MAXQDA, NVivo, ATLAS.ti and others. */
@@ -149,7 +166,8 @@ export async function importCoderInteractive() {
     // Only documents that match, or missing coded ones the user agreed to add, are passed on.
     const docs = src.docs.filter((d) => !missing.includes(d) || (addTo && missingCoded.includes(d)));
     const res = addExternalCoding({ ...src, docs }, name, addTo);
-    toast(`Imported ${res.imported} segment(s) coded by ${name}${res.skipped ? `, skipped ${res.skipped}` : ''}.`);
+    const memos = res.memos ? ` and ${res.memos} memo(s)` : '';
+    toast(`Imported ${res.imported} segment(s)${memos} by ${name}${res.skipped ? `, skipped ${res.skipped}` : ''}.`);
   }
 }
 
@@ -194,7 +212,8 @@ export async function importCodebookInteractive() {
 export function exportTableCSV(scope: 'current' | 'all') {
   const docs = scope === 'current' ? [currentDoc()].filter((d): d is Doc => !!d) : docsInTreeOrder();
   if (!docs.length) return toast(scope === 'current' ? 'Open a document first.' : 'There are no documents.');
-  const csv = tableCSV(docs, tableColumns(docs.map((d) => d.id)));
+  const ids = docs.map((d) => d.id);
+  const csv = tableCSV(docs, tableColumns(ids), memoColumns(ids));
   const what = scope === 'current' ? safeFileName(docs[0].name.replace(/\.txt$/i, '')) : 'all-documents';
   downloadFile(`table-${what}-${today()}.csv`, csv, 'text/csv');
 }

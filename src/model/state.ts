@@ -22,7 +22,9 @@ function loadUI(): UIState {
     selectedDocId: null,
     selectedFolderId: null,
     collapsed: [],
-    hiddenExternal: [],
+    hiddenColumns: [],
+    showCodes: true,
+    showMemos: true,
     segmentsHidden: false,
     columnOrder: [],
     columnWidths: {},
@@ -37,9 +39,16 @@ function loadUI(): UIState {
     segmentsWidth: null,
     codeTarget: 'mine',
     codeBoxHelp: false,
+    backedUp: null,
   };
   try {
-    return { ...defaults, ...JSON.parse(localStorage.getItem(UI_KEY) ?? '{}') };
+    const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? '{}');
+    // Older versions only stored hidden coders.
+    if (Array.isArray(saved.hiddenExternal)) {
+      saved.hiddenColumns = [...(saved.hiddenColumns ?? []), ...saved.hiddenExternal];
+      delete saved.hiddenExternal;
+    }
+    return { ...defaults, ...saved };
   } catch {
     return defaults;
   }
@@ -131,6 +140,16 @@ export function commit() {
   emit();
 }
 
+/** A short fingerprint of the project as last committed (FNV-1a hash of its JSON). */
+export function projectFingerprint(): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < lastJson.length; i++) {
+    hash ^= lastJson.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${(hash >>> 0).toString(16)}-${lastJson.length}`;
+}
+
 /** Persist UI state only and re-render. */
 export function commitUI() {
   saveUI();
@@ -143,6 +162,6 @@ export function replaceProject(p: Project) {
   ui.selectedDocId = null;
   ui.selectedFolderId = null;
   ui.collapsed = [];
-  ui.hiddenExternal = [];
+  ui.hiddenColumns = [];
   commit();
 }

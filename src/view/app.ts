@@ -8,6 +8,7 @@ import { initSegmentList, renderSegmentList } from './segmentList';
 import { applyPanelSizes, initSplitters } from './splitters';
 import { initTopbar, renderTopbar } from './topbar';
 import { initTree, renderTree } from './tree';
+import { initLeaveGuard } from './leaveGuard';
 import { ui } from '../model/state';
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -33,6 +34,7 @@ export function initApp() {
   initTopbar();
   initSplitters(sidebar);
   initMainLayout(layout);
+  initLeaveGuard();
 
   // Dropping a file outside the document tree should not navigate away from the app.
   window.addEventListener('dragover', (e) => e.preventDefault());
