@@ -46,6 +46,9 @@ export function tableColumns(docIds: (string | null)[] = [ui.selectedDocId]): Ta
     .map((x) => x.c);
 }
 
+/** The coder columns compared while consolidating: yours and other coders' as shown, not the consolidated coding. */
+export const comparedColumns = (cols: TableColumn[] = tableColumns()) => cols.filter((c) => c.kind !== 'consolidated');
+
 /** The memo columns that are not hidden and have memos in one of `docIds`. */
 export function memoColumns(docIds: (string | null)[] = [ui.selectedDocId]): MemoColumn[] {
   const inDocs = <T extends { docId: string }>(list: T[]) => list.filter((m) => docIds.includes(m.docId));

@@ -113,7 +113,7 @@ export function buildCodebookJson(): string {
 /** The codebook in a codebook file, an exported project (.zip/.json), or a REFI-QDA project. */
 export function readCodebookFile(bytes: Uint8Array): CodebookEntry[] {
   // Only the codebook of a REFI-QDA project is needed, so no coder has to be chosen.
-  if (isQdpxFile(bytes)) return codebookEntries(parseQdpx(bytes, () => null).project.codes);
+  if (isQdpxFile(bytes)) return codebookEntries(parseQdpx(bytes).codes);
   const data = readJson(bytes);
   const d = data as { format?: string; codes?: unknown };
   return d?.format === CODEBOOK_FORMAT && Array.isArray(d.codes)

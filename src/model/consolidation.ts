@@ -1,12 +1,13 @@
 // Consolidation happens per document: each document has its own consolidated coding, built by
 // accepting segments from every coder. Finishing or discarding it leaves other documents alone.
 
-import { codeForPath, findCodeByPath } from './codes';
+import { codeForPath, codePathParts, findCodeByPath } from './codes';
 import { getDoc } from './documents';
 import { consolidationOf } from './layers';
+import { lineLabel, lineSpan } from './lines';
 import { addOrMerge } from './segmentOps';
 import { commit, project } from './state';
-import type { ExternalCoding, Segment } from './types';
+import type { Code, Doc, ExternalCoding, Segment, TableColumn } from './types';
 import { now, uid } from './util';
 
 export function startConsolidation(docId: string) {
@@ -72,4 +73,84 @@ export function acceptIntoConsolidated(items: AcceptItem[]) {
   }
   commit();
   return changed;
+}
+
+// ---------- agreement between coders ----------
+
+/**
+ * How a segment relates to another coder column: 'match' when that column has the same code on
+ * the same lines (on overlapping text), 'boundary' when it has the code on an overlapping passage
+ * but on other lines, 'missing' when it does not have the code there at all.
+ */
+export type Agreement = 'match' | 'boundary' | 'missing';
+
+export interface SegmentAgreement {
+  /** The worst relation to any other column: a segment only matches if every column agrees. */
+  status: Agreement;
+  others: { name: string; status: Agreement; lines?: string; seg?: Segment }[];
+}
+
+/** Identifies a segment within a column (coders who imported the same project share segment ids). */
+export const segmentKey = (col: TableColumn, s: Segment) => `${col.key}:${s.id}`;
+
+interface Entry {
+  seg: Segment;
+  code: Code;
+  path: string;
+  lines: [number, number];
+}
+
+/** A column's segments in a document with their code path (case-insensitive) and lines. */
+function entriesOf(doc: Doc, col: TableColumn): Entry[] {
+  const codes = new Map(col.codes.map((c) => [c.id, c]));
+  return col.segments.flatMap((seg) => {
+    const code = seg.docId === doc.id ? codes.get(seg.codeId) : undefined;
+    if (!code) return [];
+    const path = codePathParts(code, col.codes).map((p) => p.trim().toLowerCase()).join('>');
+    return [{ seg, code, path, lines: lineSpan(doc, seg.start, seg.end) }];
+  });
+}
+
+/**
+ * Compares the coder columns (at least two) of a document: for every segment, whether all other
+ * columns have the same code on the same lines. Keys are `segmentKey`s.
+ */
+export function compareCodings(doc: Doc, cols: TableColumn[]): Map<string, SegmentAgreement> {
+  const out = new Map<string, SegmentAgreement>();
+  if (cols.length < 2) return out;
+  const entries = cols.map((c) => entriesOf(doc, c));
+  cols.forEach((col, i) => {
+    for (const e of entries[i]) {
+      const others = cols.flatMap((other, j): SegmentAgreement['others'] => {
+        if (j === i) return [];
+        const same = entries[j].filter((o) => o.path === e.path && o.seg.start < e.seg.end && e.seg.start < o.seg.end);
+        const exact = same.find((o) => o.lines[0] === e.lines[0] && o.lines[1] === e.lines[1]);
+        if (exact) return [{ name: other.name, status: 'match', seg: exact.seg }];
+        if (same.length) return [{ name: other.name, status: 'boundary', lines: lineLabel(doc, same[0].seg.start, same[0].seg.end) }];
+        return [{ name: other.name, status: 'missing' }];
+      });
+      const worst = (a: Agreement) => others.some((o) => o.status === a);
+      const status = worst('missing') ? 'missing' : worst('boundary') ? 'boundary' : 'match';
+      out.set(segmentKey(col, e.seg), { status, others });
+    }
+  });
+  return out;
+}
+
+/**
+ * The passages all columns agree on, ready to accept: one item per match, covering the union of
+ * the coders' segments.
+ */
+export function matchingItems(doc: Doc, cols: TableColumn[]): AcceptItem[] {
+  const agreement = compareCodings(doc, cols);
+  if (!agreement.size) return [];
+  const source = cols.map((c) => c.name).join(' + ');
+  return entriesOf(doc, cols[0]).flatMap((e) => {
+    const a = agreement.get(segmentKey(cols[0], e.seg));
+    if (a?.status !== 'match') return [];
+    const segs = [e.seg, ...a.others.map((o) => o.seg!)];
+    const start = Math.min(...segs.map((s) => s.start));
+    const end = Math.max(...segs.map((s) => s.end));
+    return [{ seg: { ...e.seg, start, end }, path: codePathParts(e.code, cols[0].codes), color: e.code.color, source }];
+  });
 }

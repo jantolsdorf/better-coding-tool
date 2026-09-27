@@ -6,11 +6,12 @@ import {
   acceptIntoConsolidated,
   discardConsolidation,
   finishConsolidation,
+  matchingItems,
   startConsolidation,
   type AcceptItem,
 } from '../model/consolidation';
 import { commitUI, ui } from '../model/state';
-import { CONSOLIDATED_KEY, reorderedColumns } from '../model/table';
+import { comparedColumns, CONSOLIDATED_KEY, reorderedColumns } from '../model/table';
 import type { Code, ColumnKey, Doc, ExternalCoding, Segment, TableColumn } from '../model/types';
 import { ask, confirmAction, toast } from '../view/feedback';
 
@@ -93,6 +94,24 @@ export function acceptAllSegments(col: TableColumn, segs: Segment[], codes: Map<
   });
   const n = acceptIntoConsolidated(items);
   toast(n ? `Accepted ${n} segment${n === 1 ? '' : 's'} from ${col.name}.` : 'Nothing new to accept.');
+}
+
+/**
+ * Accepts every passage on which all shown coder columns agree (same code on the same lines) into
+ * the document's consolidated coding. Hiding a column leaves that coder out of the comparison.
+ */
+export function acceptMatchingSegments(doc: Doc) {
+  const cols = comparedColumns();
+  if (cols.length < 2) {
+    toast('Show at least two coder columns (View ▾) to find the codes they agree on.', 4500);
+    return;
+  }
+  const items = matchingItems(doc, cols);
+  const n = items.length ? acceptIntoConsolidated(items) : 0;
+  const names = cols.map((c) => c.name).join(', ');
+  if (n) toast(`Accepted ${n} segment${n === 1 ? '' : 's'} on which ${names} agree.`, 4500);
+  else if (items.length) toast('All matching segments are already in the consolidated coding.');
+  else toast(`${names} do not have the same code on the same lines anywhere in this document.`, 4500);
 }
 
 // ---------- column layout ----------

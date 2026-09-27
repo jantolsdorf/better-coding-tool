@@ -12,12 +12,12 @@ import {
 import { removeSegment } from '../../controller/coding';
 import { editMemo, removeMemo } from '../../controller/memos';
 import { codePathParts } from '../../model/codes';
-import { isConsolidated } from '../../model/consolidation';
+import { compareCodings, isConsolidated, segmentKey, type SegmentAgreement } from '../../model/consolidation';
 import { currentDoc } from '../../model/documents';
 import { activeLayer, consolidationOf } from '../../model/layers';
 import { lineLabel } from '../../model/lines';
 import { ui } from '../../model/state';
-import { columnKeysInOrder, memoColumns, tableColumns, TEXT_KEY } from '../../model/table';
+import { columnKeysInOrder, comparedColumns, memoColumns, tableColumns, TEXT_KEY } from '../../model/table';
 import type { Code, ColumnKey, Doc, Memo, MemoColumn, Segment, TableColumn } from '../../model/types';
 import { h } from '../dom';
 import { focusSegment, gridEl, rangeFor, renderedContent, renderedDocId, setHoverRange } from './textView';
@@ -197,6 +197,8 @@ export function layoutColumns() {
   if (!doc) return;
   const keys = columnKeysInOrder();
   const textAt = keys.indexOf(TEXT_KEY);
+  // While consolidating, each segment shows whether the other shown coders agree with it.
+  const agreement = consolidationOf(doc.id) ? compareCodings(doc, comparedColumns(columns.map((c) => c.col))) : new Map<string, SegmentAgreement>();
   for (const col of columns) {
     // Mirror everything when the column is left of the text, so brackets still open towards it.
     const textOnLeft = keys.indexOf(col.col.key) > textAt;
@@ -236,7 +238,7 @@ export function layoutColumns() {
     const toX = (fromText: number) => (textOnLeft ? fromText : width - fromText);
     const parts: Element[] = [lines];
     for (const it of items) {
-      parts.push(...codeMark(doc, col, it, textOnLeft, lanesWidth, labelStart, lines, toX));
+      parts.push(...codeMark(doc, col, it, textOnLeft, lanesWidth, labelStart, lines, toX, agreement.get(segmentKey(col.col, it.s))));
     }
     lines.setAttribute('height', String(Math.max(labelBottom, ...items.map((i) => i.bottom), 0) + 4));
     col.body.replaceChildren(...parts);
@@ -268,6 +270,7 @@ function codeMark(
   labelStart: number,
   lines: SVGSVGElement,
   toX: (fromText: number) => number,
+  agree?: SegmentAgreement,
 ): Element[] {
   const { s, top, bottom, lane, labelTop } = it;
   const code = col.codes.get(s.codeId);
@@ -276,7 +279,7 @@ function codeMark(
   const lineLabelText = lineLabel(doc, s.start, s.end);
   const excerpt = s.text.length > 300 ? s.text.slice(0, 300) + '…' : s.text;
   const from = s.source ? ` · from ${s.source}` : '';
-  const title = `${name} · ${lineLabelText}${from}\n\n${excerpt}`;
+  const title = `${name} · ${lineLabelText}${from}${agree ? `\n${agreementNote(agree)}` : ''}\n\n${excerpt}`;
   const near = textOnLeft ? 'left' : 'right';
   const far = textOnLeft ? 'right' : 'left';
 
@@ -304,10 +307,11 @@ function codeMark(
   const label = h(
     'div',
     {
-      class: `code-label ${near}`,
+      class: `code-label ${near}` + (agree ? ` agree-${agree.status}` : ''),
       title,
       style: { top: `${labelTop}px`, [near]: `${labelStart}px`, [far]: '4px' },
     },
+    agree ? h('span', { class: `agree-mark ${agree.status}` }, AGREE_MARKS[agree.status]) : null,
     h('span', { class: 'code-label-name' }, name),
     boxActions(col, s, code),
   );
@@ -329,6 +333,22 @@ function codeMark(
     el.addEventListener('click', select);
   }
   return [brace, label];
+}
+
+const AGREE_MARKS: Record<SegmentAgreement['status'], string> = { match: '=', boundary: '≈', missing: '≠' };
+
+/** How the other shown coders relate to a segment, e.g. "Anna: same code on L4–L6". */
+function agreementNote(a: SegmentAgreement): string {
+  if (a.status === 'match') return `= Same code on the same lines: ${a.others.map((o) => o.name).join(', ')}`;
+  return a.others
+    .map((o) =>
+      o.status === 'match'
+        ? `= ${o.name}: same code on the same lines`
+        : o.status === 'boundary'
+          ? `≈ ${o.name}: same code on ${o.lines}`
+          : `≠ ${o.name}: not coded with this code here`,
+    )
+    .join('\n');
 }
 
 // ---------- memos (sticky notes) ----------

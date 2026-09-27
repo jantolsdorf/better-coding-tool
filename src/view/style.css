@@ -1153,6 +1153,40 @@ body.resizing {
   background: var(--surface);
   box-shadow: 0 0 0 1px var(--border);
 }
+/* Agreement between coders while consolidating: = same code on the same lines, ≈ other lines, ≠ missing. */
+.agree-mark {
+  flex: none;
+  width: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.agree-mark.match {
+  color: var(--ok);
+}
+.agree-mark.boundary {
+  color: var(--warn);
+}
+.agree-mark.missing {
+  color: var(--danger);
+}
+.code-label.agree-match {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+.code-label.agree-boundary {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+.code-label.agree-missing {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.code-label.agree-match.hot,
+.code-label.agree-boundary.hot,
+.code-label.agree-missing.hot {
+  background: color-mix(in srgb, var(--code-color) 22%, transparent);
+}
+.agree-summary {
+  font-size: 12px;
+  white-space: nowrap;
+}
 .stripe-ok {
   color: var(--ok);
   font-weight: 700;

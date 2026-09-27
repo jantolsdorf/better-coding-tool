@@ -1,7 +1,7 @@
 // The "View ▾" menu in the top bar: switches for codes and memos, and a checkbox for every column
 // that can be shown. It stays open while boxes are ticked, so the layout can be changed quickly.
 
-import { setCodesShown, setColumnVisible, setMemosShown, setSegmentListShown, setTextColored } from '../controller/comparison';
+import { setCodesShown, setColumnVisible, setMemosShown, setSegmentListShown } from '../controller/comparison';
 import { ui } from '../model/state';
 import { availableColumns } from '../model/table';
 import { h } from './dom';

@@ -12,7 +12,7 @@ import {
   readCodebookFile,
   readJson,
 } from '../model/formats/projectFile';
-import { buildQdpx, parseQdpx } from '../model/formats/refi';
+import { buildQdpx } from '../model/formats/refi';
 import { emptyProject, parseProject } from '../model/parse';
 import { commitUI, project, projectFingerprint, replaceProject, ui } from '../model/state';
 import { memoColumns, tableColumns } from '../model/table';

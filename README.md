@@ -131,7 +131,17 @@ npm run build      # produces a single self-contained dist/index.html
   for the open document only; documents with a consolidation in progress are marked
   *consolidating* in the document list. Hover a segment in any coder's column and click **＋**
   to accept it (✓ marks accepted ones), or use **⇉ All** in a column header to accept all of
-  that coder's segments in the document. In a document being consolidated, new codes go into
+  that coder's segments in the document.
+  - **Agreement**: while consolidating, the shown coder columns (yours and other coders', not
+    the consolidated one) are compared. Each code name is marked **=** (green) when every
+    shown coder has the same code on the same lines, **≈** (amber) when another coder has the
+    code on overlapping but different lines, and **≠** (red) when another coder did not code
+    it there; hover a name to see who differs. The document header counts both and offers
+    **⇉ Accept … matching**, which adds every agreed passage to the consolidated coding at
+    once, so only the discrepancies are left to decide. Hide a coder's column (View ▾) to
+    leave that coder out of the comparison.
+
+  In a document being consolidated, new codes go into
   the consolidated coding (switch with *Code into* in the code box), so you can also add or
   re-cut segments directly; in all other documents you keep coding as usual. **✓ Finish**
   makes the consolidated coding your coding of that document and keeps your previous coding of

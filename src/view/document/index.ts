@@ -1,10 +1,11 @@
 // The document area: header, text with highlights, coder columns, and the code box.
 
-import { setTextColored, setTextWidth, startConsolidationOf } from '../../controller/comparison';
+import { acceptMatchingSegments, setTextColored, setTextWidth, startConsolidationOf } from '../../controller/comparison';
+import { compareCodings, isConsolidated, matchingItems } from '../../model/consolidation';
 import { currentDoc, folderPath } from '../../model/documents';
 import { activeLayer, consolidationOf, layerSegments } from '../../model/layers';
 import { project, ui } from '../../model/state';
-import { TEXT_KEY } from '../../model/table';
+import { comparedColumns, TEXT_KEY } from '../../model/table';
 import type { Doc } from '../../model/types';
 import { h } from '../dom';
 import { closeCodeBox, initCodeBox } from './codeBox';
@@ -104,6 +105,7 @@ function renderHeader(doc: Doc) {
             'Start consolidation',
           )
         : null,
+      ...(consolidationOf(doc.id) && ui.showCodes ? agreementTools(doc) : []),
     ),
   );
   if (!hlSupported) {
@@ -111,4 +113,47 @@ function renderHeader(doc: Doc) {
       h('div', { class: 'vh-warn' }, 'This browser does not support colored text highlights; codes are still shown in the columns.'),
     );
   }
+}
+
+/**
+ * While consolidating: how many passages the shown coder columns agree and differ on, and a
+ * button that accepts all agreed passages into the consolidated coding.
+ */
+function agreementTools(doc: Doc): HTMLElement[] {
+  const cols = comparedColumns();
+  if (cols.length < 2) {
+    return [h('span', { class: 'agree-summary muted', title: 'Matches are found between the coder columns that are shown' }, 'Show two or more coders to compare')];
+  }
+  const agreement = [...compareCodings(doc, cols).values()];
+  const items = matchingItems(doc, cols);
+  const pending = items.filter((i) => !isConsolidated(i.seg, i.path)).length;
+  const differ = agreement.filter((a) => a.status !== 'match').length;
+  const names = cols.map((c) => c.name).join(', ');
+  return [
+    h(
+      'span',
+      {
+        class: 'agree-summary',
+        title: `Compared: ${names} (hide a column in View ▾ to leave it out).\n= all have the same code on the same lines\n≈ others have the code on overlapping but different lines\n≠ not coded like this by everyone`,
+      },
+      h('span', { class: 'agree-mark match' }, '='),
+      ` ${items.length} agree `,
+      h('span', { class: 'agree-mark missing' }, '≠'),
+      ` ${differ} differ`,
+    ),
+    h(
+      'button',
+      {
+        class: 'btn small',
+        disabled: !pending,
+        title: pending
+          ? `Add the ${pending} passage${pending === 1 ? '' : 's'} on which ${names} agree to the consolidated coding`
+          : items.length
+            ? 'All passages the coders agree on are already in the consolidated coding'
+            : 'The coders do not have the same code on the same lines anywhere in this document',
+        onClick: () => acceptMatchingSegments(doc),
+      },
+      pending ? `⇉ Accept ${pending} matching` : '⇉ Accept matching',
+    ),
+  ];
 }
