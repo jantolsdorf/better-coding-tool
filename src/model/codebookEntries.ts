@@ -6,6 +6,7 @@ import type { Code } from './types';
 import { now, uid } from './util';
 
 export interface CodebookEntry {
+  // The name of the code
   name: string;
   color: string;
   description?: string;

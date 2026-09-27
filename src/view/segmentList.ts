@@ -13,6 +13,8 @@ import { openCodeDialog } from './codeDialog';
 import { focusSegment, setHoverRange } from './document/textView';
 import { h, hexToRgba } from './dom';
 
+export const title = "Labeled segments";
+
 export function initSegmentList(container: HTMLElement) {
   // Clicking a bracket in the text margin highlights the matching card here.
   document.addEventListener('bct:segment-selected', (e) => {
@@ -26,7 +28,7 @@ export function initSegmentList(container: HTMLElement) {
 }
 
 export function renderSegmentList(container: HTMLElement, countEl: HTMLElement, titleEl: HTMLElement) {
-  titleEl.textContent = activeLayer() === 'consolidated' ? 'Consolidated segments' : 'Coded segments';
+  titleEl.textContent = activeLayer() === 'consolidated' ? 'Consolidated segments' : title;
   const doc = currentDoc();
   if (!doc) {
     countEl.textContent = '';

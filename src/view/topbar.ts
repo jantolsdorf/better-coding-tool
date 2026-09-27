@@ -59,7 +59,6 @@ export function initTopbar() {
   onClick('btn-import-coder', importCoderInteractive);
 
   // Import and export
-  onClick('btn-import-coder-top', importCoderInteractive);
   onClick('btn-compare-coder', importCoderInteractive);
   onClick('btn-import-project', importProjectInteractive);
   onClick('btn-import-qdpx', importProjectInteractive);

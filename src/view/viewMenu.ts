@@ -5,6 +5,7 @@ import { setCodesShown, setColumnVisible, setMemosShown, setSegmentListShown, se
 import { ui } from '../model/state';
 import { availableColumns } from '../model/table';
 import { h } from './dom';
+import { title as segmentListTitle } from './segmentList';
 
 let open = false;
 
@@ -55,10 +56,9 @@ function menuItems(): HTMLElement[] {
   const off = (kind: 'codes' | 'memos') => (kind === 'codes' ? !ui.showCodes : !ui.showMemos);
   return [
     h('div', { class: 'view-title' }, 'Show'),
-    checkbox('Codes', 'brackets, list', ui.showCodes, setCodesShown),
-    checkbox('Color coded text', 'otherwise only on hover', ui.colorText, setTextColored, !ui.showCodes),
-    checkbox('Memos', 'sticky notes, underlines, list', ui.showMemos, setMemosShown),
-    checkbox('Segment list', 'panel on the side', !ui.segmentsHidden, setSegmentListShown),
+    checkbox('Codes', 'columns with codes', ui.showCodes, setCodesShown),
+    checkbox('Memos', 'columns with memos', ui.showMemos, setMemosShown),
+    checkbox(segmentListTitle, '', !ui.segmentsHidden, setSegmentListShown),
     h('div', { class: 'view-title' }, 'Columns'),
     ...columns.map((c) =>
       checkbox(c.label, String(c.count), c.visible, (v) => setColumnVisible(c.key, v), off(c.kind)),
