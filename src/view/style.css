@@ -1735,3 +1735,86 @@ dialog.backup {
   align-items: center;
   gap: 4px;
 }
+
+/* ---------- choice dialog ---------- */
+
+.choose-dialog {
+  border: none;
+  border-radius: 12px;
+  padding: 20px;
+  width: min(448px, 92vw);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+}
+.choose-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.35);
+}
+.choose-dialog h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.choose-dialog p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.choose-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.choose-list button {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+.choose-list button:hover {
+  background: var(--hover);
+  border-color: var(--border-strong);
+}
+.choose-list button:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.choose-list button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.choose-list button.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.choose-detail {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.choose-list button.primary .choose-detail {
+  color: rgba(255, 255, 255, 0.8);
+}
+.choose-cancel {
+  display: block;
+  margin: 12px 0 0 auto;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.choose-cancel:hover {
+  background: var(--hover);
+  color: var(--text);
+}

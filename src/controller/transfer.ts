@@ -20,11 +20,16 @@ import type { Doc, Project } from '../model/types';
 import { now, safeFileName } from '../model/util';
 import { ask, confirmAction, notify, toast } from '../view/feedback';
 import { downloadFile, pickFiles } from '../view/files';
+import { ImportController } from './importController';
+import { ImportView, type QdpxPurpose } from '../view/importView';
 
 const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+
+const importView = new ImportView();
+const importController = new ImportController(importView);
 
 const exportName = () => safeFileName(project.coderName || 'project');
 
@@ -35,36 +40,15 @@ const importFailed = (file: File, e: unknown) => {
   if (!(e instanceof ImportCancelled)) notify(`Could not import “${file.name}”: ${(e as Error).message}`);
 };
 
-/** Why a REFI-QDA project is being read: to open it, or to compare with one of its coders. */
-type QdpxPurpose = 'open' | 'compare';
-
 /** Reads a project: an exported .zip (via its project.json), a plain .json, or a REFI-QDA .qdpx. */
 async function readProjectFile(file: File, purpose: QdpxPurpose = 'open'): Promise<Project> {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (isQdpxFile(bytes)) return readQdpx(bytes, file.name, purpose);
-  return parseProject(readJson(bytes));
-}
-
-/** Converts a REFI-QDA project, asking whose coding to use when several people coded it. */
-function readQdpx(bytes: Uint8Array, fileName: string, purpose: QdpxPurpose): Project {
-  const { project: p, skipped } = parseQdpx(bytes, (users) => {
-    const list = users.map((u, i) => `${i + 1}) ${u.name} — ${u.codings} coding${u.codings === 1 ? '' : 's'}`).join('\n');
-    const question =
-      purpose === 'open'
-        ? `“${fileName}” contains coding by ${users.length} people. Which one are you?\n` +
-          'Everyone else is added under “Other coders” for comparison.\n\n' +
-          `${list}\n\nEnter a number (or 0 if you are none of them):`
-        : `“${fileName}” contains coding by ${users.length} people. Whose coding do you want to compare with yours?\n\n` +
-          `${list}\n\nEnter a number:`;
-    const answer = ask(question, '1');
-    if (answer === null) throw new ImportCancelled();
-    return users[Number(answer) - 1]?.guid ?? null;
-  });
-  if (skipped.sources) {
-    toast(`Skipped ${skipped.sources} source(s) that are not text documents (e.g. PDFs, images, audio or video).`, 6000);
+  if (isQdpxFile(bytes)) {
+    const p = await importController.importQdpx(bytes, file.name, purpose);
+    if (!p) throw new ImportCancelled();
+    return p;
   }
-  if (skipped.selections) toast(`Skipped ${skipped.selections} coding(s) that refer to a code missing from the codebook.`, 6000);
-  return p;
+  return parseProject(readJson(bytes));
 }
 
 // ---------- backups ----------
@@ -93,23 +77,21 @@ export async function importProjectInteractive({ confirmReplace = true } = {}): 
   if (!file) return false;
   try {
     const p = await readProjectFile(file);
-    const current = `${project.docs.length} document(s), ${project.segments.length} segment(s)`;
-    if (
-      confirmReplace &&
-      (project.docs.length || project.codes.length) &&
-      !confirmAction(`Replace your current project (${current}) with “${file.name}”?\n\nExport your current project first if you want to keep it.`)
-    ) {
-      return false;
+
+    if (confirmReplace && (project.docs.length || project.codes.length)) {
+      const answer = await importView.confirmReplace(file.name, project.docs.length, project.segments.length);
+      if (!answer) return false;
+      if (answer === 'export') exportProject();
     }
+
     const me = project.coderName;
     if (!p.coderName) p.coderName = me;
     else if (me && p.coderName !== me) {
-      const stayMe = confirmAction(
-        `This project was coded by “${p.coderName}”. Who will continue coding it?\n\n` +
-          `OK: “${me}” (the existing coding is then labelled as yours).\nCancel: “${p.coderName}”.`,
-      );
-      if (stayMe) p.coderName = me;
+      const coder = await importView.askContinuingCoder(me, p.coderName);
+      if (coder === undefined) return false;
+      p.coderName = coder;
     }
+
     replaceProject(p);
     markBackedUp();
     toast(`Loaded ${p.docs.length} document(s), ${p.codes.length} code(s), ${p.segments.length} segment(s).`);

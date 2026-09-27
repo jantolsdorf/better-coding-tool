@@ -24,3 +24,84 @@ export const confirmAction = (question: string) => window.confirm(question);
 
 /** A question with a text answer; null when cancelled. */
 export const ask = (question: string, suggestion?: string) => window.prompt(question, suggestion);
+
+export interface Choice<T> {
+  label: string;
+  detail?: string;
+  value: T;
+  primary?: boolean;
+}
+
+interface ChooseOptions<T> {
+  title: string;
+  message?: string;
+  choices: Choice<T>[];
+  cancelLabel?: string;
+}
+
+/** Shows a modal list of choices. Resolves with the chosen value, or `undefined` if cancelled. */
+export function choose<T>({ title, message, choices, cancelLabel = 'Cancel' }: ChooseOptions<T>): Promise<T | undefined> {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'choose-dialog';
+
+    const heading = document.createElement('h2');
+    heading.textContent = title;
+    dialog.append(heading);
+
+    if (message) {
+      const p = document.createElement('p');
+      p.textContent = message;
+      dialog.append(p);
+    }
+
+    // Wrapped so that a legitimately chosen `null` is distinguishable from "cancelled".
+    let picked: { value: T } | undefined;
+
+    const list = document.createElement('div');
+    list.className = 'choose-list';
+    for (const choice of choices) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const label = document.createElement('span');
+      label.className = 'choose-label';
+      label.textContent = choice.label;
+      btn.append(label);
+      if (choice.detail) {
+        const detail = document.createElement('span');
+        detail.className = 'choose-detail';
+        detail.textContent = choice.detail;
+        btn.append(detail);
+      }
+      if (choice.primary) btn.classList.add('primary');
+      btn.addEventListener('click', () => {
+        picked = { value: choice.value };
+        dialog.close();
+      });
+      list.append(btn);
+    }
+    dialog.append(list);
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'choose-cancel';
+    cancel.textContent = cancelLabel;
+    cancel.addEventListener('click', () => dialog.close());
+    dialog.append(cancel);
+
+    // Clicking the backdrop cancels.
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+
+    // Fires for button clicks and for Escape.
+    dialog.addEventListener('close', () => {
+      dialog.remove();
+      resolve(picked?.value);
+    });
+
+    document.body.append(dialog);
+    dialog.showModal();
+    (list.querySelector('button') as HTMLButtonElement | null)?.focus();
+  });
+}

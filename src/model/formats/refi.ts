@@ -94,9 +94,9 @@ export function buildQdpx() {
     `${indent}<Code${attr('guid', c.guid)}${attr('name', c.name)} isCodable="true"${attr('color', c.color)}` +
     (c.description || c.children.length
       ? `>\n` +
-        (c.description ? `${indent}  <Description>${xml(c.description)}</Description>\n` : '') +
-        c.children.map((k) => codeXml(k, indent + '  ')).join('') +
-        `${indent}</Code>\n`
+      (c.description ? `${indent}  <Description>${xml(c.description)}</Description>\n` : '') +
+      c.children.map((k) => codeXml(k, indent + '  ')).join('') +
+      `${indent}</Code>\n`
       : '/>\n');
 
   const files: Record<string, Uint8Array> = {};
@@ -163,9 +163,15 @@ export interface QdpxUser {
   codings: number;
 }
 
-export interface QdpxResult {
-  project: Project;
+/** A parsed .qdpx file, before deciding whose coding is "yours". */
+export interface ParsedQdpx {
+  /** Everyone who coded something, in file order. */
+  users: QdpxUser[];
   skipped: { sources: number; selections: number };
+  folders: Folder[];
+  docs: Doc[];
+  codes: Code[];
+  segmentsByUser: Map<string, Segment[]>;
 }
 
 /** Whether a zip is a REFI-QDA project (contains a .qde file). */
@@ -178,10 +184,10 @@ const byLocal = (el: Element | Document, name: string) =>
 const children = (el: Element, name: string) => [...el.children].filter((c) => c.localName === name);
 
 /**
- * Converts a .qdpx file into a project. `chooseUser` decides whose coding becomes "yours" when
- * the file contains coding by several people; everyone else becomes an other coder.
+ * Reads a .qdpx file. Call `qdpxToProject` afterwards to decide whose coding becomes "yours";
+ * `users` tells you whether there is a choice to make.
  */
-export function parseQdpx(bytes: Uint8Array, chooseUser: (users: QdpxUser[]) => string | null): QdpxResult {
+export function parseQdpx(bytes: Uint8Array): ParsedQdpx {
   const entries = unzipSync(bytes);
   const names = Object.keys(entries);
   const qdeName = names.filter((n) => /\.qde$/i.test(n)).sort((a, b) => a.split('/').length - b.split('/').length)[0];
@@ -292,9 +298,21 @@ export function parseQdpx(bytes: Uint8Array, chooseUser: (users: QdpxUser[]) => 
 
   // Decide whose coding is "yours".
   const users: QdpxUser[] = [...segmentsByUser].map(([guid, list]) => ({ guid, name: userNames.get(guid) || 'Unknown coder', codings: list.length }));
-  let mine = users.length === 1 ? users[0].guid : null;
-  if (users.length > 1) mine = chooseUser(users);
+  return { users, skipped, folders, docs, codes, segmentsByUser };
+}
 
+/**
+ * The coder whose coding is "yours" when no choice is needed: the only coder, or nobody.
+ * `undefined` means several people coded the file and the user has to choose.
+ */
+export function defaultQdpxCoder(parsed: ParsedQdpx): string | null | undefined {
+  if (parsed.users.length > 1) return undefined;
+  return parsed.users[0]?.guid ?? null;
+}
+
+/** Builds the project, with `mine` as "your" coding and everyone else as other coders. */
+export function qdpxToProject(parsed: ParsedQdpx, mine: string | null): Project {
+  const { users, folders, docs, codes, segmentsByUser } = parsed;
   const p = emptyProject(mine ? (users.find((u) => u.guid === mine)?.name ?? '') : '');
   p.folders = folders;
   p.docs = docs;
@@ -303,7 +321,7 @@ export function parseQdpx(bytes: Uint8Array, chooseUser: (users: QdpxUser[]) => 
   p.externalCodings = users
     .filter((u) => u.guid !== mine)
     .map((u): ExternalCoding => ({ id: uid('x'), coderName: u.name, codes: codes.map((c) => ({ ...c })), segments: segmentsByUser.get(u.guid)!, memos: [], importedAt: new Date().toISOString() }));
-  return { project: p, skipped };
+  return p;
 }
 
 function expandColor(c: string | null): string | null {
