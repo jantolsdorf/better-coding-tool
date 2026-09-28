@@ -1852,3 +1852,105 @@ dialog.backup {
   background: var(--hover);
   color: var(--text);
 }
+/* ---------- CSV codebook import ---------- */
+
+.csv-dialog .check-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.csv-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0 10px;
+}
+.csv-map {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.csv-map-head,
+.csv-map-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) minmax(0, 1.6fr) 300px;
+  gap: 10px;
+  align-items: center;
+  padding: 5px 10px;
+}
+.csv-map-head {
+  background: var(--head);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.csv-map-row {
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.csv-map-row.ignored .csv-col-name,
+.csv-map-row.ignored .csv-samples {
+  opacity: 0.55;
+}
+.csv-col-name {
+  font-weight: 600;
+}
+.csv-col-name,
+.csv-samples {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.csv-role {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.csv-role select {
+  padding: 3px 6px;
+}
+.csv-level {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.csv-preview {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.csv-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  min-width: 0;
+}
+.csv-preview-path {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.csv-preview-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.csv-preview-more {
+  font-size: 12px;
+  padding-top: 4px;
+}
+.menu-list button.danger-item {
+  color: var(--danger);
+}

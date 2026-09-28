@@ -3,6 +3,7 @@
 import {
   codeById,
   createCode,
+  deleteAllCodes,
   deleteCode,
   findChildCode,
   findCodeByPath,
@@ -13,6 +14,7 @@ import {
   subtreeOf,
   updateCode,
 } from '../model/codes';
+import { allConsolidated } from '../model/layers';
 import { commitUI, project, ui } from '../model/state';
 import type { Code, UIState } from '../model/types';
 import { focusSegment } from '../view/document/textView';
@@ -72,6 +74,27 @@ export function deleteCodeInteractive(code: Code, segments: number): boolean {
   if (!confirmAction(`Delete code “${code.name}” and remove it from ${segments} segment(s)?`)) return false;
   deleteCode(code.id);
   return true;
+}
+
+/** Deletes the whole codebook, and with it your coded segments, after confirmation. */
+export function deleteCodebookInteractive() {
+  const codes = project.codes.length;
+  if (!codes) return toast('The codebook is already empty.');
+  const segments = project.segments.length;
+  const consolidated = allConsolidated().length;
+  const removes = [
+    segments ? `${segments} coded segment${segments === 1 ? '' : 's'}` : '',
+    consolidated ? `${consolidated} consolidated segment${consolidated === 1 ? '' : 's'}` : '',
+  ].filter(Boolean);
+  const question =
+    `Delete the whole codebook (${codes} code${codes === 1 ? '' : 's'})?` +
+    (removes.length ? `\n\nThis also removes your ${removes.join(' and ')}.` : '') +
+    '\nDocuments, memos and other coders’ coding are kept. You can undo this (⌘Z / Ctrl+Z).';
+  if (!confirmAction(question)) return;
+  deleteAllCodes();
+  ui.collapsedCodes = [];
+  commitUI();
+  toast(`Deleted ${codes} code${codes === 1 ? '' : 's'}.`);
 }
 
 export function recolorCode(id: string, color: string) {

@@ -46,17 +46,19 @@ export function countExistingEntries(entries: CodebookEntry[]): number {
  * description unless `updateExisting` is set.
  */
 export function importCodebook(entries: CodebookEntry[], updateExisting: boolean) {
-  let added = 0;
+  const before = project.codes.length;
   let updated = 0;
   const valid = entries.filter((e) => typeof e?.name === 'string' && e.name.trim());
   // Parents first, so their colors and descriptions are used when their subcodes are added.
   const withPaths = valid.map((e) => ({ e, path: codebookEntryPath(e, valid) })).sort((a, b) => a.path.length - b.path.length);
   for (const { e, path } of withPaths) {
-    const color = /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : nextColor();
+    // Without a color of its own, a subcode takes its parent's color (like typed subcodes).
+    const parentColor = path.length > 1 ? findCodeByPath(path.slice(0, -1))?.color : undefined;
+    const color = /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : (parentColor ?? nextColor());
     const existing = findCodeByPath(path);
     if (existing) {
       if (updateExisting) {
-        existing.color = color;
+        if (/^#[0-9a-f]{6}$/i.test(e.color)) existing.color = e.color;
         existing.description = e.description || existing.description;
         existing.updatedAt = now();
         updated++;
@@ -72,8 +74,8 @@ export function importCodebook(entries: CodebookEntry[], updateExisting: boolean
       parentId: parent?.id ?? null,
       updatedAt: now(),
     });
-    added++;
   }
   commit();
-  return { added, updated };
+  // Also counts parent codes that were only named in a path.
+  return { added: project.codes.length - before, updated };
 }

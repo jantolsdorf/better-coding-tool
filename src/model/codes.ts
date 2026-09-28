@@ -171,6 +171,14 @@ export function deleteCode(id: string) {
   commit();
 }
 
+/** Deletes every code, and with them your coded segments and all consolidated segments. Memos and other coders' coding stay. */
+export function deleteAllCodes() {
+  project.codes = [];
+  project.segments = [];
+  for (const docId of Object.keys(project.consolidations)) project.consolidations[docId] = [];
+  commit();
+}
+
 function mergeIn(list: Segment[], fromId: string, intoId: string) {
   for (const s of list.filter((x) => x.codeId === fromId)) {
     list.splice(list.indexOf(s), 1);

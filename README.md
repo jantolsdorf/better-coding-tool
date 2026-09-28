@@ -88,6 +88,20 @@ npm run build      # produces a single self-contained dist/index.html
     Importing accepts a codebook file or any exported project and only adds codes (matched by
     path, i.e. name and position); you can choose whether existing codes take the imported color
     and description. Consolidation matches other coders' codes by path in the same way.
+  - **Import codebook from CSV…** (also *Import ▾ → Codebook from CSV*) reads a spreadsheet
+    (comma, semicolon or tab separated). A dialog shows every column with examples; choose
+    which columns are **codes**, which are **descriptions**, and optionally which one is the
+    **color** (`#rrggbb`). Code columns are always read from left to right as
+    *parent › child › sub-child*; a cell may also hold a whole path (`Parent > Child`, as in the
+    codebook CSV export), and empty code cells at the start of a row continue the codes of the
+    row above (outline-style sheets). Each description column describes the codes of one level
+    (*Description of level 1* for parents, *level 2* for children, …) or the *last code* of each
+    row, so parents and subcodes can have their own descriptions; several columns for the same
+    code (e.g. definition and example) are combined. A preview shows the resulting codes before
+    importing. The color belongs to the last code of a row; subcodes without a color take their
+    parent's, and parents without one take their first subcode's.
+  - **Delete codebook…** removes all codes, and with them your coded segments (and consolidated
+    ones). Documents, memos and other coders' coding are kept; Undo brings everything back.
 - **Backups**: the top bar shows **● Not downloaded** while your latest changes exist only in
   this browser (click it to download the project zip) and **✓ Downloaded** with the time once a
   copy has them. Closing or reloading the tab with changes that were not downloaded triggers the
@@ -172,7 +186,7 @@ notifies `renderApp`, which re-renders the views.
 | `model/consolidation.ts` | Per-document consolidation |
 | `model/codebookEntries.ts` | The codebook in portable form (codebook import/export) |
 | `model/lines.ts` | Line numbers from character offsets |
-| `model/formats/` | File formats: project zip/json and codebook files, CSV, REFI-QDA (.qdpx) |
+| `model/formats/` | File formats: project zip/json and codebook files, CSV (export, codebook import), REFI-QDA (.qdpx) |
 | **`src/controller/`** | User actions: ask and confirm, update the model, report the outcome |
 | `controller/documents.ts` | Adding, moving, renaming and deleting documents and folders |
 | `controller/codes.ts` | Codebook actions and the code details dialog's checks |
@@ -185,6 +199,7 @@ notifies `renderApp`, which re-renders the views.
 | `view/app.ts` | Sets up all views and re-renders them |
 | `view/document/` | The document area: text and highlights, coder and memo columns, code box, View menu |
 | `view/tree.ts`, `codebookList.ts`, `codeDialog.ts`, `segmentList.ts`, `coderList.ts` | The panels and the code details dialog |
+| `view/csvCodebookDialog.ts` | Choosing the code, description and color columns of a CSV codebook |
 | `view/topbar.ts`, `startDialog.ts` | Top bar, menus, keyboard shortcuts; the start dialog (new project or open a file) |
 | `view/leaveGuard.ts` | Warning before closing the tab, with an offer to download a copy |
 | `view/layout.ts`, `splitters.ts` | Rearranging and resizing the main areas and sidebar panels |

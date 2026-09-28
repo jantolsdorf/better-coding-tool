@@ -1,7 +1,7 @@
 // The top bar (coder name, undo/redo, view menu, import/export menus, theme) and the page-wide buttons,
 // menus and keyboard shortcuts.
 
-import { addCodeFromPrompt, setCodeSort, setCodeView } from '../controller/codes';
+import { addCodeFromPrompt, deleteCodebookInteractive, setCodeSort, setCodeView } from '../controller/codes';
 import { addFilesFromPicker, addSampleDocument, createFolder } from '../controller/documents';
 import { redoChange, undoChange } from '../controller/history';
 import { cycleTheme, setCoderName } from '../controller/preferences';
@@ -12,6 +12,7 @@ import {
   exportQdpx,
   exportSegmentsCSV,
   exportTableCSV,
+  importCodebookCsvInteractive,
   importCodebookInteractive,
   importCoderInteractive,
   importProjectInteractive,
@@ -64,6 +65,9 @@ export function initTopbar() {
   onClick('btn-import-qdpx', importProjectInteractive);
   onClick('btn-import-codebook-top', importCodebookInteractive);
   onClick('btn-import-codebook', importCodebookInteractive);
+  onClick('btn-import-codebook-csv', importCodebookCsvInteractive);
+  onClick('btn-import-codebook-csv-top', importCodebookCsvInteractive);
+  onClick('btn-delete-codebook', deleteCodebookInteractive);
   onClick('btn-export-project', exportProject);
   onClick('btn-export-qdpx', exportQdpx);
   onClick('btn-export-table-current', () => exportTableCSV('current'));

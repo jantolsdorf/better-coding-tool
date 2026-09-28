@@ -4,6 +4,7 @@ import { countExistingEntries, importCodebook, type CodebookEntry } from '../mod
 import { addExternalCoding, hasExternalCoder, matchDocs } from '../model/coders';
 import { currentDoc, docsInTreeOrder } from '../model/documents';
 import { codebookCSV, segmentsCSV, tableCSV } from '../model/formats/csv';
+import { csvCodebookEntries, parseCSV } from '../model/formats/csvCodebook';
 import {
   PROJECT_FILE_TYPES,
   buildCodebookJson,
@@ -19,6 +20,7 @@ import { memoColumns, tableColumns } from '../model/table';
 import type { Doc, Project } from '../model/types';
 import { now, safeFileName } from '../model/util';
 import { ask, confirmAction, notify, toast } from '../view/feedback';
+import { askCsvCodebookMapping } from '../view/csvCodebookDialog';
 import { downloadFile, pickFiles } from '../view/files';
 import { ImportController } from './importController';
 import { ImportView, type QdpxPurpose } from '../view/importView';
@@ -168,16 +170,40 @@ export function exportCodebook(kind: 'json' | 'csv') {
   downloadFile(`codebook-${exportName()}-${today()}.json`, buildCodebookJson(), 'application/json');
 }
 
-/** Adds codes from an exported codebook, or from the codebook of an exported project. */
+const CSV_TYPES = '.csv,.tsv,text/csv,text/tab-separated-values';
+const isCsv = (file: File) => /\.(csv|tsv)$/i.test(file.name) || /csv|tab-separated/.test(file.type);
+
+/**
+ * Adds codes from an exported codebook, the codebook of an exported project, or a spreadsheet
+ * (CSV, whose columns are chosen in a dialog).
+ */
 export async function importCodebookInteractive() {
-  const [file] = await pickFiles(PROJECT_FILE_TYPES, false);
+  const [file] = await pickFiles(`${PROJECT_FILE_TYPES},${CSV_TYPES}`, false);
   if (!file) return;
+  if (isCsv(file)) return importCodebookCsv(file);
   let entries: CodebookEntry[];
   try {
     entries = readCodebookFile(new Uint8Array(await file.arrayBuffer()));
   } catch (e) {
     return importFailed(file, e);
   }
+  addCodebookEntries(file, entries);
+}
+
+/** Adds codes from a CSV file after the user chose which columns hold codes, description and color. */
+export async function importCodebookCsvInteractive() {
+  const [file] = await pickFiles(CSV_TYPES, false);
+  if (file) await importCodebookCsv(file);
+}
+
+async function importCodebookCsv(file: File) {
+  const rows = parseCSV(await file.text());
+  if (!rows.length) return toast(`“${file.name}” is empty.`);
+  const mapping = await askCsvCodebookMapping(file.name, rows);
+  if (mapping) addCodebookEntries(file, csvCodebookEntries(rows, mapping));
+}
+
+function addCodebookEntries(file: File, entries: CodebookEntry[]) {
   if (!entries.length) return toast('The codebook is empty.');
   const existing = countExistingEntries(entries);
   const fresh = entries.length - existing;
