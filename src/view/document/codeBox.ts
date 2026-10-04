@@ -2,7 +2,7 @@
 // suggested); "memo: …" adds a memo instead, and "code: …" forces a code. Everything works from
 // the keyboard, so coding a passage takes no clicks beyond the selection.
 
-import { codePassage, inVivoName, parseEntry, setCodeBoxHelp, setCodeTarget, type Entry } from '../../controller/coding';
+import { codePassage, inVivoName, parseEntry, setCodeBoxHelp, setCodeBoxSubcodes, setCodeTarget, type Entry } from '../../controller/coding';
 import { addMemoToPassage } from '../../controller/memos';
 import {
   codeById,
@@ -10,6 +10,7 @@ import {
   codePathParts,
   findChildCode,
   findCodeByPath,
+  isCodeInSubtree,
   matchesCodeQuery,
   missingInPath,
   nextColor,
@@ -123,6 +124,23 @@ function openCodeBox(doc: Doc, start: number, end: number) {
     },
     '?',
   );
+  const subcodesBtn = h(
+    'button',
+    {
+      class: 'seg-toggle subcodes-toggle' + (ui.codeBoxSubcodes ? ' on' : ''),
+      title: 'Also list all subcodes of the codes that match what you type',
+      'aria-pressed': String(ui.codeBoxSubcodes),
+      onMousedown: (e: MouseEvent) => {
+        e.preventDefault();
+        setCodeBoxSubcodes(!ui.codeBoxSubcodes);
+        subcodesBtn.classList.toggle('on', ui.codeBoxSubcodes);
+        subcodesBtn.setAttribute('aria-pressed', String(ui.codeBoxSubcodes));
+        refreshSuggestions();
+        input.focus({ preventScroll: true });
+      },
+    },
+    '+ Subcodes',
+  );
   const copyBtn = h(
     'button',
     {
@@ -144,6 +162,7 @@ function openCodeBox(doc: Doc, start: number, end: number) {
       { class: 'popup-meta' },
       kind,
       h('span', { class: 'grow' }, `${lineLabel(doc, start, end)} · ${end - start} characters`),
+      subcodesBtn,
       copyBtn,
       helpToggle,
     ),
@@ -302,13 +321,24 @@ function refreshSuggestions() {
   const trailing = /[>›]\s*$/.test(typed);
   const last = trailing ? '' : (parts.at(-1) ?? '').toLowerCase();
   const exactPath = !trailing && parts.length ? findCodeByPath(parts) : undefined;
-  const rank = (c: Code) => {
+  const ownRank = (c: Code) => {
     const n = c.name.toLowerCase();
     return c === exactPath ? 0 : n === last ? 1 : n.startsWith(last) ? 2 : 3;
   };
-  p.items = project.codes
-    .filter((c) => matchesCodeQuery(c, typed))
-    .sort((a, b) => rank(a) - rank(b) || codePath(a).localeCompare(codePath(b)))
+  const matches = project.codes.filter((c) => matchesCodeQuery(c, typed));
+  // Optionally also every subcode of a match; it ranks like that match, so (sorted by path) it
+  // is listed right below its parent.
+  const rankOf = new Map(matches.map((c) => [c, ownRank(c)]));
+  if (ui.codeBoxSubcodes && typed.trim()) {
+    const own = new Map(rankOf);
+    for (const c of project.codes) {
+      // Also a subcode that matches by itself is grouped under its best-matching parent.
+      const ranks = matches.filter((m) => isCodeInSubtree(c.id, m.id)).map((m) => own.get(m)!);
+      if (ranks.length) rankOf.set(c, Math.min(...ranks));
+    }
+  }
+  p.items = [...rankOf.keys()]
+    .sort((a, b) => rankOf.get(a)! - rankOf.get(b)! || codePath(a).localeCompare(codePath(b)))
     // All matches are listed; the list scrolls. The cap only keeps huge codebooks responsive.
     .slice(0, 300);
   p.pathExists = !!exactPath;

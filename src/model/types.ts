@@ -22,6 +22,8 @@ export interface Code {
   parentId?: string | null;
   /** When the code was last created, changed or applied (ISO date). */
   updatedAt?: string;
+  /** Position among its sibling codes for the custom order (0 = first). */
+  order?: number;
 }
 
 export interface Segment {
@@ -122,7 +124,8 @@ export interface UIState {
   /** Width of the text column in px (null = automatic). */
   textWidth: number | null;
   collapsedCodes: string[];
-  codeSort: 'name' | 'recent';
+  /** Codebook order: by name, by last edit, or the custom order set by dragging. */
+  codeSort: 'name' | 'recent' | 'custom';
   /** Codebook as an indented tree, or as a flat list of "Parent > Child" paths. */
   codeView: 'tree' | 'path';
   /** Codebook filter: also show all subcodes of matching codes. */
@@ -140,6 +143,8 @@ export interface UIState {
   codeTarget: 'mine' | 'consolidated';
   /** Whether the help section of the code box is open. */
   codeBoxHelp: boolean;
+  /** Whether code box suggestions also list all subcodes of matching codes. */
+  codeBoxSubcodes: boolean;
   /** Fingerprint and time of the project when a copy was last downloaded (or opened from a file). */
   backedUp: { fingerprint: string; at: string } | null;
 }

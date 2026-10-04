@@ -49,6 +49,12 @@ export function setCodeBoxHelp(open: boolean) {
   commitUI();
 }
 
+/** Whether code box suggestions also list all subcodes of matching codes. */
+export function setCodeBoxSubcodes(on: boolean) {
+  ui.codeBoxSubcodes = on;
+  commitUI();
+}
+
 /** Codes a passage with a typed name or path, and explains when an existing segment was extended instead. */
 export function codePassage(docId: string, start: number, end: number, codeNameOrPath: string, colorForNew: string) {
   const res = applyCode(docId, start, end, codeNameOrPath, colorForNew);

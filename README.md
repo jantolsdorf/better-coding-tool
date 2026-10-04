@@ -43,7 +43,8 @@ npm run build      # produces a single self-contained dist/index.html
 - **Coding**: open a document and highlight a passage. A small box opens below the selection;
   type a code (existing codes are suggested, each with its parent codes as a small line above
   its name, so long names stay distinguishable) and press **Enter**. **⌘C / Ctrl+C** (or **⧉** in the box)
-  copies the highlighted text. Pressing **Enter** without
+  copies the highlighted text. **+ Subcodes** in the box also lists all subcodes of the matching codes,
+  each right below its parent (remembered). Pressing **Enter** without
   typing anything creates an *in-vivo code* from the highlighted words (or applies it, if a code
   with that name exists); **Tab** first puts the words into the box so you can shorten them. **Shift+Enter** applies the
   code and keeps the box open to add more codes to the same passage. **↑/↓** chooses a
@@ -80,7 +81,9 @@ npm run build      # produces a single self-contained dist/index.html
   header of the text column (or tick *View ▾ → Color coded text*); press it again to go back to plain text.
 - **Codebook**: change a code's color with its swatch; click its name to rename it, add a
   description, set its parent code, see every segment coded with it across all documents,
-  merge it into another code, or delete it.
+  merge it into another code, or delete it. Hovering a code shows a checkbox (to select it), **＋**
+  (new subcode, which takes the parent's color) and **🗑** (deletes the code at once, without
+  asking; its subcodes move up a level, and Undo brings it back).
   - **Hierarchy**: drag a code onto another code. Below the target's name, two buttons appear:
     **⤷ Subcode** (nests it, no confirmation; it and its own subcodes take the new parent's
     color — Undo keeps the old colors) and **⇢ Merge into** (moves all its segments and subcodes
@@ -95,9 +98,13 @@ npm run build      # produces a single self-contained dist/index.html
     visible, greyed, for context; Esc clears. The **⋯** next to the field sets the filter
     rules: *Include subcodes of matches* also shows every subcode of a matching code, and
     *Also search descriptions* (on by default) matches descriptions too; the ⋯ is highlighted
-    while the rules differ from the default. Sort by *A–Z* or *Last edited* (the
+    while the rules differ from the default. Sort by *A–Z*, *Last edited* (the
     most recently created, changed, moved or applied codes first; a parent sorts by its most
-    recently edited subcode).
+    recently edited subcode) or *Custom (drag)*: then drop a code on the upper or lower half of
+    another code to place it directly above or below it (a line shows where; this can also move
+    it to another level). The custom order is saved in the project (each code's `order` among
+    its siblings) and used by all exports (project, codebook JSON/CSV, REFI-QDA); projects and
+    imports without it get an alphabetical order per level, and new codes go last.
   - **⋯ menu**: export the codebook only (JSON, re-importable, or CSV), or import a codebook.
     Importing accepts a codebook file or any exported project and only adds codes (matched by
     path, i.e. name and position); you can choose whether existing codes take the imported color
@@ -199,6 +206,7 @@ notifies `renderApp`, which re-renders the views.
 | `model/table.ts` | Which coder columns are shown, and their order |
 | `model/consolidation.ts` | Per-document consolidation |
 | `model/codebookEntries.ts` | The codebook in portable form (codebook import/export) |
+| `model/codeOrder.ts` | The custom order of codes among their siblings |
 | `model/lines.ts` | Line numbers from character offsets |
 | `model/formats/` | File formats: project zip/json and codebook files, CSV (export, codebook import), REFI-QDA (.qdpx) |
 | **`src/controller/`** | User actions: ask and confirm, update the model, report the outcome |

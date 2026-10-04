@@ -42,6 +42,7 @@ function loadUI(): UIState {
     segmentsWidth: null,
     codeTarget: 'mine',
     codeBoxHelp: false,
+    codeBoxSubcodes: false,
     backedUp: null,
   };
   try {

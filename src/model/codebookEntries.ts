@@ -1,6 +1,6 @@
 // The codebook in a portable form, for exporting and importing just the code system.
 
-import { codeForPath, codePathParts, findCodeByPath, nextColor } from './codes';
+import { codeForPath, codePathParts, findCodeByPath, nextColor, nextOrder } from './codes';
 import { commit, project } from './state';
 import type { Code } from './types';
 import { now, uid } from './util';
@@ -72,6 +72,8 @@ export function importCodebook(entries: CodebookEntry[], updateExisting: boolean
       color,
       description: e.description || undefined,
       parentId: parent?.id ?? null,
+      // Imported codes keep the file's order, after the existing codes.
+      order: nextOrder(parent?.id ?? null),
       updatedAt: now(),
     });
   }

@@ -3,22 +3,27 @@
 // merge, recolor or delete several codes at once.
 
 import {
+  addSubcodeInteractive,
   anyCodeExpanded,
+  deleteCodeNow,
   deleteCodesInteractive,
   mergeCodesInteractive,
   mergeDroppedCode,
   moveCode,
   moveCodesTo,
+  placeCodesAt,
   recolorCode,
   recolorCodesTo,
   setCodeCollapsed,
 } from '../controller/codes';
+import { byOrder } from '../model/codeOrder';
 import {
   childCodes,
   codeById,
   codeChain,
   codePath,
   codePathParts,
+  codesInTreeOrder,
   isCodeInSubtree,
   lastEditedByCode,
   matchesCodeQuery,
@@ -202,7 +207,7 @@ function codeRows(parentId: string | null, depth: number, state: ListState): HTM
     (state.recent.get(b.id) ?? '').localeCompare(state.recent.get(a.id) ?? '') || byName(a, b);
   return childCodes(parentId)
     .filter((c) => !state.visible || state.visible.has(c.id))
-    .sort(ui.codeSort === 'recent' ? byRecent : byName)
+    .sort(ui.codeSort === 'recent' ? byRecent : ui.codeSort === 'custom' ? byOrder : byName)
     .flatMap((c) => {
       const children = childCodes(c.id);
       // While filtering, everything that matches is shown, even inside collapsed codes.
@@ -219,9 +224,11 @@ function pathRows(state: ListState, edited: Map<string, string>): HTMLElement[] 
     codePath(a).localeCompare(codePath(b), undefined, { numeric: true, sensitivity: 'base' });
   // In this view each code sorts by its own last edit, since parents are not grouped.
   const byRecent = (a: Code, b: Code) => (edited.get(b.id) ?? '').localeCompare(edited.get(a.id) ?? '') || byPath(a, b);
-  return project.codes
+  // The custom order lists each code right after its parent, as in the indented view.
+  const tree = ui.codeSort === 'custom' ? codesInTreeOrder() : project.codes;
+  return tree
     .filter((c) => !state.visible || state.matches.has(c.id))
-    .sort(ui.codeSort === 'recent' ? byRecent : byPath)
+    .sort(ui.codeSort === 'recent' ? byRecent : ui.codeSort === 'custom' ? () => 0 : byPath)
     .map((c) => codeRow(c, 0, false, false, state, true));
 }
 
@@ -240,6 +247,38 @@ function formatDate(iso: string): string {
 function subtreeCount(id: string, counts: Map<string, number>, depth = 0): number {
   if (depth > 50) return 0;
   return (counts.get(id) ?? 0) + childCodes(id).reduce((n, c) => n + subtreeCount(c.id, counts, depth + 1), 0);
+}
+
+/** A button shown on the code's line while hovering it. */
+function rowButton(label: string, title: string, fn: () => void): HTMLElement {
+  return h(
+    'button',
+    {
+      class: 'icon-btn code-action',
+      title,
+      draggable: false,
+      onClick: (e: MouseEvent) => {
+        e.stopPropagation();
+        fn();
+      },
+    },
+    label,
+  );
+}
+
+/** A small pill (color and name, or "3 codes") follows the cursor instead of the whole wide row. */
+function setCompactDragImage(e: DragEvent, c: Code, count: number) {
+  if (!e.dataTransfer) return;
+  const ghost = h(
+    'div',
+    { class: 'code-drag-ghost' },
+    h('span', { class: 'swatch', style: { background: c.color } }),
+    h('span', { class: 'code-drag-name' }, count > 1 ? `${count} codes` : c.name),
+  );
+  document.body.append(ghost);
+  e.dataTransfer.setDragImage(ghost, 12, ghost.offsetHeight / 2);
+  // The browser takes its picture right away; the element is no longer needed after that.
+  setTimeout(() => ghost.remove(), 0);
 }
 
 /** Calls `fn` when a dragged code is dropped on `el`. */
@@ -300,22 +339,30 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
           class: 'code-name',
           title:
             (c.description ? c.description + '\n\n' : '') +
-            `Last edited: ${formatDate(state.recent.get(c.id) ?? '')}\nClick for details · drag onto another code to nest or merge`,
+            `Last edited: ${formatDate(state.recent.get(c.id) ?? '')}\nClick for details · drag onto another code to nest or merge` +
+            (ui.codeSort === 'custom' ? ' · drop on the upper or lower half of a code to place it above or below' : ''),
           onClick: () => openCodeDialog(c.id),
         },
         parents.length ? h('span', { class: 'code-parent' }, `${parents.join(' > ')} > `) : null,
         ...nameWithMatch(c.name),
+      ),
+      h(
+        'span',
+        { class: 'code-actions' },
+        rowButton('＋', `New subcode of “${c.name}”`, () => addSubcodeInteractive(c.id)),
+        rowButton('🗑', `Delete “${c.name}” (Undo brings it back)`, () => deleteCodeNow(c)),
       ),
       h('span', { class: 'badge', title: hasChildren ? `${own} with this code, ${total} including subcodes` : 'Coded segments' }, hasChildren && total !== own ? `${own} · ${total}` : String(own)),
     ),
     h('div', { class: 'drop-opts' }, asSub, asMerge),
   );
 
-  selection.bindRow(row, c.id, row.querySelector<HTMLElement>('.code-main')!);
+  selection.bindRow(row, c.id, row.querySelector<HTMLElement>('.code-main')!, { hoverCheckbox: true });
   row.addEventListener('dragstart', (e) => {
     e.stopPropagation();
     draggedCodeIds = selection.has(c.id) ? selectedCodes() : [c.id];
     e.dataTransfer?.setData('text/plain', draggedCodeIds.length > 1 ? `${draggedCodeIds.length} codes` : c.name);
+    setCompactDragImage(e, c, draggedCodeIds.length);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
     // Deferred so the drag image is taken before the list changes appearance.
     requestAnimationFrame(() => {
@@ -345,5 +392,36 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
     if (!row.contains(e.relatedTarget as Node)) row.classList.remove('drag-over');
   });
   row.addEventListener('drop', (e) => e.preventDefault());
+  if (ui.codeSort === 'custom') makeReorderTarget(row, c);
   return row;
+}
+
+/**
+ * In the custom order, dropping a code on the upper or lower half of another code's line puts it
+ * directly above or below that code (as its sibling).
+ */
+function makeReorderTarget(row: HTMLElement, c: Code) {
+  const main = row.querySelector<HTMLElement>('.code-main')!;
+  const clear = () => row.classList.remove('insert-before', 'insert-after');
+  main.addEventListener('dragover', (e) => {
+    const ids = draggedCodeIds;
+    if (!ids.length || ids.includes(c.id)) return;
+    e.preventDefault();
+    const r = main.getBoundingClientRect();
+    const after = e.clientY > r.top + r.height / 2;
+    row.classList.toggle('insert-after', after);
+    row.classList.toggle('insert-before', !after);
+  });
+  main.addEventListener('dragleave', (e) => {
+    if (!main.contains(e.relatedTarget as Node)) clear();
+  });
+  main.addEventListener('drop', (e) => {
+    const ids = draggedCodeIds;
+    if (!ids.length || ids.includes(c.id)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const after = row.classList.contains('insert-after');
+    clear();
+    placeCodesAt(ids, c.id, after);
+  });
 }

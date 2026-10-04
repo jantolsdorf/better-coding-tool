@@ -3,7 +3,7 @@
 // Text selections count Unicode code points from 0, with an exclusive end position.
 
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
-import { codePathParts } from '../codes';
+import { codePathParts, codesInTreeOrder } from '../codes';
 import { docsInTreeOrder, folderChain, normalizeText } from '../documents';
 import { emptyProject } from '../parse';
 import { project } from '../state';
@@ -88,7 +88,8 @@ export function buildQdpx() {
     return node!;
   };
   const codeGuid = new Map<Code, string>();
-  for (const u of users) for (const c of u.codes) codeGuid.set(c, nodeFor(codePathParts(c, u.codes), c).guid);
+  // In the custom order, so other programs show the codes in the same order.
+  for (const u of users) for (const c of codesInTreeOrder(null, 0, u.codes)) codeGuid.set(c, nodeFor(codePathParts(c, u.codes), c).guid);
 
   const codeXml = (c: ExportCode, indent: string): string =>
     `${indent}<Code${attr('guid', c.guid)}${attr('name', c.name)} isCodable="true"${attr('color', c.color)}` +
@@ -214,13 +215,13 @@ export function parseQdpx(bytes: Uint8Array): ParsedQdpx {
   const codeByGuid = new Map<string, Code>();
   const walkCodes = (els: Element[], parentId: string | null) => {
     const used = new Set<string>();
-    for (const el of els) {
+    for (const [order, el] of els.entries()) {
       let name = (el.getAttribute('name') || 'Unnamed code').replace(/[>›]/g, '/').trim();
       for (let n = 2; used.has(name.toLowerCase()); n++) name = `${name.replace(/ \(\d+\)$/, '')} (${n})`;
       used.add(name.toLowerCase());
       const color = expandColor(el.getAttribute('color')) ?? PALETTE[codes.length % PALETTE.length];
       const description = children(el, 'Description')[0]?.textContent?.trim() || undefined;
-      const code: Code = { id: uid('c'), name, color, description, parentId, updatedAt: new Date().toISOString() };
+      const code: Code = { id: uid('c'), name, color, description, parentId, order, updatedAt: new Date().toISOString() };
       codes.push(code);
       codeByGuid.set(el.getAttribute('guid') ?? '', code);
       walkCodes(children(el, 'Code'), code.id);

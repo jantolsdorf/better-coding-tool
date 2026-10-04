@@ -1,5 +1,6 @@
 // Creating and validating projects (e.g. from files or local storage).
 
+import { ensureCodeOrder } from './codeOrder';
 import type { Code, Doc, ExternalCoding, Folder, Memo, Project, Segment } from './types';
 
 export function emptyProject(coderName = ''): Project {
@@ -34,13 +35,17 @@ export function parseProject(data: unknown): Project {
     segments: arr<Segment>(x.segments).filter(validSegment),
     memos: arr<Memo>(x.memos).filter(validMemo),
   }));
+  const codes = arr<Code>(d.codes);
+  // Projects from before custom ordering get positions (alphabetical per level).
+  ensureCodeOrder(codes);
+  for (const x of externalCodings) ensureCodeOrder(x.codes);
   return {
     format: 'bct-project',
     version: 1,
     coderName: typeof d.coderName === 'string' ? d.coderName : '',
     folders: arr<Folder>(d.folders),
     docs: arr<Doc>(d.docs).filter((doc) => typeof doc?.content === 'string'),
-    codes: arr<Code>(d.codes),
+    codes,
     segments: arr<Segment>(d.segments).filter(validSegment),
     memos: arr<Memo>(d.memos).filter(validMemo),
     externalCodings,

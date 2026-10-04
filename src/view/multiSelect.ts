@@ -66,12 +66,18 @@ export class Selection {
   }
 
   /** Intercepts clicks on a row (before its buttons react) while selecting; in select mode adds a checkbox to `checkboxIn`. */
-  bindRow(row: HTMLElement, key: string, checkboxIn: HTMLElement = row) {
+  bindRow(row: HTMLElement, key: string, checkboxIn: HTMLElement = row, { hoverCheckbox = false } = {}) {
     row.classList.toggle('multi-selected', this.has(key));
     row.addEventListener(
       'click',
       (e) => {
         if ((e.target as Element).closest('.caret')) return;
+        // Ticking a row's own checkbox selects it, even outside select mode.
+        if ((e.target as Element).closest('.row-check')) {
+          e.stopImmediatePropagation();
+          this.toggle(key);
+          return;
+        }
         if (this.click(e, key)) {
           e.preventDefault();
           // Also stops the row's own click handler when the row itself was clicked.
@@ -80,7 +86,21 @@ export class Selection {
       },
       true,
     );
-    if (this.mode) checkboxIn.prepend(h('input', { type: 'checkbox', class: 'row-check', checked: this.has(key), tabIndex: -1 }));
+    // With `hoverCheckbox`, every row has a checkbox that shows on hover (always while selecting).
+    if (this.mode || hoverCheckbox) {
+      const box = h('input', { type: 'checkbox', class: 'row-check', checked: this.has(key), tabIndex: -1 });
+      if (hoverCheckbox) box.classList.add('hover-check', ...(this.active ? ['shown'] : []));
+      checkboxIn.prepend(box);
+    }
+  }
+
+  /** Adds or removes one row, starting select mode. */
+  toggle(key: string) {
+    if (this.keys.has(key)) this.keys.delete(key);
+    else this.keys.add(key);
+    this.anchor = key;
+    this.mode = true;
+    this.onChange();
   }
 
   /** The bar with the selection count and the actions for the selected rows. */

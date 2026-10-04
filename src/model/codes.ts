@@ -3,12 +3,13 @@
 // Code names are unique among siblings only: "Trust > Coping" and a top-level "Coping" are
 // different codes. Codes are therefore looked up by their path from the top level.
 
+import { byOrder } from './codeOrder';
 import { getDoc } from './documents';
 import { layerSegments } from './layers';
 import { addOrMerge } from './segmentOps';
 import { commit, project } from './state';
 import type { Code, Segment } from './types';
-import { byName, now, PALETTE, uid } from './util';
+import { now, PALETTE, uid } from './util';
 
 export const codeById = (id: string) => project.codes.find((c) => c.id === id);
 
@@ -84,16 +85,24 @@ export function missingInPath(parts: string[]): string[] {
   return [];
 }
 
-export const childCodes = (parentId: string | null) =>
-  project.codes.filter((c) => (c.parentId ?? null) === parentId && c.id !== parentId);
+export const childCodes = (parentId: string | null, codes: Code[] = project.codes) =>
+  codes.filter((c) => (c.parentId ?? null) === parentId && c.id !== parentId);
 
-/** Codes depth-first in the order the codebook shows them. */
-export function codesInTreeOrder(parentId: string | null = null, depth = 0): Code[] {
+
+/** Codes depth-first in the custom order (the order exports use). */
+export function codesInTreeOrder(parentId: string | null = null, depth = 0, codes: Code[] = project.codes): Code[] {
   if (depth > 100) return [];
-  return childCodes(parentId)
-    .sort(byName)
-    .flatMap((c) => [c, ...codesInTreeOrder(c.id, depth + 1)]);
+  return childCodes(parentId, codes)
+    .sort(byOrder)
+    .flatMap((c) => [c, ...codesInTreeOrder(c.id, depth + 1, codes)]);
 }
+
+/** The position after the last subcode of `parentId` (null = top level). */
+export function nextOrder(parentId: string | null, codes: Code[] = project.codes): number {
+  return Math.max(-1, ...childCodes(parentId, codes).map((c) => c.order ?? -1)) + 1;
+}
+
+
 
 /** Whether code `id` is `rootId` itself or one of its (nested) subcodes. */
 export function isCodeInSubtree(id: string, rootId: string): boolean {
@@ -135,7 +144,7 @@ export function codeForPath(input: string | string[], colorForNew?: string): Cod
   for (const [i, name] of parts.entries()) {
     code = findChildCode(parentId, name);
     if (!code) {
-      code = { id: uid('c'), name: name.trim(), color: rootColor, parentId };
+      code = { id: uid('c'), name: name.trim(), color: rootColor, parentId, order: nextOrder(parentId) };
       project.codes.push(code);
     }
     if (i === 0) rootColor = code.color;
@@ -281,9 +290,44 @@ function reparent(id: string, parentId: string | null, adoptParentColor: boolean
   if (!code || (parentId && isCodeInSubtree(parentId, id))) return 'cycle';
   const clash = findChildCode(parentId, code.name);
   if (clash && clash.id !== id) return 'duplicate';
+  // A code moved to another parent goes after its new siblings.
+  if ((code.parentId ?? null) !== parentId) code.order = nextOrder(parentId);
   code.parentId = parentId;
   code.updatedAt = now();
   const parent = parentId ? codeById(parentId) : undefined;
   if (adoptParentColor && parent) for (const c of subtreeOf(id)) c.color = parent.color;
   return 'ok';
+}
+
+/**
+ * Places codes directly before or after `targetId`, among the target's siblings (moving them to
+ * the target's parent if needed, like dragging onto it as a subcode of that parent). Selected
+ * subcodes of other selected codes move along with their parent. Keeps the codes' current order.
+ */
+export function placeCodes(ids: string[], targetId: string, after: boolean): { moved: number; cycle: number; duplicate: number } {
+  const counts = { moved: 0, cycle: 0, duplicate: 0 };
+  const target = codeById(targetId);
+  if (!target) return counts;
+  const parentId = target.parentId ?? null;
+  const tree = codesInTreeOrder();
+  const moving = topmostCodes(ids)
+    .filter((id) => id !== targetId)
+    .sort((a, b) => tree.findIndex((c) => c.id === a) - tree.findIndex((c) => c.id === b));
+  const placed: Code[] = [];
+  for (const id of moving) {
+    const code = codeById(id);
+    if (!code) continue;
+    const res = (code.parentId ?? null) === parentId ? 'ok' : reparent(id, parentId, true);
+    if (res !== 'ok') {
+      counts[res]++;
+      continue;
+    }
+    placed.push(code);
+    counts.moved++;
+  }
+  const siblings = childCodes(parentId).filter((c) => !placed.includes(c)).sort(byOrder);
+  siblings.splice(siblings.indexOf(target) + (after ? 1 : 0), 0, ...placed);
+  siblings.forEach((c, i) => (c.order = i));
+  commit();
+  return counts;
 }

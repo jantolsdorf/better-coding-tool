@@ -2,6 +2,7 @@
 
 import {
   codeById,
+  codePathParts,
   createCode,
   deleteAllCodes,
   deleteCode,
@@ -11,6 +12,7 @@ import {
   mergeCode,
   mergeCodes,
   moveCodes,
+  placeCodes,
   recolorCodes,
   setCodeParent,
   setSubtreeColor,
@@ -49,6 +51,24 @@ export function moveCode(id: string, parentId: string | null) {
     const where = parentId ? `“${codeById(parentId)?.name}” already has a subcode` : 'There is already a top-level code';
     toast(`${where} named “${codeById(id)?.name}”. Drop on “Merge” to combine them instead.`, 5000);
   }
+}
+
+/** Asks for a name and creates a subcode of `parentId` (it takes the parent's color). */
+export function addSubcodeInteractive(parentId: string) {
+  const parent = codeById(parentId);
+  if (!parent) return;
+  const name = ask(`New subcode of “${parent.name}”:`)?.trim();
+  if (!name) return;
+  if (/[>›]/.test(name)) return notify('A code name cannot contain “>”; it separates a code from its subcodes.');
+  if (findChildCode(parentId, name)) return notify(`“${parent.name}” already has a subcode named “${name}”.`);
+  ui.collapsedCodes = ui.collapsedCodes.filter((x) => x !== parentId);
+  createCode([...codePathParts(parent), name].join(' > '));
+}
+
+/** Deletes a code right away (no question; Undo brings it back). */
+export function deleteCodeNow(code: Code) {
+  deleteCode(code.id);
+  toast(`Deleted “${code.name}”. Undo with ⌘Z / Ctrl+Z.`);
 }
 
 /** Merges a dragged code into another after confirmation. */
@@ -109,6 +129,16 @@ export function moveCodesTo(ids: string[], parentId: string | null) {
   const res = moveCodes(ids, parentId);
   const problems = [
     res.cycle ? `${plural(res.cycle, 'code')} cannot become a subcode of ${res.cycle === 1 ? 'its' : 'their'} own subcode` : '',
+    res.duplicate ? `${plural(res.duplicate, 'code')} already exist${res.duplicate === 1 ? 's' : ''} there with the same name (merge instead)` : '',
+  ].filter(Boolean);
+  if (problems.length) toast(`Moved ${res.moved}; ${problems.join('; ')}.`, 5000);
+}
+
+/** Places dragged codes before or after another code (custom order); switches to that order. */
+export function placeCodesAt(ids: string[], targetId: string, after: boolean) {
+  const res = placeCodes(ids, targetId, after);
+  const problems = [
+    res.cycle ? `${plural(res.cycle, 'code')} cannot go inside ${res.cycle === 1 ? 'its' : 'their'} own subcodes` : '',
     res.duplicate ? `${plural(res.duplicate, 'code')} already exist${res.duplicate === 1 ? 's' : ''} there with the same name (merge instead)` : '',
   ].filter(Boolean);
   if (problems.length) toast(`Moved ${res.moved}; ${problems.join('; ')}.`, 5000);

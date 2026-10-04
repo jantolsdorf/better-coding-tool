@@ -693,6 +693,31 @@ dialog.start {
 }
 .code-row.dragging {
   opacity: 0.4;
+  transform: scale(0.94);
+  transform-origin: left center;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+/* What follows the cursor while dragging a code. */
+.code-drag-ghost {
+  position: fixed;
+  top: -100px;
+  left: -100px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  padding: 3px 9px 3px 6px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--accent-border);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.code-drag-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .code-row.drag-over {
   background: var(--accent-soft);
@@ -2101,4 +2126,50 @@ dialog.backup {
 .copy-toggle.done {
   color: var(--ok);
   font-weight: 700;
+}
+
+/* Custom code order: a line shows where a dragged code will be placed. */
+.code-row.insert-before > .code-main {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.code-row.insert-after > .code-main {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* "+ Subcodes" switch in the code box. */
+.seg-toggle.subcodes-toggle {
+  font-size: 11px;
+  padding: 0 7px;
+  line-height: 18px;
+}
+
+/* Codebook rows: checkbox, ＋ (new subcode) and 🗑 appear while hovering a code. */
+.row-check.hover-check {
+  pointer-events: auto;
+  cursor: pointer;
+  visibility: hidden;
+}
+.code-main:hover .row-check.hover-check,
+.row-check.hover-check.shown {
+  visibility: visible;
+}
+.code-actions {
+  display: none;
+  flex: none;
+  gap: 1px;
+}
+.code-main:hover .code-actions {
+  display: inline-flex;
+}
+.code-row.dragging .code-actions {
+  display: none;
+}
+.icon-btn.code-action {
+  padding: 0 3px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.icon-btn.code-action:hover {
+  color: var(--text);
 }
