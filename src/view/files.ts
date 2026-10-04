@@ -19,3 +19,22 @@ export function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
     input.click();
   });
 }
+
+/** Copies text to the clipboard; resolves false if the browser refused. */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Older browsers or insecure contexts: copy through a temporary text field.
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    return ok;
+  }
+}

@@ -41,7 +41,9 @@ npm run build      # produces a single self-contained dist/index.html
   **Delete** deletes the selection of the panel you used last. Each of these is one step for
   Undo.
 - **Coding**: open a document and highlight a passage. A small box opens below the selection;
-  type a code (existing codes are suggested) and press **Enter**. Pressing **Enter** without
+  type a code (existing codes are suggested, each with its parent codes as a small line above
+  its name, so long names stay distinguishable) and press **Enter**. **⌘C / Ctrl+C** (or **⧉** in the box)
+  copies the highlighted text. Pressing **Enter** without
   typing anything creates an *in-vivo code* from the highlighted words (or applies it, if a code
   with that name exists); **Tab** first puts the words into the box so you can shorten them. **Shift+Enter** applies the
   code and keeps the box open to add more codes to the same passage. **↑/↓** chooses a

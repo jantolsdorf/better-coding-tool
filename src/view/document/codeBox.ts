@@ -23,6 +23,8 @@ import { memosOf } from '../../model/memos';
 import { project, ui } from '../../model/state';
 import type { Code, Doc } from '../../model/types';
 import { h, hexToRgba } from '../dom';
+import { toast } from '../feedback';
+import { copyText } from '../files';
 import { gridEl, pointToOffset, rangeFor, renderedDocId, setNamedHighlight, textBody } from './textView';
 
 interface Popup {
@@ -121,10 +123,30 @@ function openCodeBox(doc: Doc, start: number, end: number) {
     },
     '?',
   );
+  const copyBtn = h(
+    'button',
+    {
+      class: 'icon-btn copy-toggle',
+      title: 'Copy the selected text (⌘C / Ctrl+C)',
+      onMousedown: (e: MouseEvent) => {
+        e.preventDefault();
+        copyPassage();
+        input.focus({ preventScroll: true });
+      },
+    },
+    '⧉',
+  );
   const el = h(
     'div',
     { class: 'code-popup' },
-    h('div', { class: 'popup-meta' }, kind, h('span', { class: 'grow' }, `${lineLabel(doc, start, end)} · ${end - start} characters`), helpToggle),
+    h(
+      'div',
+      { class: 'popup-meta' },
+      kind,
+      h('span', { class: 'grow' }, `${lineLabel(doc, start, end)} · ${end - start} characters`),
+      copyBtn,
+      helpToggle,
+    ),
     target,
     h('div', { class: 'popup-row' }, color, input),
     list,
@@ -153,6 +175,22 @@ function openCodeBox(doc: Doc, start: number, end: number) {
   renderApplied();
   input.focus({ preventScroll: true });
   el.scrollIntoView({ block: 'nearest' });
+}
+
+/** Copies the passage the box was opened for (the text selection itself is gone once the box has focus). */
+async function copyPassage() {
+  const p = popup;
+  const doc = currentDoc();
+  if (!p || !doc || doc.id !== p.docId) return;
+  const btn = p.el.querySelector('.copy-toggle');
+  if (await copyText(doc.content.slice(p.start, p.end))) {
+    btn?.classList.add('done');
+    if (btn) btn.textContent = '✓';
+    setTimeout(() => {
+      btn?.classList.remove('done');
+      if (btn) btn.textContent = '⧉';
+    }, 1200);
+  } else toast('Could not copy to the clipboard.');
 }
 
 export function closeCodeBox() {
@@ -192,6 +230,7 @@ function helpSection(onClose: () => void): HTMLElement {
     row('⇧↵', 'apply and keep the box open to add another code or memo'),
     row('↑ ↓', 'choose a suggestion'),
     row('Tab', 'complete the suggestion, or (with nothing typed) put the highlighted words in the box to edit them'),
+    row('⌘C / Ctrl+C', 'copy the selected text (or click ⧉)'),
     row('Esc', 'close without changes'),
   );
 }
@@ -280,6 +319,27 @@ function refreshSuggestions() {
   renderList();
 }
 
+/**
+ * A suggestion's text: the parent codes as a small breadcrumb line above the name, so the parent
+ * stays readable however long the names are. Both lines wrap instead of being cut off.
+ */
+function suggestionText(parents: string[], name: string, prefix = '', suffix = ''): HTMLElement {
+  return h(
+    'span',
+    { class: 'sugg-text' },
+    parents.length
+      ? h(
+          'span',
+          { class: 'sugg-path' },
+          prefix ? `${prefix} ` : '',
+          ...parents.flatMap((part, i) => [i ? h('span', { class: 'sugg-sep' }, ' › ') : '', h('span', { class: 'sugg-part' }, part)]),
+          suffix,
+        )
+      : null,
+    h('span', { class: 'sugg-name' }, name),
+  );
+}
+
 function renderList() {
   const p = popup;
   if (!p) return;
@@ -305,15 +365,10 @@ function renderList() {
     ...p.items.map((c, i) =>
       h(
         'li',
-        { class: i === p.active ? 'active' : '', onMousedown: pick(i) },
+        { class: i === p.active ? 'active' : '', title: codePath(c), onMousedown: pick(i) },
         h('span', { class: 'swatch', style: { background: c.color } }),
-        h(
-          'span',
-          { class: 'grow' },
-          c.name,
-          c.parentId ? h('span', { class: 'code-parent' }, ` in ${codePathParts(c).slice(0, -1).join(' > ')}`) : null,
-        ),
-        h('span', { class: 'muted' }, String(p.counts.get(c.id) ?? 0)),
+        suggestionText(codePathParts(c).slice(0, -1), c.name),
+        h('span', { class: 'muted sugg-count' }, String(p.counts.get(c.id) ?? 0)),
       ),
     ),
   );
@@ -325,16 +380,15 @@ function renderList() {
     const newParents = missingInPath(parts).slice(0, -1);
     // Subcodes take the color of the level 1 code.
     const color = parents.length ? (findChildCode(null, parents[0])?.color ?? p.color.value) : p.color.value;
-    const label = parents.length
-      ? `Create subcode “${name}” in ${parents.join(' > ')}` +
-        (newParents.length ? ` (also creates ${newParents.map((n) => `“${n}”`).join(', ')})` : '')
-      : `Create new code “${name}”`;
+    const also = newParents.length ? ` (also creates ${newParents.map((n) => `“${n}”`).join(', ')})` : '';
     p.list.append(
       h(
         'li',
-        { class: 'create' + (p.active === -1 ? ' active' : ''), onMousedown: pick(-1) },
+        { class: 'create' + (p.active === -1 ? ' active' : ''), title: parts.join(' > '), onMousedown: pick(-1) },
         h('span', { class: 'swatch', style: { background: color } }),
-        h('span', { class: 'grow' }, label),
+        parents.length
+          ? suggestionText(parents, `Create subcode “${name}”`, 'in', also)
+          : h('span', { class: 'sugg-text' }, h('span', { class: 'sugg-name' }, `Create new code “${name}”`)),
       ),
     );
   }
@@ -422,5 +476,9 @@ function onKey(e: KeyboardEvent) {
   } else if (e.key === 'Escape') {
     e.preventDefault();
     closeCodeBox();
+  } else if (e.key.toLowerCase() === 'c' && (e.metaKey || e.ctrlKey) && p.input.selectionStart === p.input.selectionEnd) {
+    // Nothing selected in the box: copy the highlighted passage instead.
+    e.preventDefault();
+    copyPassage();
   }
 }
