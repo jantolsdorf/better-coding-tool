@@ -1,7 +1,14 @@
 // The top bar (coder name, undo/redo, view menu, import/export menus, theme) and the page-wide buttons,
 // menus and keyboard shortcuts.
 
-import { addCodeFromPrompt, deleteCodebookInteractive, setCodeSort, setCodeView } from '../controller/codes';
+import {
+  addCodeFromPrompt,
+  deleteCodebookInteractive,
+  setCodeFilterOption,
+  setCodeSort,
+  setCodeView,
+  toggleAllCodesCollapsed,
+} from '../controller/codes';
 import { addFilesFromPicker, addSampleDocument, createFolder } from '../controller/documents';
 import { redoChange, undoChange } from '../controller/history';
 import { cycleTheme, setCoderName } from '../controller/preferences';
@@ -19,8 +26,9 @@ import {
 } from '../controller/transfer';
 import { canRedo, canUndo, project, savedBytes, ui } from '../model/state';
 import type { UIState } from '../model/types';
-import { setCodebookFilter } from './codebookList';
+import { clearCodeSelection, deleteSelectedCodes, setCodebookFilter, toggleCodeSelectMode } from './codebookList';
 import { openStartDialog } from './startDialog';
+import { clearDocSelection, deleteSelectedItems, toggleDocSelectMode } from './tree';
 import { closeViewMenu, initViewMenu, viewMenu } from './viewMenu';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -36,6 +44,9 @@ let redoBtn: HTMLButtonElement;
 let themeBtn: HTMLButtonElement;
 let codeSort: HTMLSelectElement;
 let codeView: HTMLSelectElement;
+let filterSubcodes: HTMLInputElement;
+let filterDescriptions: HTMLInputElement;
+let filterOptions: HTMLElement;
 let viewMenuSlot: HTMLElement;
 
 export function initTopbar() {
@@ -57,6 +68,25 @@ export function initTopbar() {
   onClick('btn-empty-add', addFilesFromPicker);
   onClick('btn-sample', addSampleDocument);
   onClick('btn-add-code', addCodeFromPrompt);
+  onClick('btn-select-docs', toggleDocSelectMode);
+  onClick('btn-select-codes', toggleCodeSelectMode);
+  onClick('btn-toggle-codes', toggleAllCodesCollapsed);
+
+  // Esc ends selecting; Delete/Backspace deletes the selection of the panel used last.
+  let lastPanel: 'docs' | 'codes' = 'docs';
+  document.querySelector('.panel.docs')?.addEventListener('pointerdown', () => (lastPanel = 'docs'));
+  document.querySelector('.panel.codes')?.addEventListener('pointerdown', () => (lastPanel = 'codes'));
+  document.addEventListener('keydown', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest?.('input:not([type=checkbox]), textarea, select, [contenteditable]') || document.querySelector('dialog[open]')) return;
+    if (e.key === 'Escape') {
+      clearDocSelection();
+      clearCodeSelection();
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      const done = lastPanel === 'codes' ? deleteSelectedCodes() : deleteSelectedItems();
+      if (done) e.preventDefault();
+    }
+  });
   onClick('btn-import-coder', importCoderInteractive);
 
   // Import and export
@@ -87,6 +117,13 @@ export function initTopbar() {
   });
   codeSort.addEventListener('change', () => setCodeSort(codeSort.value as UIState['codeSort']));
   codeView.addEventListener('change', () => setCodeView(codeView.value as UIState['codeView']));
+  filterSubcodes = $<HTMLInputElement>('filter-subcodes');
+  filterDescriptions = $<HTMLInputElement>('filter-descriptions');
+  filterOptions = $('btn-filter-options');
+  filterSubcodes.addEventListener('change', () => setCodeFilterOption('codeFilterSubcodes', filterSubcodes.checked));
+  filterDescriptions.addEventListener('change', () => setCodeFilterOption('codeFilterDescriptions', filterDescriptions.checked));
+  // Ticking options keeps the menu open.
+  document.querySelector('.filter-menu')?.addEventListener('click', (e) => e.stopPropagation());
 
   coderInput.addEventListener('change', () => {
     // The coder always needs a name; clearing the field keeps the previous one.
@@ -132,6 +169,10 @@ export function renderTopbar() {
   themeBtn.title = 'Color theme (click to switch between automatic, light and dark)';
   codeSort.value = ui.codeSort;
   codeView.value = ui.codeView;
+  filterSubcodes.checked = ui.codeFilterSubcodes;
+  filterDescriptions.checked = ui.codeFilterDescriptions;
+  // Highlighted while the filter works differently from the default.
+  filterOptions.classList.toggle('on', ui.codeFilterSubcodes || !ui.codeFilterDescriptions);
   viewMenuSlot.replaceChildren(viewMenu());
   if (document.activeElement !== coderInput) coderInput.value = project.coderName;
   undoBtn.disabled = !canUndo();

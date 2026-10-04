@@ -1,7 +1,18 @@
 // The codebook panel: codes as an indented tree or as "Parent > Child" paths, with filtering,
-// sorting, and dragging a code onto another to nest or merge it.
+// sorting, dragging a code onto another to nest or merge it, and multiple selection to move,
+// merge, recolor or delete several codes at once.
 
-import { mergeDroppedCode, moveCode, recolorCode, setCodeCollapsed } from '../controller/codes';
+import {
+  anyCodeExpanded,
+  deleteCodesInteractive,
+  mergeCodesInteractive,
+  mergeDroppedCode,
+  moveCode,
+  moveCodesTo,
+  recolorCode,
+  recolorCodesTo,
+  setCodeCollapsed,
+} from '../controller/codes';
 import {
   childCodes,
   codeById,
@@ -18,17 +29,45 @@ import type { Code } from '../model/types';
 import { byName } from '../model/util';
 import { openCodeDialog } from './codeDialog';
 import { h } from './dom';
+import { actionSelect, Selection, TOP_LEVEL } from './multiSelect';
 
-// The dragged code's id; dataTransfer contents cannot be read during dragover.
-let draggedCodeId: string | null = null;
+// The dragged codes' ids (several when dragging a selection); dataTransfer contents cannot be
+// read during dragover.
+let draggedCodeIds: string[] = [];
 
 // The filter is a transient view setting (not saved).
 let filterText = '';
 let lastContainer: HTMLElement | null = null;
 
+const selection = new Selection(() => lastContainer && renderCodebook(lastContainer));
+const selectedCodes = () => [...selection.keys];
+
+/** Turns the codebook's select mode (checkboxes) on or off. */
+export const toggleCodeSelectMode = () => selection.toggleMode();
+
+/** Deletes the selected codes (Delete key); returns false if nothing is selected. */
+export function deleteSelectedCodes(): boolean {
+  if (!selection.size) return false;
+  if (deleteCodesInteractive(selectedCodes())) selection.clear();
+  return true;
+}
+
+export const clearCodeSelection = () => selection.clear();
+
+/** Moves or merges the dragged codes onto a code (null = top level). */
+function dropDragged(targetId: string | null, merge: boolean) {
+  const ids = draggedCodeIds;
+  if (!ids.length) return;
+  if (merge && targetId) {
+    if (ids.length === 1) mergeDroppedCode(ids[0], targetId);
+    else if (mergeCodesInteractive(ids, targetId)) selection.clear();
+  } else if (ids.length === 1) moveCode(ids[0], targetId);
+  else moveCodesTo(ids, targetId);
+}
+
 /**
- * Shows only codes matching `text`: by name or description, or by path ("trust > dist").
- * Their parent codes stay visible for context.
+ * Shows only codes matching `text`: by name (or description, if that rule is on), or by path
+ * ("trust > dist"), optionally with all their subcodes. Their parent codes stay visible for context.
  */
 export function setCodebookFilter(text: string) {
   filterText = text.trim().toLowerCase();
@@ -46,7 +85,19 @@ interface ListState {
 
 export function renderCodebook(container: HTMLElement) {
   lastContainer = container;
-  if (!draggedCodeId) container.classList.remove('dragging-code');
+  if (!draggedCodeIds.length) container.classList.remove('dragging-code');
+  selection.prune(new Set(project.codes.map((c) => c.id)));
+  const selectBtn = document.getElementById('btn-select-codes');
+  selectBtn?.classList.toggle('on', selection.active);
+  if (selectBtn) selectBtn.textContent = selection.active ? 'Done' : 'Select';
+  // Opening and closing subcodes only applies to the indented view.
+  const toggleBtn = document.getElementById('btn-toggle-codes');
+  if (toggleBtn) {
+    const close = anyCodeExpanded();
+    toggleBtn.hidden = ui.codeView === 'path' || !project.codes.some((c) => c.parentId);
+    toggleBtn.textContent = close ? '⊟' : '⊞';
+    toggleBtn.title = close ? 'Close all subcodes' : 'Open all subcodes';
+  }
   if (!project.codes.length) {
     container.replaceChildren(h('p', { class: 'muted pad' }, 'No codes yet. Highlight text in a document to create one.'));
     return;
@@ -68,10 +119,17 @@ export function renderCodebook(container: HTMLElement) {
     visible = new Set();
     const isPath = /[>›]/.test(filterText);
     for (const c of project.codes) {
-      const inDescription = !isPath && (c.description ?? '').toLowerCase().includes(filterText);
-      if (!matchesCodeQuery(c, filterText) && !inDescription) continue;
-      matches.add(c.id);
-      for (let p: Code | undefined = c, d = 0; p && d < 100; p = p.parentId ? codeById(p.parentId) : undefined, d++) visible.add(p.id);
+      const inDescription = ui.codeFilterDescriptions && !isPath && (c.description ?? '').toLowerCase().includes(filterText);
+      if (matchesCodeQuery(c, filterText) || inDescription) matches.add(c.id);
+    }
+    // Optionally, every subcode of a matching code counts as a match too.
+    if (ui.codeFilterSubcodes) {
+      const direct = [...matches];
+      for (const c of project.codes) if (direct.some((id) => isCodeInSubtree(c.id, id))) matches.add(c.id);
+    }
+    // Parents of matches stay visible for context.
+    for (const id of matches) {
+      for (let p = codeById(id), d = 0; p && d < 100; p = p.parentId ? codeById(p.parentId) : undefined, d++) visible.add(p.id);
     }
     if (!matches.size) {
       container.replaceChildren(h('p', { class: 'muted pad' }, `No codes match “${filterText}”.`));
@@ -81,11 +139,43 @@ export function renderCodebook(container: HTMLElement) {
 
   const state: ListState = { counts: segmentCounts(), recent, visible, matches };
   const topLevel = h('div', { class: 'code-top-drop' }, 'Drop here to move to the top level');
-  onDrop(topLevel, () => {
-    if (draggedCodeId) moveCode(draggedCodeId, null);
-  });
+  onDrop(topLevel, () => dropDragged(null, false));
   const rows = ui.codeView === 'path' ? pathRows(state, edited) : codeRows(null, 0, state);
-  container.replaceChildren(topLevel, ...rows);
+  selection.order = rows.map((r) => r.dataset.id!);
+  container.replaceChildren(...(selection.active ? [selectionBar()] : []), topLevel, ...rows);
+}
+
+function selectionBar(): HTMLElement {
+  const ids = selectedCodes();
+  // Codes can be moved under any code outside the selected subtrees.
+  const targets = project.codes
+    .filter((c) => !ids.some((id) => isCodeInSubtree(c.id, id)))
+    .map((c): [string, string] => [c.id, codePath(c)])
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  const mergeTargets = project.codes
+    .filter((c) => !ids.includes(c.id))
+    .map((c): [string, string] => [c.id, codePath(c)])
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  const color = h('input', {
+    type: 'color',
+    class: 'swatch-input',
+    title: 'Give the selected codes one color',
+    value: codeById(ids[0])?.color ?? '#888888',
+    onChange: (e: Event) => recolorCodesTo(selectedCodes(), (e.target as HTMLInputElement).value),
+  });
+  return selection.bar(
+    [
+      color,
+      actionSelect('Move…', 'Make the selected codes subcodes of another code', [[TOP_LEVEL, '(top level)'], ...targets], (v) =>
+        moveCodesTo(selectedCodes(), v === TOP_LEVEL ? null : v),
+      ),
+      actionSelect('Merge…', 'Merge the selected codes into another code', mergeTargets, (v) => {
+        if (mergeCodesInteractive(selectedCodes(), v)) selection.clear();
+      }),
+      h('button', { class: 'icon-btn danger', title: 'Delete the selected codes (Delete)', onClick: deleteSelectedCodes }, '🗑'),
+    ],
+    ['code', 'codes'],
+  );
 }
 
 /**
@@ -155,7 +245,7 @@ function subtreeCount(id: string, counts: Map<string, number>, depth = 0): numbe
 /** Calls `fn` when a dragged code is dropped on `el`. */
 function onDrop(el: HTMLElement, fn: () => void) {
   el.addEventListener('dragover', (e) => {
-    if (!draggedCodeId || el.classList.contains('disabled')) return;
+    if (!draggedCodeIds.length || el.classList.contains('disabled')) return;
     e.preventDefault();
     e.stopPropagation();
     el.classList.add('over');
@@ -177,12 +267,8 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
   // Shown below this row while another code is dragged over it.
   const asSub = h('div', { class: 'drop-opt', title: `Make it a subcode of “${c.name}”` }, '⤷ Subcode');
   const asMerge = h('div', { class: 'drop-opt merge', title: `Merge it into “${c.name}”` }, '⇢ Merge into');
-  onDrop(asSub, () => {
-    if (draggedCodeId) moveCode(draggedCodeId, c.id);
-  });
-  onDrop(asMerge, () => {
-    if (draggedCodeId) mergeDroppedCode(draggedCodeId, c.id);
-  });
+  onDrop(asSub, () => dropDragged(c.id, false));
+  onDrop(asMerge, () => dropDragged(c.id, true));
 
   const isContext = !!state.visible && !state.matches.has(c.id);
   const row = h(
@@ -225,10 +311,11 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
     h('div', { class: 'drop-opts' }, asSub, asMerge),
   );
 
+  selection.bindRow(row, c.id, row.querySelector<HTMLElement>('.code-main')!);
   row.addEventListener('dragstart', (e) => {
     e.stopPropagation();
-    draggedCodeId = c.id;
-    e.dataTransfer?.setData('text/plain', c.name);
+    draggedCodeIds = selection.has(c.id) ? selectedCodes() : [c.id];
+    e.dataTransfer?.setData('text/plain', draggedCodeIds.length > 1 ? `${draggedCodeIds.length} codes` : c.name);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
     // Deferred so the drag image is taken before the list changes appearance.
     requestAnimationFrame(() => {
@@ -238,21 +325,21 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
     });
   });
   row.addEventListener('dragend', () => {
-    draggedCodeId = null;
+    draggedCodeIds = [];
     row.classList.remove('dragging');
     const list = row.closest('.panel-body');
     list?.classList.remove('dragging-code');
     list?.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
   });
   row.addEventListener('dragenter', () => {
-    const id = draggedCodeId;
-    if (!id || id === c.id) return;
+    const ids = draggedCodeIds;
+    if (!ids.length || ids.includes(c.id)) return;
     row.classList.add('drag-over');
     // A code cannot be nested inside its own subtree (merging is still possible).
-    asSub.classList.toggle('disabled', isCodeInSubtree(c.id, id));
+    asSub.classList.toggle('disabled', ids.some((id) => isCodeInSubtree(c.id, id)));
   });
   row.addEventListener('dragover', (e) => {
-    if (draggedCodeId && draggedCodeId !== c.id) e.preventDefault();
+    if (draggedCodeIds.length && !draggedCodeIds.includes(c.id)) e.preventDefault();
   });
   row.addEventListener('dragleave', (e) => {
     if (!row.contains(e.relatedTarget as Node)) row.classList.remove('drag-over');

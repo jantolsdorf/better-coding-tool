@@ -131,3 +131,51 @@ export function moveFolder(id: string, parentId: string | null): boolean {
   commit();
   return true;
 }
+
+/** Documents inside these folders (and their subfolders). */
+export function docsInFolders(folderIds: string[]): Doc[] {
+  const ids = new Set(folderIds.flatMap((id) => [...descendantFolderIds(id)]));
+  return project.docs.filter((d) => d.folderId && ids.has(d.folderId));
+}
+
+/** Whether a document or folder lies inside one of these folders (at any depth). */
+function isInside(item: { type: 'doc' | 'folder'; id: string }, folderIds: Set<string>): boolean {
+  let parent = item.type === 'doc' ? getDoc(item.id)?.folderId : project.folders.find((f) => f.id === item.id)?.parentId;
+  for (let d = 0; parent && d < 100; d++) {
+    if (folderIds.has(parent)) return true;
+    parent = project.folders.find((f) => f.id === parent)?.parentId;
+  }
+  return false;
+}
+
+/** Deletes documents and folders (with everything in them) in one step. */
+export function deleteItems(docIds: string[], folderIds: string[]) {
+  const folders = new Set(folderIds.flatMap((id) => [...descendantFolderIds(id)]));
+  removeDocsData(new Set([...docIds, ...docsInFolders(folderIds).map((d) => d.id)]));
+  project.folders = project.folders.filter((f) => !folders.has(f.id));
+  if (ui.selectedFolderId && folders.has(ui.selectedFolderId)) ui.selectedFolderId = null;
+  commit();
+}
+
+/**
+ * Moves documents and folders into a folder (null = top level) in one step. Items inside another
+ * moved folder go along with it; a folder cannot move into itself. Returns how many could not move.
+ */
+export function moveItems(items: { type: 'doc' | 'folder'; id: string }[], folderId: string | null): number {
+  const movedFolders = new Set(items.filter((i) => i.type === 'folder').map((i) => i.id));
+  let refused = 0;
+  for (const item of items) {
+    if (isInside(item, movedFolders)) continue;
+    if (item.type === 'doc') {
+      const d = getDoc(item.id);
+      if (d) d.folderId = folderId;
+      continue;
+    }
+    const f = project.folders.find((x) => x.id === item.id);
+    if (!f || f.id === folderId) continue;
+    if (folderId && descendantFolderIds(f.id).has(folderId)) refused++;
+    else f.parentId = folderId;
+  }
+  commit();
+  return refused;
+}

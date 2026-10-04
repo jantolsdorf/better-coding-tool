@@ -161,6 +161,17 @@ export function updateCode(id: string, patch: Partial<Omit<Code, 'id'>>) {
 
 /** Deletes a code and its segments; its subcodes move up to the deleted code's parent. */
 export function deleteCode(id: string) {
+  removeCode(id);
+  commit();
+}
+
+/** Deletes several codes in one step (subcodes that are not deleted move up, as with one code). */
+export function deleteCodes(ids: string[]) {
+  ids.forEach(removeCode);
+  commit();
+}
+
+function removeCode(id: string) {
   const code = codeById(id);
   for (const c of project.codes) if (c.parentId === id) c.parentId = code?.parentId ?? null;
   project.codes = project.codes.filter((c) => c.id !== id);
@@ -168,7 +179,6 @@ export function deleteCode(id: string) {
   for (const [docId, list] of Object.entries(project.consolidations)) {
     project.consolidations[docId] = list.filter((s) => s.codeId !== id);
   }
-  commit();
 }
 
 /** Deletes every code, and with them your coded segments and all consolidated segments. Memos and other coders' coding stay. */
@@ -189,8 +199,19 @@ function mergeIn(list: Segment[], fromId: string, intoId: string) {
 
 /** Reassigns all segments and subcodes of `fromId` to `intoId` and removes `fromId`. */
 export function mergeCode(fromId: string, intoId: string) {
+  mergeOne(fromId, intoId);
+  commit();
+}
+
+/** Merges several codes into one in one step. */
+export function mergeCodes(fromIds: string[], intoId: string) {
+  for (const id of fromIds) mergeOne(id, intoId);
+  commit();
+}
+
+function mergeOne(fromId: string, intoId: string) {
   const from = codeById(fromId);
-  if (!from || fromId === intoId) return;
+  if (!from || fromId === intoId || !codeById(intoId)) return;
   mergeIn(project.segments, fromId, intoId);
   for (const list of Object.values(project.consolidations)) mergeIn(list, fromId, intoId);
   for (const c of project.codes) {
@@ -200,7 +221,6 @@ export function mergeCode(fromId: string, intoId: string) {
   project.codes = project.codes.filter((c) => c.id !== fromId);
   const into = codeById(intoId);
   if (into) into.updatedAt = now();
-  commit();
 }
 
 /** A code and all its (nested) subcodes. */
@@ -221,6 +241,42 @@ export function setSubtreeColor(id: string, color: string) {
  * With `adoptParentColor`, the code and its subcodes take the new parent's color.
  */
 export function setCodeParent(id: string, parentId: string | null, { adoptParentColor = false } = {}): 'ok' | 'cycle' | 'duplicate' {
+  const res = reparent(id, parentId, adoptParentColor);
+  if (res === 'ok') commit();
+  return res;
+}
+
+/**
+ * Moves several codes under `parentId` (null = top level) in one step, like dragging each of them.
+ * Selected subcodes of other selected codes stay where they are, inside their moved parent.
+ */
+export function moveCodes(ids: string[], parentId: string | null): { moved: number; cycle: number; duplicate: number } {
+  const counts = { moved: 0, cycle: 0, duplicate: 0 };
+  for (const id of topmostCodes(ids)) {
+    const res = reparent(id, parentId, true);
+    counts[res === 'ok' ? 'moved' : res]++;
+  }
+  commit();
+  return counts;
+}
+
+/** Gives several codes one color. */
+export function recolorCodes(ids: string[], color: string) {
+  for (const id of ids) {
+    const c = codeById(id);
+    if (!c) continue;
+    c.color = color;
+    c.updatedAt = now();
+  }
+  commit();
+}
+
+/** The codes among `ids` that are not inside another of them. */
+export function topmostCodes(ids: string[]): string[] {
+  return ids.filter((id) => !ids.some((other) => other !== id && isCodeInSubtree(id, other)));
+}
+
+function reparent(id: string, parentId: string | null, adoptParentColor: boolean): 'ok' | 'cycle' | 'duplicate' {
   const code = codeById(id);
   if (!code || (parentId && isCodeInSubtree(parentId, id))) return 'cycle';
   const clash = findChildCode(parentId, code.name);
@@ -229,6 +285,5 @@ export function setCodeParent(id: string, parentId: string | null, { adoptParent
   code.updatedAt = now();
   const parent = parentId ? codeById(parentId) : undefined;
   if (adoptParentColor && parent) for (const c of subtreeOf(id)) c.color = parent.color;
-  commit();
   return 'ok';
 }

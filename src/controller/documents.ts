@@ -6,14 +6,17 @@ import {
   currentDoc,
   deleteDoc,
   deleteFolder,
+  deleteItems,
+  docsInFolders,
   folderContents,
   moveDoc,
   moveFolder,
+  moveItems,
   renameDoc,
   renameFolder,
 } from '../model/documents';
 import { SAMPLE_NAME, SAMPLE_TEXT } from '../model/sample';
-import { commitUI, ui } from '../model/state';
+import { commitUI, project, ui } from '../model/state';
 import type { Doc, Folder } from '../model/types';
 import { ask, confirmAction, toast } from '../view/feedback';
 import { pickFiles } from '../view/files';
@@ -102,8 +105,49 @@ export function selectFolder(folderId: string | null) {
   commitUI();
 }
 
+/** Folders that contain anything, i.e. that can be opened and closed. */
+const nonEmptyFolderIds = () =>
+  project.folders.filter((f) => project.folders.some((x) => x.parentId === f.id) || project.docs.some((d) => d.folderId === f.id)).map((f) => f.id);
+
+/** Whether any folder with contents is open (so "close all" applies). */
+export const anyFolderExpanded = () => nonEmptyFolderIds().some((id) => !ui.collapsed.includes(id));
+
+/** Closes all folders if any is open, otherwise opens them all. */
+export function toggleAllFoldersCollapsed() {
+  ui.collapsed = anyFolderExpanded() ? project.folders.map((f) => f.id) : [];
+  commitUI();
+}
+
 export function setFolderCollapsed(folderId: string, collapsed: boolean) {
   ui.collapsed = ui.collapsed.filter((x) => x !== folderId);
   if (collapsed) ui.collapsed.push(folderId);
   commitUI();
+}
+
+export type TreeItem = { type: 'doc' | 'folder'; id: string };
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** Moves several documents and folders into a folder (null = top level). */
+export function moveItemsTo(items: TreeItem[], folderId: string | null) {
+  expand(folderId);
+  const refused = moveItems(items, folderId);
+  if (refused) toast(`${plural(refused, 'folder')} could not be moved into ${refused === 1 ? 'itself' : 'themselves'}.`);
+}
+
+/** Deletes several documents and folders after confirmation; returns whether they were deleted. */
+export function deleteItemsInteractive(items: TreeItem[]): boolean {
+  const docIds = items.filter((i) => i.type === 'doc').map((i) => i.id);
+  const folderIds = items.filter((i) => i.type === 'folder').map((i) => i.id);
+  const inside = docsInFolders(folderIds).filter((d) => !docIds.includes(d.id));
+  const all = new Set([...docIds, ...inside.map((d) => d.id)]);
+  const segments = project.segments.filter((s) => all.has(s.docId)).length;
+  const what = [docIds.length ? plural(docIds.length, 'document') : '', folderIds.length ? plural(folderIds.length, 'folder') : '']
+    .filter(Boolean)
+    .join(' and ');
+  const extra = inside.length ? ` with ${plural(inside.length, 'more document')} inside` : '';
+  const coding = segments ? `\n\nThis also removes ${plural(segments, 'coded segment')} and all memos and other coders’ coding of these documents.` : '';
+  if (!confirmAction(`Delete ${what}${extra}?${coding}\n\nYou can undo this (⌘Z / Ctrl+Z).`)) return false;
+  deleteItems(docIds, folderIds);
+  return true;
 }

@@ -30,7 +30,16 @@ npm run build      # produces a single self-contained dist/index.html
   automatic (follows the system), light and dark.
 - **Documents**: add `.txt` files with **+ Files** or by dropping them on the document list.
   Organise them in nested folders (**+ Folder**, or the ＋ on a folder). Drag documents and
-  folders to move them. New files go into the selected folder.
+  folders to move them. New files go into the selected folder. **⊟ / ⊞** on *All documents*
+  closes or opens all folders at once (the same button next to the codebook's sort menu does
+  this for all subcodes).
+- **Selecting several documents or codes**: **Select** in the *Documents* or *Codebook* header
+  shows checkboxes; Cmd/Ctrl-click or Shift-click (a range) works at any time. A bar above the
+  list shows how many are selected, with **Move…** (into a folder, or under another code),
+  **🗑** (delete, after confirmation) and, for codes, a color swatch for all of them and
+  **Merge…**. Dragging a selected row drags the whole selection. **Esc** ends selecting;
+  **Delete** deletes the selection of the panel you used last. Each of these is one step for
+  Undo.
 - **Coding**: open a document and highlight a passage. A small box opens below the selection;
   type a code (existing codes are suggested) and press **Enter**. Pressing **Enter** without
   typing anything creates an *in-vivo code* from the highlighted words (or applies it, if a code
@@ -81,7 +90,10 @@ npm run build      # produces a single self-contained dist/index.html
     list of full paths such as `Trust > Distrust`.
   - **Filter and sort**: type in *Filter codes…* to show only matching codes, by name,
     description or path (`trust > dist`). In the indented view their parent codes stay
-    visible, greyed, for context; Esc clears. Sort by *A–Z* or *Last edited* (the
+    visible, greyed, for context; Esc clears. The **⋯** next to the field sets the filter
+    rules: *Include subcodes of matches* also shows every subcode of a matching code, and
+    *Also search descriptions* (on by default) matches descriptions too; the ⋯ is highlighted
+    while the rules differ from the default. Sort by *A–Z* or *Last edited* (the
     most recently created, changed, moved or applied codes first; a parent sorts by its most
     recently edited subcode).
   - **⋯ menu**: export the codebook only (JSON, re-importable, or CSV), or import a codebook.

@@ -125,6 +125,10 @@ export interface UIState {
   codeSort: 'name' | 'recent';
   /** Codebook as an indented tree, or as a flat list of "Parent > Child" paths. */
   codeView: 'tree' | 'path';
+  /** Codebook filter: also show all subcodes of matching codes. */
+  codeFilterSubcodes: boolean;
+  /** Codebook filter: also match code descriptions (not only names). */
+  codeFilterDescriptions: boolean;
   theme: 'auto' | 'light' | 'dark';
   /** Relative heights of the sidebar panels (documents, codebook, other coders); null = default. */
   panelFlex: number[] | null;

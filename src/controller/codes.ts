@@ -5,9 +5,13 @@ import {
   createCode,
   deleteAllCodes,
   deleteCode,
+  deleteCodes,
   findChildCode,
   findCodeByPath,
   mergeCode,
+  mergeCodes,
+  moveCodes,
+  recolorCodes,
   setCodeParent,
   setSubtreeColor,
   splitCodePath,
@@ -97,6 +101,47 @@ export function deleteCodebookInteractive() {
   toast(`Deleted ${codes} code${codes === 1 ? '' : 's'}.`);
 }
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** Moves several codes under another code (null = top level), like dragging each of them. */
+export function moveCodesTo(ids: string[], parentId: string | null) {
+  if (parentId) ui.collapsedCodes = ui.collapsedCodes.filter((x) => x !== parentId);
+  const res = moveCodes(ids, parentId);
+  const problems = [
+    res.cycle ? `${plural(res.cycle, 'code')} cannot become a subcode of ${res.cycle === 1 ? 'its' : 'their'} own subcode` : '',
+    res.duplicate ? `${plural(res.duplicate, 'code')} already exist${res.duplicate === 1 ? 's' : ''} there with the same name (merge instead)` : '',
+  ].filter(Boolean);
+  if (problems.length) toast(`Moved ${res.moved}; ${problems.join('; ')}.`, 5000);
+}
+
+/** Merges several codes into another after confirmation; returns whether they were merged. */
+export function mergeCodesInteractive(ids: string[], intoId: string): boolean {
+  const into = codeById(intoId);
+  const from = ids.filter((id) => id !== intoId);
+  if (!into || !from.length) return false;
+  const n = project.segments.filter((s) => from.includes(s.codeId)).length;
+  if (!confirmAction(`Merge ${plural(from.length, 'code')} into “${into.name}”?\n\nTheir ${plural(n, 'segment')} and any subcodes move to “${into.name}”, and the merged codes are removed.`)) {
+    return false;
+  }
+  mergeCodes(from, intoId);
+  return true;
+}
+
+/** Deletes several codes after confirmation; returns whether they were deleted. */
+export function deleteCodesInteractive(ids: string[]): boolean {
+  const n = project.segments.filter((s) => ids.includes(s.codeId)).length;
+  const question =
+    `Delete ${plural(ids.length, 'code')}${n ? ` and remove ${n === 1 ? 'it' : 'them'} from ${plural(n, 'segment')}` : ''}?` +
+    '\nSubcodes that are not selected move up one level. You can undo this (⌘Z / Ctrl+Z).';
+  if (!confirmAction(question)) return false;
+  deleteCodes(ids);
+  return true;
+}
+
+export function recolorCodesTo(ids: string[], color: string) {
+  recolorCodes(ids, color);
+}
+
 export function recolorCode(id: string, color: string) {
   updateCode(id, { color });
 }
@@ -142,8 +187,26 @@ export function setCodeCollapsed(id: string, collapsed: boolean) {
   commitUI();
 }
 
+/** Codes that have subcodes, i.e. that can be opened and closed. */
+const parentCodeIds = () => project.codes.filter((c) => project.codes.some((x) => x.parentId === c.id)).map((c) => c.id);
+
+/** Whether any code with subcodes is open (so "close all" applies). */
+export const anyCodeExpanded = () => parentCodeIds().some((id) => !ui.collapsedCodes.includes(id));
+
+/** Closes all codes with subcodes if any is open, otherwise opens them all. */
+export function toggleAllCodesCollapsed() {
+  ui.collapsedCodes = anyCodeExpanded() ? parentCodeIds() : [];
+  commitUI();
+}
+
 export function setCodeSort(sort: UIState['codeSort']) {
   ui.codeSort = sort;
+  commitUI();
+}
+
+/** Sets a codebook filter rule: include subcodes of matches, or search descriptions. */
+export function setCodeFilterOption(option: 'codeFilterSubcodes' | 'codeFilterDescriptions', on: boolean) {
+  ui[option] = on;
   commitUI();
 }
 

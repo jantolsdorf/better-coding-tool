@@ -64,6 +64,7 @@
             <span class="grow">Documents</span>
             <button id="btn-add-files" class="btn small" title="Add .txt files to the selected folder">+ Files</button>
             <button id="btn-add-folder" class="btn small" title="Create a folder inside the selected folder">+ Folder</button>
+            <button id="btn-select-docs" class="btn small" title="Select several documents and folders to move or delete them (or Cmd/Ctrl-click, Shift-click)">Select</button>
           </div>
           <div id="tree" class="panel-body"></div>
         </section>
@@ -72,6 +73,7 @@
           <div class="panel-head">
             <span class="grow">Codebook</span>
             <button id="btn-add-code" class="btn small" title="Add a code without applying it">+ Code</button>
+            <button id="btn-select-codes" class="btn small" title="Select several codes to move, merge, recolor or delete them (or Cmd/Ctrl-click, Shift-click)">Select</button>
             <div class="menu">
               <button class="btn small menu-toggle" title="Export or import the codebook only" aria-haspopup="true">⋯</button>
               <div class="menu-list left" hidden>
@@ -92,7 +94,22 @@
             </div>
           </div>
           <div class="panel-tools">
-            <input id="code-search" type="search" placeholder="Filter codes…" autocomplete="off" spellcheck="false" />
+            <div class="filter-row">
+              <input id="code-search" type="search" placeholder="Filter codes…" autocomplete="off" spellcheck="false" />
+              <div class="menu">
+                <button id="btn-filter-options" class="icon-btn menu-toggle" title="Filter options" aria-haspopup="true">⋯</button>
+                <div class="menu-list filter-menu" hidden>
+                  <label class="view-item" title="Also show all subcodes of the codes that match the filter">
+                    <input id="filter-subcodes" type="checkbox" />
+                    <span class="grow">Include subcodes of matches</span>
+                  </label>
+                  <label class="view-item" title="Match the filter text in code descriptions, not only in names">
+                    <input id="filter-descriptions" type="checkbox" />
+                    <span class="grow">Also search descriptions</span>
+                  </label>
+                </div>
+              </div>
+            </div>
             <select id="code-view" title="Show subcodes indented, or as “Parent > Child” paths">
               <option value="tree">Indented</option>
               <option value="path">A &gt; B</option>
@@ -101,6 +118,7 @@
               <option value="name">A–Z</option>
               <option value="recent">Last edited</option>
             </select>
+            <button id="btn-toggle-codes" class="icon-btn expand-all" title="Close all subcodes">⊟</button>
           </div>
           <div id="codebook" class="panel-body"></div>
         </section>

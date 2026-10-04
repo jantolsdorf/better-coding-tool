@@ -33,6 +33,8 @@ function loadUI(): UIState {
     collapsedCodes: [],
     codeSort: 'name',
     codeView: 'tree',
+    codeFilterSubcodes: true,
+    codeFilterDescriptions: true,
     theme: 'auto',
     panelFlex: null,
     mainOrder: ['sidebar', 'viewer', 'segments'],

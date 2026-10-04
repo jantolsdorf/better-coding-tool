@@ -1954,3 +1954,92 @@ dialog.backup {
 .menu-list button.danger-item {
   color: var(--danger);
 }
+
+/* ---------- multiple selection (documents, codes) ---------- */
+
+.select-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  margin-bottom: 2px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--accent-border);
+  font-size: 12px;
+}
+.select-count {
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.select-action {
+  max-width: 84px;
+  font-size: 12px;
+  padding: 1px 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+.select-bar .icon-btn.danger:hover {
+  color: var(--danger);
+}
+.row-check {
+  flex: none;
+  margin: 0 4px 0 0;
+  pointer-events: none;
+}
+.tree-row.multi-selected,
+.code-row.multi-selected > .code-main {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.btn.small.on {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+/* Open or close all folders / subcodes at once. */
+.icon-btn.expand-all {
+  flex: none;
+  font-size: 14px;
+  line-height: 1;
+  padding: 1px 4px;
+  color: var(--muted);
+}
+.icon-btn.expand-all:hover {
+  color: var(--text);
+}
+
+/* The codebook filter field and its options menu. */
+.filter-row {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.filter-row input {
+  flex: 1;
+}
+.filter-menu {
+  left: auto;
+  right: 0;
+  min-width: 220px;
+  padding: 6px;
+}
+#btn-filter-options.on {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 4px;
+}
+.filter-menu input[type='checkbox'] {
+  flex: none;
+  padding: 0;
+  border: none;
+}
