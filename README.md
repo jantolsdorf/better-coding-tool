@@ -156,7 +156,7 @@ npm run build      # produces a single self-contained dist/index.html
     view. Each cell lists the codes on that line, separated by semicolons.
   - *Export segments to CSV*: one row per coded segment, for every coder.
 - **Comparing coders**: choose **Import ▾ → Other coder's coding** in the top bar (or
-  **＋ Compare with coder…** in the top bar, or *Other coders → Import…*) and pick another
+  **Compare ▾ → ＋ Add a coder to compare…** in the top bar, or *Other coders → Import…*) and pick another
   person's exported project. Their coding appears as an extra column next to the text; each additional coder gets
   another column. Documents are matched by identical text. Use the checkboxes to show or hide
   coders. Drag a column header, including the *Text* column's, to reorder columns; while the
@@ -182,6 +182,27 @@ npm run build      # produces a single self-contained dist/index.html
   makes the consolidated coding your coding of that document and keeps your previous coding of
   it under *Other coders* as “… (before consolidation)”; **✕** discards that document's
   consolidation. Other documents are never changed.
+- **Challenging codes** (reviewing another coder's coding): when you do not agree with a code
+  of another coder, challenge it and write why.
+  - In the document: switch on **⚑ Challenge** in the document header (it also shows how many
+    codes of this document you challenged). Hover a code in another coder's column and click
+    **⚑**; a dialog shows the passage and asks for your comment (Enter saves). Challenged codes
+    are marked with a red ⚑ and struck through; hover them to read your comment, click ✎ to edit
+    or withdraw it.
+  - **Compare ▾ → ⚑ Review & challenge codes…** goes through a coder's coding either **by code**
+    (all passages of one code across all documents, optionally with its subcodes) or **by
+    document** (all codes of one document in text order). Each passage can be challenged, edited
+    or withdrawn there; *Show* opens it in the document; *Only challenged* lists just your
+    challenges. **Export challenges (CSV)** writes coder, file, lines, code, text and comment,
+    e.g. to send to the coders.
+  - Challenges are saved in the project (and its export). They refer to the coder's name, the
+    passage and the code path, so they still apply after importing that coder again.
+- **Code occurrence** (**Compare ▾ → Code occurrence across coders…**): which codes each coder
+  used in a document at all, regardless of where in the text, with the number of segments. Codes
+  that not every coder used are marked **≠** and highlighted; each document shows how many of
+  its codes all coders used (and the percentage). Choose one document or all, which coders to
+  compare (yours and every imported coder), *Only differences*, and **Export CSV** (one row per
+  document and code, with each coder's count).
 
 ## Code layout
 
@@ -205,6 +226,7 @@ notifies `renderApp`, which re-renders the views.
 | `model/memos.ts` | Memos (notes on passages) |
 | `model/table.ts` | Which coder columns are shown, and their order |
 | `model/consolidation.ts` | Per-document consolidation |
+| `model/challenges.ts`, `model/occurrence.ts` | Challenges of other coders' codes; code occurrence per document and coder |
 | `model/codebookEntries.ts` | The codebook in portable form (codebook import/export) |
 | `model/codeOrder.ts` | The custom order of codes among their siblings |
 | `model/lines.ts` | Line numbers from character offsets |
@@ -215,6 +237,7 @@ notifies `renderApp`, which re-renders the views.
 | `controller/coding.ts` | Reading what was typed in the code box (`memo:`, `code:`, `?`), coding passages |
 | `controller/memos.ts` | Adding, editing and deleting memos |
 | `controller/comparison.ts` | Other coders, consolidation, column order and widths |
+| `controller/challenges.ts` | Challenge mode, challenging and withdrawing, challenge export |
 | `controller/transfer.ts` | All imports and exports |
 | `controller/preferences.ts`, `history.ts` | Coder name, theme, layout; undo/redo |
 | **`src/view/`** | Rendering and DOM events |
@@ -222,6 +245,7 @@ notifies `renderApp`, which re-renders the views.
 | `view/document/` | The document area: text and highlights, coder and memo columns, code box, View menu |
 | `view/tree.ts`, `codebookList.ts`, `codeDialog.ts`, `segmentList.ts`, `coderList.ts` | The panels and the code details dialog |
 | `view/csvCodebookDialog.ts` | Choosing the code, description and color columns of a CSV codebook |
+| `view/challengeReview.ts`, `commentDialog.ts`, `occurrenceView.ts` | Reviewing and challenging another coder's codes; the comment dialog; the code occurrence table |
 | `view/topbar.ts`, `startDialog.ts` | Top bar, menus, keyboard shortcuts; the start dialog (new project or open a file) |
 | `view/leaveGuard.ts` | Warning before closing the tab, with an offer to download a copy |
 | `view/layout.ts`, `splitters.ts` | Rearranging and resizing the main areas and sidebar panels |

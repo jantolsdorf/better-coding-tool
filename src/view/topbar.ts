@@ -27,6 +27,9 @@ import {
 import { canRedo, canUndo, project, savedBytes, ui } from '../model/state';
 import type { UIState } from '../model/types';
 import { clearCodeSelection, deleteSelectedCodes, setCodebookFilter, toggleCodeSelectMode } from './codebookList';
+import { openChallengeReview } from './challengeReview';
+import { toast } from './feedback';
+import { openOccurrenceView } from './occurrenceView';
 import { openStartDialog } from './startDialog';
 import { clearDocSelection, deleteSelectedItems, toggleDocSelectMode } from './tree';
 import { closeViewMenu, initViewMenu, viewMenu } from './viewMenu';
@@ -91,6 +94,12 @@ export function initTopbar() {
 
   // Import and export
   onClick('btn-compare-coder', importCoderInteractive);
+  onClick('btn-review-challenge', () =>
+    project.externalCodings.length ? openChallengeReview() : toast('Add another coder first (Compare ▾ → Add a coder to compare).', 4500),
+  );
+  onClick('btn-code-occurrence', () =>
+    project.externalCodings.length ? openOccurrenceView() : toast('Add another coder first (Compare ▾ → Add a coder to compare).', 4500),
+  );
   onClick('btn-import-project', importProjectInteractive);
   onClick('btn-import-qdpx', importProjectInteractive);
   onClick('btn-import-codebook-top', importCodebookInteractive);

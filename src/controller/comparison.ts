@@ -13,7 +13,10 @@ import {
 import { commitUI, ui } from '../model/state';
 import { comparedColumns, CONSOLIDATED_KEY, reorderedColumns } from '../model/table';
 import type { Code, ColumnKey, Doc, ExternalCoding, Segment, TableColumn } from '../model/types';
+import { occurrenceCSV } from '../model/formats/csv';
+import { now, safeFileName } from '../model/util';
 import { ask, confirmAction, toast } from '../view/feedback';
+import { downloadFile } from '../view/files';
 
 // ---------- other coders ----------
 
@@ -141,4 +144,11 @@ export function setTextWidth(width: number | null) {
 export function setSegmentListShown(shown: boolean) {
   ui.segmentsHidden = !shown;
   commitUI();
+}
+
+/** Code occurrence per document and coder (see the code occurrence dialog) as CSV. */
+export function exportOccurrenceCSV(docs: Doc[], cols: TableColumn[]) {
+  if (!docs.length || cols.length < 2) return toast('Choose at least two coders and a document.');
+  const what = docs.length === 1 ? safeFileName(docs[0].name.replace(/\.txt$/i, '')) : 'all-documents';
+  downloadFile(`code-occurrence-${what}-${now().slice(0, 10)}.csv`, occurrenceCSV(docs, cols), 'text/csv');
 }

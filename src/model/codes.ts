@@ -104,9 +104,10 @@ export function nextOrder(parentId: string | null, codes: Code[] = project.codes
 
 
 
-/** Whether code `id` is `rootId` itself or one of its (nested) subcodes. */
-export function isCodeInSubtree(id: string, rootId: string): boolean {
-  for (let c = codeById(id), depth = 0; c && depth < 100; c = c.parentId ? codeById(c.parentId) : undefined, depth++) {
+/** Whether code `id` is `rootId` itself or one of its (nested) subcodes (in `codes`, e.g. another coder's codebook). */
+export function isCodeInSubtree(id: string, rootId: string, codes: Code[] = project.codes): boolean {
+  const byId = (x: string | null | undefined) => (x ? codes.find((c) => c.id === x) : undefined);
+  for (let c = byId(id), depth = 0; c && depth < 100; c = byId(c.parentId), depth++) {
     if (c.id === rootId) return true;
   }
   return false;

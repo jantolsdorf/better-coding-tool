@@ -65,6 +65,23 @@ export interface ExternalCoding {
   importedAt: string;
 }
 
+/**
+ * Your objection to one coded segment of another coder ("challenge mode"). It identifies the
+ * segment by coder name, passage and code path, so it still applies after re-importing that coder.
+ */
+export interface Challenge {
+  id: string;
+  coderName: string;
+  docId: string;
+  start: number;
+  end: number;
+  /** The challenged code as named in that coder's codebook, top level first. */
+  codePath: string[];
+  /** Why you do not agree. */
+  comment: string;
+  createdAt: string;
+}
+
 export interface Project {
   format: 'bct-project';
   version: 1;
@@ -82,6 +99,8 @@ export interface Project {
    * codebook as Project.codes.
    */
   consolidations: Record<string, Segment[]>;
+  /** Your challenges of other coders' codes (see Challenge). */
+  challenges: Challenge[];
 }
 
 /** 'me', 'consolidated', or the id of an ExternalCoding. */
@@ -145,6 +164,8 @@ export interface UIState {
   codeBoxHelp: boolean;
   /** Whether code box suggestions also list all subcodes of matching codes. */
   codeBoxSubcodes: boolean;
+  /** Challenge mode: other coders' codes in the document columns can be challenged (⚑). */
+  challengeMode: boolean;
   /** Fingerprint and time of the project when a copy was last downloaded (or opened from a file). */
   backedUp: { fingerprint: string; at: string } | null;
 }

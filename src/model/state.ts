@@ -43,6 +43,7 @@ function loadUI(): UIState {
     codeTarget: 'mine',
     codeBoxHelp: false,
     codeBoxSubcodes: false,
+    challengeMode: false,
     backedUp: null,
   };
   try {

@@ -1,6 +1,7 @@
 // The document area: header, text with highlights, coder columns, and the code box.
 
 import { acceptMatchingSegments, setTextColored, setTextWidth, startConsolidationOf } from '../../controller/comparison';
+import { setChallengeMode } from '../../controller/challenges';
 import { compareCodings, isConsolidated, matchingItems } from '../../model/consolidation';
 import { currentDoc, folderPath } from '../../model/documents';
 import { activeLayer, consolidationOf, layerSegments } from '../../model/layers';
@@ -106,6 +107,7 @@ function renderHeader(doc: Doc) {
           )
         : null,
       ...(consolidationOf(doc.id) && ui.showCodes ? agreementTools(doc) : []),
+      project.externalCodings.length ? challengeToggle(doc) : null,
     ),
   );
   if (!hlSupported) {
@@ -156,4 +158,21 @@ function agreementTools(doc: Doc): HTMLElement[] {
       pending ? `⇉ Accept ${pending} matching` : '⇉ Accept matching',
     ),
   ];
+}
+
+/** Switches challenge mode, showing how many codes of this document you challenged. */
+function challengeToggle(doc: Doc): HTMLElement {
+  const n = project.challenges.filter((c) => c.docId === doc.id).length;
+  return h(
+    'button',
+    {
+      class: 'btn small toggle-challenge' + (ui.challengeMode ? ' on' : ''),
+      'aria-pressed': String(ui.challengeMode),
+      title: ui.challengeMode
+        ? 'Challenge mode is on: hover a code in another coder’s column and click ⚑ to challenge it with a comment'
+        : 'Challenge mode: review other coders’ codes and challenge the ones you do not agree with',
+      onClick: () => setChallengeMode(!ui.challengeMode),
+    },
+    `⚑ Challenge${n ? ` · ${n}` : ''}`,
+  );
 }

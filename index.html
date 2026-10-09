@@ -18,7 +18,20 @@
       <button id="btn-undo" class="btn icon" title="Undo (⌘Z / Ctrl+Z)" disabled>↶ Undo</button>
       <button id="btn-redo" class="btn icon" title="Redo (⇧⌘Z / Ctrl+Y)" disabled>↷ Redo</button>
       <div id="view-menu-slot"></div>
-      <button id="btn-compare-coder" class="btn" title="Import another person’s exported project and show their coding as a column next to yours">＋ Compare with coder…</button>
+      <div class="menu">
+        <button class="btn menu-toggle" aria-haspopup="true" title="Compare your coding with other coders">Compare ▾</button>
+        <div class="menu-list" hidden>
+          <button id="btn-compare-coder" title="Import another person’s exported project and show their coding as a column next to yours">
+            <strong>＋ Add a coder to compare…</strong>
+          </button>
+          <button id="btn-review-challenge" title="Go through another coder’s codes, by code or by document, and challenge the ones you do not agree with">
+            ⚑ Review &amp; challenge codes…
+          </button>
+          <button id="btn-code-occurrence" title="Which codes each coder used in a document at all, regardless of where">
+            Code occurrence across coders…
+          </button>
+        </div>
+      </div>
       <div class="menu">
         <button class="btn menu-toggle" aria-haspopup="true">Import ▾</button>
         <div class="menu-list" hidden>

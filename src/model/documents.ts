@@ -89,6 +89,7 @@ function removeDocsData(docIds: Set<string>) {
   project.segments = project.segments.filter((s) => !docIds.has(s.docId));
   project.memos = project.memos.filter((m) => !docIds.has(m.docId));
   for (const id of docIds) delete project.consolidations[id];
+  project.challenges = project.challenges.filter((c) => !docIds.has(c.docId));
   for (const x of project.externalCodings) {
     x.segments = x.segments.filter((s) => !docIds.has(s.docId));
     x.memos = x.memos.filter((m) => !docIds.has(m.docId));

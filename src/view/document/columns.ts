@@ -9,8 +9,10 @@ import {
   moveColumn,
   setColumnWidth,
 } from '../../controller/comparison';
+import { challengeInteractive } from '../../controller/challenges';
 import { removeSegment } from '../../controller/coding';
 import { editMemo, removeMemo } from '../../controller/memos';
+import { findChallenge } from '../../model/challenges';
 import { codePathParts } from '../../model/codes';
 import { compareCodings, isConsolidated, segmentKey, type SegmentAgreement } from '../../model/consolidation';
 import { currentDoc } from '../../model/documents';
@@ -279,7 +281,10 @@ function codeMark(
   const lineLabelText = lineLabel(doc, s.start, s.end);
   const excerpt = s.text.length > 300 ? s.text.slice(0, 300) + '…' : s.text;
   const from = s.source ? ` · from ${s.source}` : '';
-  const title = `${name} · ${lineLabelText}${from}${agree ? `\n${agreementNote(agree)}` : ''}\n\n${excerpt}`;
+  // Your challenge of another coder's code, if any.
+  const challenge = col.col.kind === 'external' && code ? findChallenge(col.col.name, s, code, col.col.codes) : undefined;
+  const challengeNote = challenge ? `\n⚑ You challenged this code: ${challenge.comment}` : '';
+  const title = `${name} · ${lineLabelText}${from}${agree ? `\n${agreementNote(agree)}` : ''}${challengeNote}\n\n${excerpt}`;
   const near = textOnLeft ? 'left' : 'right';
   const far = textOnLeft ? 'right' : 'left';
 
@@ -307,11 +312,12 @@ function codeMark(
   const label = h(
     'div',
     {
-      class: `code-label ${near}` + (agree ? ` agree-${agree.status}` : ''),
+      class: `code-label ${near}` + (agree ? ` agree-${agree.status}` : '') + (challenge ? ' challenged' : ''),
       title,
       style: { top: `${labelTop}px`, [near]: `${labelStart}px`, [far]: '4px' },
     },
     agree ? h('span', { class: `agree-mark ${agree.status}` }, AGREE_MARKS[agree.status]) : null,
+    challenge ? h('span', { class: 'challenge-mark' }, '⚑') : null,
     h('span', { class: 'code-label-name' }, name),
     boxActions(col, s, code),
   );
@@ -483,13 +489,23 @@ function boxActions(col: Column, s: Segment, code: Code | undefined): HTMLElemen
   if (kind === 'consolidated' || (kind === 'mine' && !consolidating)) {
     return h('span', { class: 'stripe-actions' }, btn('✕', 'Remove this segment', () => removeSegment(s.id)));
   }
-  if (!consolidating || !code) return null;
-  if (isConsolidated(s, codePathParts(code, col.col.codes))) {
-    return h('span', { class: 'stripe-actions always', title: 'Already in the consolidated coding' }, h('span', { class: 'stripe-ok' }, '✓'));
+  if (!code) return null;
+  const parts: HTMLElement[] = [];
+  let always = false;
+  if (consolidating) {
+    if (isConsolidated(s, codePathParts(code, col.col.codes))) {
+      always = true;
+      parts.push(h('span', { class: 'stripe-ok', title: 'Already in the consolidated coding' }, '✓'));
+    } else parts.push(btn('＋', 'Accept into the consolidated coding', () => acceptSegment(col.col, s, code)));
   }
-  return h(
-    'span',
-    { class: 'stripe-actions' },
-    btn('＋', 'Accept into the consolidated coding', () => acceptSegment(col.col, s, code)),
-  );
+  // Challenge mode: another coder's code can be challenged with a comment.
+  if (kind === 'external' && ui.challengeMode) {
+    const challenged = !!findChallenge(col.col.name, s, code, col.col.codes);
+    parts.push(
+      btn(challenged ? '✎' : '⚑', challenged ? 'Edit or withdraw your challenge' : `Challenge this code of ${col.col.name}`, () =>
+        challengeInteractive(col.col.name, s, code, col.col.codes),
+      ),
+    );
+  }
+  return parts.length ? h('span', { class: 'stripe-actions' + (always ? ' always' : '') }, ...parts) : null;
 }

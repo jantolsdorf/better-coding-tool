@@ -1,7 +1,7 @@
 // Creating and validating projects (e.g. from files or local storage).
 
 import { ensureCodeOrder } from './codeOrder';
-import type { Code, Doc, ExternalCoding, Folder, Memo, Project, Segment } from './types';
+import type { Challenge, Code, Doc, ExternalCoding, Folder, Memo, Project, Segment } from './types';
 
 export function emptyProject(coderName = ''): Project {
   return {
@@ -15,6 +15,7 @@ export function emptyProject(coderName = ''): Project {
     memos: [],
     externalCodings: [],
     consolidations: {},
+    challenges: [],
   };
 }
 
@@ -50,6 +51,9 @@ export function parseProject(data: unknown): Project {
     memos: arr<Memo>(d.memos).filter(validMemo),
     externalCodings,
     consolidations: parseConsolidations(d, validSegment),
+    challenges: arr<Challenge>(d.challenges).filter(
+      (c) => validRange(c) && typeof c.coderName === 'string' && typeof c.comment === 'string' && Array.isArray(c.codePath),
+    ),
   };
 }
 

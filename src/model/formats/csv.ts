@@ -3,7 +3,8 @@
 import { codeById, codePath, codesInTreeOrder } from '../codes';
 import { folderChain, folderPath, getDoc } from '../documents';
 import { allConsolidated } from '../layers';
-import { lineSpan } from '../lines';
+import { lineLabel, lineSpan } from '../lines';
+import { codeOccurrence } from '../occurrence';
 import { project } from '../state';
 import type { Code, Doc, MemoColumn, Segment, TableColumn } from '../types';
 
@@ -87,6 +88,26 @@ export function codebookCSV(): string {
   const parentName = (c: Code) => (c.parentId && codeById(c.parentId)?.name) || '';
   for (const c of codesInTreeOrder()) {
     rows.push([c.name, codePath(c), parentName(c), c.color, c.description ?? '', mine.get(c.id) ?? 0, consolidated.get(c.id) ?? 0]);
+  }
+  return toCSV(rows);
+}
+
+/** Code occurrence per document: one row per document and code, with each coder's segment count. */
+export function occurrenceCSV(docs: Doc[], cols: TableColumn[]): string {
+  const rows: (string | number)[][] = [['file', 'code', ...cols.map((c) => c.name), 'used_by_all']];
+  for (const doc of docs) {
+    for (const r of codeOccurrence(doc.id, cols)) rows.push([docPath(doc), r.path.join(' > '), ...r.counts, r.agreed ? 'yes' : 'no']);
+  }
+  return toCSV(rows);
+}
+
+/** Your challenges of other coders' codes, with the passage and your comment. */
+export function challengesCSV(): string {
+  const rows: (string | number)[][] = [['coder', 'file', 'lines', 'code', 'text', 'comment', 'challenged_at']];
+  for (const c of project.challenges) {
+    const doc = getDoc(c.docId);
+    if (!doc) continue;
+    rows.push([c.coderName, docPath(doc), lineLabel(doc, c.start, c.end), c.codePath.join(' > '), doc.content.slice(c.start, c.end), c.comment, c.createdAt]);
   }
   return toCSV(rows);
 }
