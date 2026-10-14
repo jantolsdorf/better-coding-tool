@@ -27,6 +27,12 @@ import {
 
 let root: HTMLElement;
 let headerEl: HTMLElement;
+let onPopout: (() => void) | null = null;
+
+/** What the text's ⧉ button does (open the text in a separate window or bring it back). */
+export function setViewerPopoutHandler(fn: () => void) {
+  onPopout = fn;
+}
 
 export function initDocumentView(el: HTMLElement, empty: HTMLElement) {
   root = el;
@@ -108,6 +114,11 @@ function renderHeader(doc: Doc) {
         : null,
       ...(consolidationOf(doc.id) && ui.showCodes ? agreementTools(doc) : []),
       project.externalCodings.length ? challengeToggle(doc) : null,
+      h(
+        'button',
+        { id: 'btn-popout-viewer', class: 'icon-btn popout-btn', title: 'Open in a separate window', onClick: () => onPopout?.() },
+        '⧉',
+      ),
     ),
   );
   if (!hlSupported) {

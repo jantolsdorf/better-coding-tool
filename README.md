@@ -28,11 +28,31 @@ npm run build      # produces a single self-contained dist/index.html
   by dragging their inner edge. Drag the handles between *Documents*, *Codebook* and *Other
   coders* to change their heights. Double-click any handle to reset it. The theme button in the top bar switches between
   automatic (follows the system), light and dark.
+- **Separate windows**: **⧉** in the header of *Documents*, *Codebook*, the text (document
+  header) and *Coded segments* opens that part in its own browser window, e.g. on a second
+  monitor; the main window shows a note with *Show* and *Bring back*. In the separate window the
+  same button (**↩**) or simply closing the window brings the part back. Everything keeps working
+  there (coding, shortcuts like Undo, dialogs and messages open in the window you are using), and
+  it is still one app: changes appear in all windows at once. The browser must allow pop-ups for
+  the page.
 - **Documents**: add `.txt` files with **+ Files** or by dropping them on the document list.
   Organise them in nested folders (**+ Folder**, or the ＋ on a folder). Drag documents and
   folders to move them. New files go into the selected folder. **⊟ / ⊞** on *All documents*
   closes or opens all folders at once (the same button next to the codebook's sort menu does
   this for all subcodes).
+- **Merging copies of a document**: when coders each coded their own copy of the same text
+  (e.g. one folder per coder), select the copies or their folders and choose **⇶ Merge** in the
+  selection bar. Copies with exactly the same text are grouped; a dialog shows who coded which
+  copy (with numbers of coded segments and memos). For every author, keep the name, rename it,
+  or give several authors the same name to merge their codes into one author (*Keep all names*
+  / *Merge all into one author*). Choose whose coding becomes yours (editable) — the others
+  become other coders, to compare and consolidate — and where the new copies go (a new folder
+  *Merged copies* by default). Each group becomes one new document with everyone's coding and
+  memos; codes are matched by path, and overlapping passages with the same code from merged
+  authors become one segment. Optionally the original copies are removed. Undo reverts it all.
+  Every coded segment and memo remembers its author (the coder name when it was made; older
+  ones count as yours), so this works for projects passed from coder to coder; codes by
+  someone else in your coding show "by …" in their tooltip.
 - **Selecting several documents or codes**: **Select** in the *Documents* or *Codebook* header
   shows checkboxes; Cmd/Ctrl-click or Shift-click (a range) works at any time. A bar above the
   list shows how many are selected, with **Move…** (into a folder, or under another code),
@@ -189,7 +209,7 @@ npm run build      # produces a single self-contained dist/index.html
     **⚑**; a dialog shows the passage and asks for your comment (Enter saves). Challenged codes
     are marked with a red ⚑ and struck through; hover them to read your comment, click ✎ to edit
     or withdraw it.
-  - **Compare ▾ → ⚑ Review & challenge codes…** goes through a coder's coding either **by code**
+  - **Compare ▾ → ⚑ Review & challenge codes…** (opens in its own window and stays up to date) goes through a coder's coding either **by code**
     (all passages of one code across all documents, optionally with its subcodes) or **by
     document** (all codes of one document in text order). Each passage can be challenged, edited
     or withdrawn there; *Show* opens it in the document; *Only challenged* lists just your
@@ -197,7 +217,7 @@ npm run build      # produces a single self-contained dist/index.html
     e.g. to send to the coders.
   - Challenges are saved in the project (and its export). They refer to the coder's name, the
     passage and the code path, so they still apply after importing that coder again.
-- **Code occurrence** (**Compare ▾ → Code occurrence across coders…**): which codes each coder
+- **Code occurrence** (**Compare ▾ → Code occurrence across coders…**, in its own window): which codes each coder
   used in a document at all, regardless of where in the text, with the number of segments. Codes
   that not every coder used are marked **≠** and highlighted; each document shows how many of
   its codes all coders used (and the percentage). Choose one document or all, which coders to
@@ -226,6 +246,7 @@ notifies `renderApp`, which re-renders the views.
 | `model/memos.ts` | Memos (notes on passages) |
 | `model/table.ts` | Which coder columns are shown, and their order |
 | `model/consolidation.ts` | Per-document consolidation |
+| `model/mergeDocs.ts` | Merging copies of a document (identical text) with everyone's coding, by author |
 | `model/challenges.ts`, `model/occurrence.ts` | Challenges of other coders' codes; code occurrence per document and coder |
 | `model/codebookEntries.ts` | The codebook in portable form (codebook import/export) |
 | `model/codeOrder.ts` | The custom order of codes among their siblings |
@@ -245,6 +266,8 @@ notifies `renderApp`, which re-renders the views.
 | `view/document/` | The document area: text and highlights, coder and memo columns, code box, View menu |
 | `view/tree.ts`, `codebookList.ts`, `codeDialog.ts`, `segmentList.ts`, `coderList.ts` | The panels and the code details dialog |
 | `view/csvCodebookDialog.ts` | Choosing the code, description and color columns of a CSV codebook |
+| `view/mergeDialog.ts` | Who coded which copy; keeping, renaming or merging authors |
+| `view/windows.ts` | Moving parts of the app into separate browser windows and back; tool windows; the window used last |
 | `view/challengeReview.ts`, `commentDialog.ts`, `occurrenceView.ts` | Reviewing and challenging another coder's codes; the comment dialog; the code occurrence table |
 | `view/topbar.ts`, `startDialog.ts` | Top bar, menus, keyboard shortcuts; the start dialog (new project or open a file) |
 | `view/leaveGuard.ts` | Warning before closing the tab, with an offer to download a copy |

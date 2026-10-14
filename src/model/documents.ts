@@ -84,7 +84,8 @@ export function renameFolder(id: string, name: string) {
   commit();
 }
 
-function removeDocsData(docIds: Set<string>) {
+/** Removes documents with their coding, memos and challenges, without recording an undo step (callers commit). */
+export function removeDocsData(docIds: Set<string>) {
   project.docs = project.docs.filter((d) => !docIds.has(d.id));
   project.segments = project.segments.filter((s) => !docIds.has(s.docId));
   project.memos = project.memos.filter((m) => !docIds.has(m.docId));

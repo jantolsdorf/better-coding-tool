@@ -5,15 +5,18 @@ import { setCodesShown, setColumnVisible, setMemosShown, setSegmentListShown } f
 import { ui } from '../model/state';
 import { availableColumns } from '../model/table';
 import { h } from './dom';
+import { onEveryDocument } from './windows';
 import { title as segmentListTitle } from './segmentList';
 
 let open = false;
 
 /** Closes the menu when clicking anywhere else. */
 export function initViewMenu() {
-  document.addEventListener('click', (e) => {
-    if (open && !(e.target as Element).closest?.('.view-menu')) closeViewMenu();
-  });
+  onEveryDocument((doc) =>
+    doc.addEventListener('click', (e) => {
+      if (open && !(e.target as Element).closest?.('.view-menu')) closeViewMenu();
+    }),
+  );
 }
 
 /** Closes the menu, e.g. when another menu opens. */

@@ -8,6 +8,7 @@ import {
   type CsvCodebookMapping,
   type CsvColumnRole,
 } from '../model/formats/csvCodebook';
+import { currentDocument } from './windows';
 import { h } from './dom';
 
 const LEVEL_NAMES = ['parent', 'child', 'sub-child'];
@@ -150,7 +151,7 @@ export function askCsvCodebookMapping(fileName: string, rows: string[][]): Promi
       ),
     );
     render();
-    document.body.append(dlg);
+    currentDocument().body.append(dlg);
     dlg.showModal();
     importBtn.focus();
   });

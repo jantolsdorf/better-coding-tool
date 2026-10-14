@@ -33,6 +33,7 @@ import { openOccurrenceView } from './occurrenceView';
 import { openStartDialog } from './startDialog';
 import { clearDocSelection, deleteSelectedItems, toggleDocSelectMode } from './tree';
 import { closeViewMenu, initViewMenu, viewMenu } from './viewMenu';
+import { onEveryDocument } from './windows';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const onClick = (id: string, fn: () => void) => $(id).addEventListener('click', fn);
@@ -77,11 +78,13 @@ export function initTopbar() {
 
   // Esc ends selecting; Delete/Backspace deletes the selection of the panel used last.
   let lastPanel: 'docs' | 'codes' = 'docs';
-  document.querySelector('.panel.docs')?.addEventListener('pointerdown', () => (lastPanel = 'docs'));
-  document.querySelector('.panel.codes')?.addEventListener('pointerdown', () => (lastPanel = 'codes'));
-  document.addEventListener('keydown', (e) => {
+  // On the panels' contents, which go along when a panel moves to a separate window.
+  for (const [sel, name] of [['.panel.docs', 'docs'], ['.panel.codes', 'codes']] as const) {
+    for (const child of document.querySelector(sel)?.children ?? []) child.addEventListener('pointerdown', () => (lastPanel = name));
+  }
+  onEveryDocument((doc) => doc.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement;
-    if (t.closest?.('input:not([type=checkbox]), textarea, select, [contenteditable]') || document.querySelector('dialog[open]')) return;
+    if (t.closest?.('input:not([type=checkbox]), textarea, select, [contenteditable]') || doc.querySelector('dialog[open]')) return;
     if (e.key === 'Escape') {
       clearDocSelection();
       clearCodeSelection();
@@ -89,7 +92,7 @@ export function initTopbar() {
       const done = lastPanel === 'codes' ? deleteSelectedCodes() : deleteSelectedItems();
       if (done) e.preventDefault();
     }
-  });
+  }));
   onClick('btn-import-coder', importCoderInteractive);
 
   // Import and export
@@ -141,11 +144,11 @@ export function initTopbar() {
   themeBtn.addEventListener('click', cycleTheme);
   undoBtn.addEventListener('click', undoChange);
   redoBtn.addEventListener('click', redoChange);
-  document.addEventListener('keydown', (e) => {
+  onEveryDocument((doc) => doc.addEventListener('keydown', (e) => {
     if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
     // Leave text fields their own undo, and don't change the project under an open dialog.
     const t = e.target as HTMLElement;
-    if (t.closest('input, textarea, select, [contenteditable]') || document.querySelector('dialog[open]')) return;
+    if (t.closest?.('input, textarea, select, [contenteditable]') || doc.querySelector('dialog[open]')) return;
     const key = e.key.toLowerCase();
     if (key === 'z' && !e.shiftKey) {
       e.preventDefault();
@@ -154,7 +157,7 @@ export function initTopbar() {
       e.preventDefault();
       redoChange();
     }
-  });
+  }));
 
   // Dropdown menus: a .menu-toggle button opens the .menu-list next to it; any click closes them.
   const menuLists = [...document.querySelectorAll<HTMLElement>('.menu-list')];
@@ -168,7 +171,7 @@ export function initTopbar() {
       list.hidden = !open;
     });
   }
-  document.addEventListener('click', () => menuLists.forEach((m) => (m.hidden = true)));
+  onEveryDocument((doc) => doc.addEventListener('click', () => menuLists.forEach((m) => (m.hidden = true))));
 }
 
 export function renderTopbar() {

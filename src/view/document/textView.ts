@@ -9,13 +9,15 @@ import { memoColumns, TEXT_KEY } from '../../model/table';
 import type { Doc } from '../../model/types';
 import { h, hexToRgba } from '../dom';
 
-// CSS Custom Highlight API: colors text ranges without touching the DOM.
+// CSS Custom Highlight API: colors text ranges without touching the DOM. Each browser window has
+// its own registry, so the one of the window currently showing the text is used.
 type HighlightLike = { priority: number };
-const registry: { set(name: string, hl: HighlightLike): void; delete(name: string): void } | undefined = (
-  globalThis.CSS as unknown as { highlights?: never }
-)?.highlights;
-const HighlightCtor = (globalThis as unknown as { Highlight?: new (...r: Range[]) => HighlightLike }).Highlight;
-export const hlSupported = !!registry && !!HighlightCtor;
+type Registry = { set(name: string, hl: HighlightLike): void; delete(name: string): void };
+type HighlightWindow = { CSS?: { highlights?: Registry }; Highlight?: new (...r: Range[]) => HighlightLike };
+const textWindow = () => (textBody?.ownerDocument.defaultView ?? window) as unknown as HighlightWindow;
+const registry = () => textWindow().CSS!.highlights!;
+const newHighlight = (...ranges: Range[]) => new (textWindow().Highlight!)(...ranges);
+export const hlSupported = !!(window as unknown as HighlightWindow).CSS?.highlights && !!(window as unknown as HighlightWindow).Highlight;
 
 // Elements shared with the coder columns and the code box (read-only outside this module).
 export let scrollEl: HTMLElement;
@@ -36,9 +38,9 @@ let flashTimer = 0;
 
 /** Creates the scrolling area with the text column; coder columns are added next to it. */
 export function createTextArea(): HTMLElement {
+  // The highlight colors live next to the text, so they go along when it moves to another window.
   dynStyle = h('style');
   hoverStyle = h('style');
-  document.head.append(dynStyle, hoverStyle);
   textBody = h('div', { class: 'text-body' });
   textHeadActions = h('span', { class: 'col-head-actions' });
   textCol = h(
@@ -55,7 +57,7 @@ export function createTextArea(): HTMLElement {
     h('div', { class: 'col-resizer', title: 'Drag to resize · double-click for automatic width' }),
   );
   gridEl = h('div', { class: 'viewer-grid' }, textCol);
-  scrollEl = h('div', { class: 'viewer-scroll' }, gridEl);
+  scrollEl = h('div', { class: 'viewer-scroll' }, dynStyle, hoverStyle, gridEl);
   return scrollEl;
 }
 
@@ -65,7 +67,7 @@ export function renderText(doc: Doc) {
   renderedDocId = doc.id;
   renderedContent = doc.content;
   lineStarts = lineStartsOf(doc);
-  const frag = document.createDocumentFragment();
+  const frag = textBody.ownerDocument.createDocumentFragment();
   lineEls = doc.content.split('\n').map((line, i) => {
     // Every .lt holds exactly one text node (possibly empty), which keeps offset mapping simple.
     const lt = h('span', { class: 'lt', 'data-start': String(lineStarts[i]) }, line);
@@ -92,7 +94,7 @@ function offsetToPoint(offset: number): [Node, number] {
 }
 
 export function rangeFor(start: number, end: number): Range {
-  const r = document.createRange();
+  const r = textBody.ownerDocument.createRange();
   r.setStart(...offsetToPoint(start));
   r.setEnd(...offsetToPoint(end));
   return r;
@@ -108,7 +110,7 @@ export function pointToOffset(node: Node, offset: number, kind: 'start' | 'end')
     return base + (offset > 0 ? (lt.textContent ?? '').length : 0);
   }
   // Boundary is on a line number, a line wrapper, or the container: snap to the nearest text.
-  const probe = document.createRange();
+  const probe = textBody.ownerDocument.createRange();
   probe.setStart(node, offset);
   if (kind === 'start') {
     const i = lineEls.findIndex((l) => probe.comparePoint(l, 0) >= 0);
@@ -126,16 +128,17 @@ export function pointToOffset(node: Node, offset: number, kind: 'start' | 'end')
 
 export function setNamedHighlight(name: string, range: Range | null, priority: number) {
   if (!hlSupported) return;
-  if (!range) return registry!.delete(name);
-  const hl = new HighlightCtor!(range);
+  if (!range) return registry().delete(name);
+  const hl = newHighlight(range);
   hl.priority = priority;
-  registry!.set(name, hl);
+  registry().set(name, hl);
 }
 
 /** Colors the coded passages of the active coding in their code's color. */
 export function applyHighlights(doc: Doc | null) {
   if (!hlSupported) return;
-  hlNames.forEach((n) => registry!.delete(n));
+  // Also from the main window's registry, in case the text was just moved to another window.
+  for (const reg of new Set([registry(), (window as unknown as HighlightWindow).CSS!.highlights!])) hlNames.forEach((n) => reg.delete(n));
   hlNames = [];
   if (!doc) {
     dynStyle.textContent = '';
@@ -154,7 +157,7 @@ export function applyHighlights(doc: Doc | null) {
     const code = codeById(codeId);
     if (!code) return;
     const name = `qc-code-${i}`;
-    registry!.set(name, new HighlightCtor!(...ranges));
+    registry().set(name, newHighlight(...ranges));
     hlNames.push(name);
     css += `::highlight(${name}){background-color:${hexToRgba(code.color, 0.3)};}\n`;
   });
@@ -166,7 +169,7 @@ export function applyHighlights(doc: Doc | null) {
     .filter((m) => m.docId === doc.id && m.end <= doc.content.length)
     .map((m) => rangeFor(m.start, m.end));
   if (memoRanges.length) {
-    registry!.set('qc-memo', new HighlightCtor!(...memoRanges));
+    registry().set('qc-memo', newHighlight(...memoRanges));
     hlNames.push('qc-memo');
   }
 }

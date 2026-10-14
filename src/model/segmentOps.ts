@@ -10,12 +10,12 @@ export type AddResult = 'added' | 'extended' | 'contained';
  * no new segment is created: the existing one is extended to cover both (and any other
  * overlapping segments of that code are folded into it).
  */
-export function addOrMerge(list: Segment[], doc: Doc, start: number, end: number, codeId: string, source?: string): AddResult {
+export function addOrMerge(list: Segment[], doc: Doc, start: number, end: number, codeId: string, source?: string, author?: string): AddResult {
   const overlapping = list
     .filter((s) => s.docId === doc.id && s.codeId === codeId && s.start < end && s.end > start)
     .sort((a, b) => a.start - b.start);
   if (!overlapping.length) {
-    list.push({ id: uid('s'), docId: doc.id, codeId, start, end, text: doc.content.slice(start, end), createdAt: now(), source });
+    list.push({ id: uid('s'), docId: doc.id, codeId, start, end, text: doc.content.slice(start, end), createdAt: now(), source, author });
     return 'added';
   }
   const [keep, ...absorbed] = overlapping;

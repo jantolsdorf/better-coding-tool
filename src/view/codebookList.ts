@@ -34,6 +34,7 @@ import type { Code } from '../model/types';
 import { byName } from '../model/util';
 import { openCodeDialog } from './codeDialog';
 import { h } from './dom';
+import { byId } from './windows';
 import { actionSelect, Selection, TOP_LEVEL } from './multiSelect';
 
 // The dragged codes' ids (several when dragging a selection); dataTransfer contents cannot be
@@ -92,11 +93,11 @@ export function renderCodebook(container: HTMLElement) {
   lastContainer = container;
   if (!draggedCodeIds.length) container.classList.remove('dragging-code');
   selection.prune(new Set(project.codes.map((c) => c.id)));
-  const selectBtn = document.getElementById('btn-select-codes');
+  const selectBtn = byId('btn-select-codes');
   selectBtn?.classList.toggle('on', selection.active);
   if (selectBtn) selectBtn.textContent = selection.active ? 'Done' : 'Select';
   // Opening and closing subcodes only applies to the indented view.
-  const toggleBtn = document.getElementById('btn-toggle-codes');
+  const toggleBtn = byId('btn-toggle-codes');
   if (toggleBtn) {
     const close = anyCodeExpanded();
     toggleBtn.hidden = ui.codeView === 'path' || !project.codes.some((c) => c.parentId);
@@ -275,7 +276,8 @@ function setCompactDragImage(e: DragEvent, c: Code, count: number) {
     h('span', { class: 'swatch', style: { background: c.color } }),
     h('span', { class: 'code-drag-name' }, count > 1 ? `${count} codes` : c.name),
   );
-  document.body.append(ghost);
+  // In the codebook's own window (it can be in a separate one).
+  (e.target as Element).ownerDocument.body.append(ghost);
   e.dataTransfer.setDragImage(ghost, 12, ghost.offsetHeight / 2);
   // The browser takes its picture right away; the element is no longer needed after that.
   setTimeout(() => ghost.remove(), 0);
@@ -365,7 +367,7 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
     setCompactDragImage(e, c, draggedCodeIds.length);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
     // Deferred so the drag image is taken before the list changes appearance.
-    requestAnimationFrame(() => {
+    (row.ownerDocument.defaultView ?? window).requestAnimationFrame(() => {
       row.classList.add('dragging');
       const list = row.closest<HTMLElement>('.panel-body');
       if (list && c.parentId) showTopLevelDrop(list, c);

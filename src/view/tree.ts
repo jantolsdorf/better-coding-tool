@@ -8,6 +8,7 @@ import {
   deleteDocInteractive,
   deleteFolderInteractive,
   deleteItemsInteractive,
+  mergeCopiesInteractive,
   moveItem,
   moveItemsTo,
   openDocument,
@@ -23,6 +24,7 @@ import { project, ui } from '../model/state';
 import type { Doc, Folder } from '../model/types';
 import { byName } from '../model/util';
 import { h } from './dom';
+import { byId } from './windows';
 import { actionSelect, Selection, TOP_LEVEL } from './multiSelect';
 
 const DND_TYPE = 'application/x-bct-item';
@@ -57,7 +59,7 @@ export function initTree(container: HTMLElement) {
 export function renderTree(container: HTMLElement) {
   lastContainer = container;
   selection.prune(new Set([...project.docs.map((d) => `doc:${d.id}`), ...project.folders.map((f) => `folder:${f.id}`)]));
-  const selectBtn = document.getElementById('btn-select-docs');
+  const selectBtn = byId('btn-select-docs');
   selectBtn?.classList.toggle('on', selection.active);
   if (selectBtn) selectBtn.textContent = selection.active ? 'Done' : 'Select';
   const rootRow = h(
@@ -107,6 +109,17 @@ function selectionBar(): HTMLElement {
       actionSelect('Move…', 'Move the selected documents and folders', [[TOP_LEVEL, '(top level)'], ...folders], (v) => {
         moveItemsTo(selectedItems(), v === TOP_LEVEL ? null : v);
       }),
+      h(
+        'button',
+        {
+          class: 'icon-btn',
+          title: 'Merge copies with identical text (e.g. one per coder) into new documents with everyone’s coding',
+          onClick: async () => {
+            if (await mergeCopiesInteractive(selectedItems())) selection.clear();
+          },
+        },
+        '⇶ Merge',
+      ),
       h('button', { class: 'icon-btn danger', title: 'Delete the selected documents and folders (Delete)', onClick: deleteSelectedItems }, '🗑'),
     ],
     ['item', 'items'],

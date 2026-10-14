@@ -14,7 +14,7 @@ export function addMemo(docId: string, start: number, end: number, note: string)
   const doc = getDoc(docId);
   const text = note.trim();
   if (!doc || !text || end <= start) return null;
-  const memo: Memo = { id: uid('m'), docId, start, end, text: doc.content.slice(start, end), note: text, createdAt: now() };
+  const memo: Memo = { id: uid('m'), docId, start, end, text: doc.content.slice(start, end), note: text, createdAt: now(), author: project.coderName || undefined };
   project.memos.push(memo);
   commit();
   return memo;

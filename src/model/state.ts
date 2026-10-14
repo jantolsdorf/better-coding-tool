@@ -64,8 +64,10 @@ export const ui: UIState = loadUI();
 export let savedBytes = JSON.stringify(project).length * 2;
 
 const listeners: (() => void)[] = [];
-export function subscribe(fn: () => void) {
+/** Calls `fn` after every change; returns a function that stops it. */
+export function subscribe(fn: () => void): () => void {
   listeners.push(fn);
+  return () => listeners.splice(listeners.indexOf(fn) >>> 0, 1);
 }
 const emit = () => listeners.forEach((fn) => fn());
 

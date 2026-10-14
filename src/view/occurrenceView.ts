@@ -4,9 +4,10 @@
 import { exportOccurrenceCSV } from '../controller/comparison';
 import { docsInTreeOrder, folderPath, getDoc } from '../model/documents';
 import { codeOccurrence, occurrenceAgreement, type OccurrenceRow } from '../model/occurrence';
-import { project, ui } from '../model/state';
+import { project, subscribe, ui } from '../model/state';
 import type { Doc, TableColumn } from '../model/types';
 import { h } from './dom';
+import { closeToolWindow, openToolWindow } from './windows';
 
 const ALL = '__all__';
 
@@ -29,11 +30,12 @@ const docLabel = (d: Doc) => {
 const percent = (x: number | null) => (x === null ? '–' : `${Math.round(x * 100)} %`);
 
 export function openOccurrenceView() {
-  const dlg = h('dialog', { class: 'modal occurrence-dialog' });
+  let stop = () => {};
+  const root = openToolWindow('occurrence', 'Code occurrence', () => stop());
+  if (!root) return; // already open (now in front), or blocked (see openToolWindow)
   const tools = h('div', { class: 'review-tools' });
   const body = h('div', { class: 'modal-body occurrence-body' });
   const foot = h('div', { class: 'modal-foot' });
-  dlg.addEventListener('close', () => dlg.remove());
 
   const render = () => {
     const all = coderColumns();
@@ -111,19 +113,19 @@ export function openOccurrenceView() {
     );
   };
 
-  dlg.append(
+  root.append(
     h(
       'div',
-      { class: 'modal-inner' },
-      h('div', { class: 'modal-head' }, h('strong', { class: 'grow' }, 'Code occurrence across coders'), h('button', { class: 'btn', onClick: () => dlg.close() }, 'Close')),
+      { class: 'modal-inner tool-inner' },
+      h('div', { class: 'modal-head' }, h('strong', { class: 'grow' }, 'Code occurrence across coders'), h('button', { class: 'btn', onClick: () => closeToolWindow('occurrence') }, 'Close')),
       tools,
       body,
       foot,
     ),
   );
   render();
-  document.body.append(dlg);
-  dlg.showModal();
+  // Stays up to date with coding done in the main window.
+  stop = subscribe(render);
 }
 
 function occurrenceTable(doc: Doc, rows: OccurrenceRow[], cols: TableColumn[], withTitle: boolean): HTMLElement {

@@ -249,5 +249,6 @@ export function setCodeView(view: UIState['codeView']) {
 export function goToSegment(docId: string, start: number, end: number) {
   ui.selectedDocId = docId;
   commitUI();
-  requestAnimationFrame(() => focusSegment(start, end));
+  // After rendering (which is synchronous); not tied to a frame of the main window, which may be in the background.
+  setTimeout(() => focusSegment(start, end), 0);
 }

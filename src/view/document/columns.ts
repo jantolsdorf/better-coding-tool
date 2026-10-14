@@ -18,7 +18,7 @@ import { compareCodings, isConsolidated, segmentKey, type SegmentAgreement } fro
 import { currentDoc } from '../../model/documents';
 import { activeLayer, consolidationOf } from '../../model/layers';
 import { lineLabel } from '../../model/lines';
-import { ui } from '../../model/state';
+import { project, ui } from '../../model/state';
 import { columnKeysInOrder, comparedColumns, memoColumns, tableColumns, TEXT_KEY } from '../../model/table';
 import type { Code, ColumnKey, Doc, Memo, MemoColumn, Segment, TableColumn } from '../../model/types';
 import { h } from '../dom';
@@ -155,15 +155,17 @@ export function makeResizable(el: HTMLElement, save: (width: number | null) => v
       width = Math.max(min, Math.min(max, startW + ev.clientX - startX));
       setFixedWidth(el, width);
     };
+    // The window the column is in (the text can be in a separate window).
+    const win = el.ownerDocument.defaultView ?? window;
     const up = () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-      document.body.classList.remove('resizing');
+      win.removeEventListener('mousemove', move);
+      win.removeEventListener('mouseup', up);
+      el.ownerDocument.body.classList.remove('resizing');
       if (width !== startW) save(width);
     };
-    document.body.classList.add('resizing');
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
+    el.ownerDocument.body.classList.add('resizing');
+    win.addEventListener('mousemove', move);
+    win.addEventListener('mouseup', up);
   });
 }
 
@@ -175,7 +177,8 @@ export function setFixedWidth(el: HTMLElement, width: number | null) {
 export function scheduleLayout() {
   if (layoutQueued) return;
   layoutQueued = true;
-  requestAnimationFrame(() => {
+  // The text's own window: a window in the background may not draw frames.
+  (gridEl.ownerDocument.defaultView ?? window).requestAnimationFrame(() => {
     layoutQueued = false;
     if (renderedDocId) layoutColumns();
   });
@@ -281,10 +284,12 @@ function codeMark(
   const lineLabelText = lineLabel(doc, s.start, s.end);
   const excerpt = s.text.length > 300 ? s.text.slice(0, 300) + '…' : s.text;
   const from = s.source ? ` · from ${s.source}` : '';
+  // Codes by someone else in your coding (e.g. after merging copies) show their author.
+  const by = col.col.kind !== 'external' && s.author && s.author !== project.coderName ? ` · by ${s.author}` : '';
   // Your challenge of another coder's code, if any.
   const challenge = col.col.kind === 'external' && code ? findChallenge(col.col.name, s, code, col.col.codes) : undefined;
   const challengeNote = challenge ? `\n⚑ You challenged this code: ${challenge.comment}` : '';
-  const title = `${name} · ${lineLabelText}${from}${agree ? `\n${agreementNote(agree)}` : ''}${challengeNote}\n\n${excerpt}`;
+  const title = `${name} · ${lineLabelText}${from}${by}${agree ? `\n${agreementNote(agree)}` : ''}${challengeNote}\n\n${excerpt}`;
   const near = textOnLeft ? 'left' : 'right';
   const far = textOnLeft ? 'right' : 'left';
 

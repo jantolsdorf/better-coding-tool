@@ -15,11 +15,13 @@ import {
   renameDoc,
   renameFolder,
 } from '../model/documents';
+import { identicalGroups, mergeCopies } from '../model/mergeDocs';
 import { SAMPLE_NAME, SAMPLE_TEXT } from '../model/sample';
 import { commitUI, project, ui } from '../model/state';
 import type { Doc, Folder } from '../model/types';
 import { ask, confirmAction, toast } from '../view/feedback';
 import { pickFiles } from '../view/files';
+import { askMergeOptions } from '../view/mergeDialog';
 
 const expand = (folderId: string | null) => {
   if (folderId) ui.collapsed = ui.collapsed.filter((id) => id !== folderId);
@@ -126,7 +128,7 @@ export function setFolderCollapsed(folderId: string, collapsed: boolean) {
 
 export type TreeItem = { type: 'doc' | 'folder'; id: string };
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const plural = (n: number, word: string) => `${n} ${n === 1 ? word : word.replace(/y$/, 'ie') + 's'}`;
 
 /** Moves several documents and folders into a folder (null = top level). */
 export function moveItemsTo(items: TreeItem[], folderId: string | null) {
@@ -149,5 +151,27 @@ export function deleteItemsInteractive(items: TreeItem[]): boolean {
   const coding = segments ? `\n\nThis also removes ${plural(segments, 'coded segment')} and all memos and other coders’ coding of these documents.` : '';
   if (!confirmAction(`Delete ${what}${extra}?${coding}\n\nYou can undo this (⌘Z / Ctrl+Z).`)) return false;
   deleteItems(docIds, folderIds);
+  return true;
+}
+
+/**
+ * Merges the copies with identical text among the selected documents (and those in selected
+ * folders) into new documents holding everyone's coding; returns whether anything was merged.
+ */
+export async function mergeCopiesInteractive(items: TreeItem[]): Promise<boolean> {
+  const docIds = new Set([
+    ...items.filter((i) => i.type === 'doc').map((i) => i.id),
+    ...docsInFolders(items.filter((i) => i.type === 'folder').map((i) => i.id)).map((d) => d.id),
+  ]);
+  const groups = identicalGroups(project.docs.filter((d) => docIds.has(d.id)));
+  if (!groups.length) {
+    toast('None of the selected documents have exactly the same text. Select the copies (or the folders holding them) to merge.', 6000);
+    return false;
+  }
+  const opts = await askMergeOptions(groups);
+  if (!opts) return false;
+  const created = mergeCopies(groups, opts);
+  if (created.length) openDocument(created[0]);
+  toast(`Merged ${plural(groups.reduce((n, g) => n + g.copies.length, 0), 'copy')} into ${plural(created.length, 'new document')}.`, 5000);
   return true;
 }

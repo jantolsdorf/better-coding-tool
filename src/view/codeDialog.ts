@@ -12,6 +12,7 @@ import { folderPath, getDoc } from '../model/documents';
 import { lineLabel } from '../model/lines';
 import { project } from '../model/state';
 import { byName } from '../model/util';
+import { currentDocument } from './windows';
 import { h, hexToRgba } from './dom';
 
 export function openCodeDialog(codeId: string) {
@@ -156,7 +157,8 @@ export function openCodeDialog(codeId: string) {
       save();
     }
   });
-  document.body.append(dlg);
+  // In the window used last (parts of the app can be in separate windows).
+  currentDocument().body.append(dlg);
   dlg.showModal();
   nameInput.focus();
 }

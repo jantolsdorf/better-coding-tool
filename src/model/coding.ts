@@ -12,7 +12,7 @@ export function applyCode(docId: string, start: number, end: number, codeName: s
   const name = codeName.trim();
   if (!doc || !name) return null;
   const code = codeForPath(name, colorForNew);
-  const result = addOrMerge(layerSegments(activeLayer(), docId), doc, start, end, code.id);
+  const result = addOrMerge(layerSegments(activeLayer(), docId), doc, start, end, code.id, undefined, project.coderName || undefined);
   commit();
   return { code, result };
 }

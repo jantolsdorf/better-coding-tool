@@ -8,9 +8,10 @@ import { challengesOf, findChallenge } from '../model/challenges';
 import { codePath, codesInTreeOrder, isCodeInSubtree } from '../model/codes';
 import { docsInTreeOrder, folderPath, getDoc } from '../model/documents';
 import { lineLabel } from '../model/lines';
-import { project, ui } from '../model/state';
+import { project, subscribe, ui } from '../model/state';
 import type { Code, Doc, ExternalCoding, Segment } from '../model/types';
 import { h } from './dom';
+import { closeToolWindow, openToolWindow } from './windows';
 
 /** The last choices, so reopening the dialog continues where you left off. */
 const state = {
@@ -24,17 +25,19 @@ const state = {
 
 export function openChallengeReview() {
   if (!project.externalCodings.length) return;
-  const dlg = h('dialog', { class: 'modal review-dialog' });
+  let stop = () => {};
+  const root = openToolWindow('review', 'Review & challenge codes', () => stop());
+  if (!root) return; // already open (now in front), or blocked (see openToolWindow)
   const body = h('div', { class: 'modal-body review-body' });
   const tools = h('div', { class: 'review-tools' });
   const foot = h('div', { class: 'modal-foot' });
-  dlg.addEventListener('close', () => dlg.remove());
 
   const render = () => {
+    if (!project.externalCodings.length) return closeToolWindow('review');
     const coder = project.externalCodings.find((x) => x.id === state.coderId) ?? project.externalCodings[0];
     state.coderId = coder.id;
     renderTools(tools, coder, render);
-    renderList(body, coder, render, () => dlg.close());
+    renderList(body, coder, render);
     const mine = challengesOf(coder.coderName).length;
     const all = project.challenges.length;
     foot.replaceChildren(
@@ -43,15 +46,15 @@ export function openChallengeReview() {
     );
   };
 
-  dlg.append(
+  root.append(
     h(
       'div',
-      { class: 'modal-inner' },
+      { class: 'modal-inner tool-inner' },
       h(
         'div',
         { class: 'modal-head' },
         h('strong', { class: 'grow' }, '⚑ Review & challenge codes'),
-        h('button', { class: 'btn', onClick: () => dlg.close() }, 'Close'),
+        h('button', { class: 'btn', onClick: () => closeToolWindow('review') }, 'Close'),
       ),
       tools,
       body,
@@ -59,8 +62,8 @@ export function openChallengeReview() {
     ),
   );
   render();
-  document.body.append(dlg);
-  dlg.showModal();
+  // Stays up to date with changes made in the main window (e.g. challenges in the columns).
+  stop = subscribe(render);
 }
 
 function select(options: [string, string][], value: string, onChange: (v: string) => void, title = ''): HTMLSelectElement {
@@ -158,7 +161,7 @@ const docLabel = (d: Doc) => {
   return path ? `${path} / ${d.name}` : d.name;
 };
 
-function renderList(body: HTMLElement, coder: ExternalCoding, render: () => void, close: () => void) {
+function renderList(body: HTMLElement, coder: ExternalCoding, render: () => void) {
   const codes = new Map(coder.codes.map((c) => [c.id, c]));
   let segs: Segment[];
   if (state.by === 'code') {
@@ -184,14 +187,14 @@ function renderList(body: HTMLElement, coder: ExternalCoding, render: () => void
       lastDoc = s.docId;
       out.push(h('div', { class: 'review-doc' }, docLabel(getDoc(s.docId)!)));
     }
-    out.push(reviewItem(coder, s, codes.get(s.codeId)!, render, close));
+    out.push(reviewItem(coder, s, codes.get(s.codeId)!, render));
   }
   const top = body.scrollTop;
   body.replaceChildren(...out);
   body.scrollTop = top;
 }
 
-function reviewItem(coder: ExternalCoding, s: Segment, code: Code, render: () => void, close: () => void): HTMLElement {
+function reviewItem(coder: ExternalCoding, s: Segment, code: Code, render: () => void): HTMLElement {
   const doc = getDoc(s.docId)!;
   const challenge = findChallenge(coder.coderName, s, code, coder.codes);
   const text = s.text.length > 600 ? `${s.text.slice(0, 600)}…` : s.text;
@@ -209,12 +212,12 @@ function reviewItem(coder: ExternalCoding, s: Segment, code: Code, render: () =>
         'button',
         {
           class: 'btn small',
-          title: 'Show this passage in the document (challenge mode stays on)',
+          title: 'Show this passage in the document (with challenge mode on)',
           onClick: () => {
-            close();
             setColumnVisible(coder.id, true);
             setChallengeMode(true);
             goToSegment(s.docId, s.start, s.end);
+            window.focus();
           },
         },
         'Show',

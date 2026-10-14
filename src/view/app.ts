@@ -2,7 +2,7 @@
 
 import { renderCodebook } from './codebookList';
 import { renderCoderList } from './coderList';
-import { initDocumentView, renderDocumentView } from './document';
+import { initDocumentView, renderDocumentView, setViewerPopoutHandler } from './document';
 import { applyMainLayout, initMainLayout } from './layout';
 import { initSegmentList, renderSegmentList } from './segmentList';
 import { applyPanelSizes, initSplitters } from './splitters';
@@ -10,6 +10,8 @@ import { initTopbar, renderTopbar } from './topbar';
 import { initTree, renderTree } from './tree';
 import { initLeaveGuard } from './leaveGuard';
 import { ui } from '../model/state';
+import { popupBlocked } from './feedback';
+import { bringBack, byId, initWindows, isPoppedOut, onWindowsChange, popOut } from './windows';
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -19,6 +21,23 @@ let codersEl: HTMLElement;
 let segmentsEl: HTMLElement;
 let sidebar: HTMLElement;
 let layout: HTMLElement;
+let segmentsCount: HTMLElement;
+let segmentsTitle: HTMLElement;
+
+/** Parts that can be opened in a separate window: their key, place in the main window, title and ⧉ button. */
+const PARTS = [
+  { key: 'docs', container: () => document.querySelector<HTMLElement>('.panel.docs')!, title: 'Documents', button: 'btn-popout-docs' },
+  { key: 'codes', container: () => document.querySelector<HTMLElement>('.panel.codes')!, title: 'Codebook', button: 'btn-popout-codes' },
+  { key: 'viewer', container: () => $('viewer'), title: 'Text', button: 'btn-popout-viewer' },
+  { key: 'segments', container: () => document.querySelector<HTMLElement>('.segments')!, title: 'Coded segments', button: 'btn-popout-segments' },
+];
+
+/** Opens a part in a separate window, or brings it back if it is in one. */
+export function togglePopout(key: string) {
+  const part = PARTS.find((p) => p.key === key)!;
+  if (isPoppedOut(key)) bringBack(key);
+  else if (!popOut(key, part.container(), part.title, key === 'viewer' ? { width: 1000, height: 820 } : undefined)) popupBlocked();
+}
 
 export function initApp() {
   treeEl = $('tree');
@@ -28,7 +47,16 @@ export function initApp() {
   sidebar = document.querySelector<HTMLElement>('.sidebar')!;
   layout = document.querySelector<HTMLElement>('.layout')!;
 
+  segmentsCount = $('segments-count');
+  segmentsTitle = $('segments-title');
+  initWindows();
+  // After a part moved between windows, render again (e.g. to lay out the code columns).
+  onWindowsChange(renderApp);
+  for (const part of PARTS) {
+    if (part.key !== 'viewer') $(part.button).addEventListener('click', () => togglePopout(part.key));
+  }
   initDocumentView($('viewer'), $('viewer-empty'));
+  setViewerPopoutHandler(() => togglePopout('viewer'));
   initTree(treeEl);
   initSegmentList(segmentsEl);
   initTopbar();
@@ -57,5 +85,12 @@ export function renderApp() {
   keepScroll(codebookEl, () => renderCodebook(codebookEl));
   renderCoderList(codersEl);
   renderDocumentView();
-  keepScroll(segmentsEl, () => renderSegmentList(segmentsEl, $('segments-count'), $('segments-title')));
+  keepScroll(segmentsEl, () => renderSegmentList(segmentsEl, segmentsCount, segmentsTitle));
+  // ⧉ opens a part in a separate window; in that window the same button brings it back.
+  for (const part of PARTS) {
+    const btn = byId(part.button);
+    if (!btn) continue;
+    btn.textContent = isPoppedOut(part.key) ? '↩' : '⧉';
+    btn.title = isPoppedOut(part.key) ? 'Back into the main window' : 'Open in a separate window';
+  }
 }

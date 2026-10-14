@@ -1,5 +1,6 @@
 // A small dialog for writing a comment about a passage, e.g. why you challenge a code.
 
+import { currentDocument } from './windows';
 import { h } from './dom';
 
 export type CommentResult = { action: 'save'; text: string } | { action: 'remove' } | undefined;
@@ -54,7 +55,7 @@ export function askComment(opts: { title: string; context: string; quote: string
         ),
       ),
     );
-    document.body.append(dlg);
+    currentDocument().body.append(dlg);
     dlg.showModal();
     area.focus();
   });

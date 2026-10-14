@@ -2,13 +2,16 @@
 // dialogs directly, so all user interaction goes through the view layer.
 
 import { h } from './dom';
+import { currentDocument, currentWindow } from './windows';
 
 /** A short message that disappears by itself. */
 export function toast(message: string, ms = 3500) {
-  let host = document.getElementById('toasts');
+  // Shown in the window used last (the app can have parts in separate windows).
+  const doc = currentDocument();
+  let host = doc.getElementById('toasts');
   if (!host) {
     host = h('div', { id: 'toasts' });
-    document.body.append(host);
+    doc.body.append(host);
   }
   const t = h('div', { class: 'toast' }, message);
   host.append(t);
@@ -17,13 +20,13 @@ export function toast(message: string, ms = 3500) {
 }
 
 /** A message the user has to acknowledge. */
-export const notify = (message: string) => window.alert(message);
+export const notify = (message: string) => currentWindow().alert(message);
 
 /** A yes/no question (OK = yes). */
-export const confirmAction = (question: string) => window.confirm(question);
+export const confirmAction = (question: string) => currentWindow().confirm(question);
 
 /** A question with a text answer; null when cancelled. */
-export const ask = (question: string, suggestion?: string) => window.prompt(question, suggestion);
+export const ask = (question: string, suggestion?: string) => currentWindow().prompt(question, suggestion);
 
 export interface Choice<T> {
   label: string;
@@ -100,8 +103,12 @@ export function choose<T>({ title, message, choices, cancelLabel = 'Cancel' }: C
       resolve(picked?.value);
     });
 
-    document.body.append(dialog);
+    currentDocument().body.append(dialog);
     dialog.showModal();
     (list.querySelector('button') as HTMLButtonElement | null)?.focus();
   });
 }
+
+/** Explains that the browser did not open a new window. */
+export const popupBlocked = () =>
+  toast('The browser blocked the new window. Allow pop-ups for this page (usually an icon in the address bar) and try again.', 7000);

@@ -37,6 +37,11 @@ export interface Segment {
   createdAt: string;
   /** For consolidated segments: whose coding it was accepted from. */
   source?: string;
+  /**
+   * Who coded it (the coder name when it was coded). Kept when documents are merged or the
+   * project is continued by someone else. Missing in older projects: then it is the project's coder.
+   */
+  author?: string;
 }
 
 /** A note attached to a passage of text, shown as a sticky note. */
@@ -52,6 +57,8 @@ export interface Memo {
   note: string;
   createdAt: string;
   updatedAt?: string;
+  /** Who wrote it (see Segment.author). */
+  author?: string;
 }
 
 /** The coding of another person, imported for side-by-side comparison. */

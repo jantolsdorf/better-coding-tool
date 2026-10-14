@@ -24,6 +24,7 @@ import { memosOf } from '../../model/memos';
 import { project, ui } from '../../model/state';
 import type { Code, Doc } from '../../model/types';
 import { h, hexToRgba } from '../dom';
+import { onEveryDocument } from '../windows';
 import { toast } from '../feedback';
 import { copyText } from '../files';
 import { gridEl, pointToOffset, rangeFor, renderedDocId, setNamedHighlight, textBody } from './textView';
@@ -57,15 +58,18 @@ let popup: Popup | null = null;
 
 /** Opens the code box whenever text in the document is selected. */
 export function initCodeBox() {
-  document.addEventListener('mouseup', () => setTimeout(onSelectionDone, 0));
-  document.addEventListener('mousedown', (e) => {
-    if (popup && !popup.el.contains(e.target as Node)) closeCodeBox();
+  // In every window, since the text can be moved to a separate one.
+  onEveryDocument((doc) => {
+    doc.addEventListener('mouseup', () => setTimeout(onSelectionDone, 0));
+    doc.addEventListener('mousedown', (e) => {
+      if (popup && !popup.el.contains(e.target as Node)) closeCodeBox();
+    });
   });
 }
 
 function onSelectionDone() {
   const doc = currentDoc();
-  const sel = window.getSelection();
+  const sel = textBody.ownerDocument.getSelection();
   if (!doc || !renderedDocId || !sel || sel.rangeCount === 0 || sel.isCollapsed) return;
   const r = sel.getRangeAt(0);
   // Selections that run past the text (e.g. into a coder column) are clamped to the text.
