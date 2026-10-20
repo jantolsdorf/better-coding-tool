@@ -10,6 +10,7 @@ import { memosOf } from '../model/memos';
 import { ui } from '../model/state';
 import type { Doc, Memo, Segment } from '../model/types';
 import { openCodeDialog } from './codeDialog';
+import { pinSegment } from './document/pins';
 import { focusSegment, setHoverRange } from './document/textView';
 import { h, hexToRgba } from './dom';
 
@@ -103,7 +104,10 @@ function segmentCard(doc: Doc, s: Segment): HTMLElement {
       style: { borderLeftColor: color },
       onMouseenter: () => setHoverRange(s.start, s.end, color),
       onMouseleave: () => setHoverRange(null),
-      onClick: () => focusSegment(s.start, s.end),
+      onClick: () => {
+        focusSegment(s.start, s.end);
+        pinSegment(s.id);
+      },
     },
     h(
       'div',

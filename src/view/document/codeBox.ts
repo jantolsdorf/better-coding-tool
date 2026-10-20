@@ -25,6 +25,7 @@ import { project, ui } from '../../model/state';
 import type { Code, Doc } from '../../model/types';
 import { h, hexToRgba } from '../dom';
 import { onEveryDocument } from '../windows';
+import { hidePins, showPins } from './pins';
 import { toast } from '../feedback';
 import { copyText } from '../files';
 import { gridEl, pointToOffset, rangeFor, renderedDocId, setNamedHighlight, textBody } from './textView';
@@ -62,7 +63,8 @@ export function initCodeBox() {
   onEveryDocument((doc) => {
     doc.addEventListener('mouseup', () => setTimeout(onSelectionDone, 0));
     doc.addEventListener('mousedown', (e) => {
-      if (popup && !popup.el.contains(e.target as Node)) closeCodeBox();
+      // The pins belong to the box's passage, so dragging them keeps the box open.
+      if (popup && !popup.el.contains(e.target as Node) && !(e.target as Element).closest?.('.text-pin')) closeCodeBox();
     });
   });
 }
@@ -158,6 +160,7 @@ function openCodeBox(doc: Doc, start: number, end: number) {
     },
     '⧉',
   );
+  const meta = h('span', { class: 'grow' }, `${lineLabel(doc, start, end)} · ${end - start} characters`);
   const el = h(
     'div',
     { class: 'code-popup' },
@@ -165,7 +168,7 @@ function openCodeBox(doc: Doc, start: number, end: number) {
       'div',
       { class: 'popup-meta' },
       kind,
-      h('span', { class: 'grow' }, `${lineLabel(doc, start, end)} · ${end - start} characters`),
+      meta,
       subcodesBtn,
       copyBtn,
       helpToggle,
@@ -191,6 +194,20 @@ function openCodeBox(doc: Doc, start: number, end: number) {
     items: [], exact: undefined, pathExists: false, active: -1, counts: segmentCounts(),
   };
   setNamedHighlight('qc-pending', range, 10);
+  // Pins at both ends adjust the passage before it is coded.
+  const adjust = (a: number, b: number) => {
+    if (!popup) return;
+    popup.start = a;
+    popup.end = b;
+    popup.inVivo = inVivoName(doc.content.slice(a, b));
+    meta.textContent = `${lineLabel(doc, a, b)} · ${b - a} characters`;
+    setNamedHighlight('qc-pending', rangeFor(a, b), 10);
+    refreshSuggestions();
+  };
+  showPins(start, end, { onChange: adjust, onCommit: (a, b) => {
+    adjust(a, b);
+    input.focus({ preventScroll: true });
+  } });
   input.addEventListener('input', refreshSuggestions);
   input.addEventListener('keydown', onKey);
   refreshSuggestions();
@@ -218,6 +235,7 @@ async function copyPassage() {
 
 export function closeCodeBox() {
   if (!popup) return;
+  hidePins();
   popup.el.remove();
   popup = null;
   setNamedHighlight('qc-pending', null, 0);

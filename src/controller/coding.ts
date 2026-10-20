@@ -1,6 +1,6 @@
 // User actions while coding text.
 
-import { applyCode, deleteSegment } from '../model/coding';
+import { applyCode, deleteSegment, resizeSegment } from '../model/coding';
 import { commitUI, ui } from '../model/state';
 import type { UIState } from '../model/types';
 import { toast } from '../view/feedback';
@@ -61,6 +61,11 @@ export function codePassage(docId: string, start: number, end: number, codeNameO
   if (res?.result === 'extended') toast(`Extended the existing “${res.code.name}” segment to include this passage.`);
   if (res?.result === 'contained') toast(`This passage is already part of a “${res.code.name}” segment.`);
   return res;
+}
+
+/** Moves the boundaries of a coded segment (dragging its pins). */
+export function resizeSegmentTo(id: string, start: number, end: number) {
+  resizeSegment(id, start, end);
 }
 
 export function removeSegment(id: string) {

@@ -22,6 +22,7 @@ import { project, ui } from '../../model/state';
 import { columnKeysInOrder, comparedColumns, memoColumns, tableColumns, TEXT_KEY } from '../../model/table';
 import type { Code, ColumnKey, Doc, Memo, MemoColumn, Segment, TableColumn } from '../../model/types';
 import { h } from '../dom';
+import { pinSegment, placePins } from './pins';
 import { focusSegment, gridEl, rangeFor, renderedContent, renderedDocId, setHoverRange } from './textView';
 
 interface Column {
@@ -249,6 +250,7 @@ export function layoutColumns() {
     col.body.replaceChildren(...parts);
   }
   for (const { col, body } of memoCols) layoutMemos(doc, col, body);
+  placePins();
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -336,7 +338,11 @@ function codeMark(
   };
   const select = () => {
     focusSegment(s.start, s.end);
-    if (col.col.kind === activeLayer()) document.dispatchEvent(new CustomEvent('bct:segment-selected', { detail: s.id }));
+    if (col.col.kind === activeLayer()) {
+      document.dispatchEvent(new CustomEvent('bct:segment-selected', { detail: s.id }));
+      // Pins at both ends let you move the segment's boundaries.
+      pinSegment(s.id);
+    }
   };
   for (const el of [brace, label]) {
     el.addEventListener('mouseenter', () => hover(true));

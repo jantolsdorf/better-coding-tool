@@ -10,6 +10,7 @@ import { comparedColumns, TEXT_KEY } from '../../model/table';
 import type { Doc } from '../../model/types';
 import { h } from '../dom';
 import { closeCodeBox, initCodeBox } from './codeBox';
+import { hidePins, initPins } from './pins';
 import { buildColumns, layoutColumns, makeColumnDraggable, makeResizable, scheduleLayout, setFixedWidth } from './columns';
 import {
   applyHighlights,
@@ -41,6 +42,7 @@ export function initDocumentView(el: HTMLElement, empty: HTMLElement) {
   makeColumnDraggable(textCol, TEXT_KEY);
   makeResizable(textCol, setTextWidth);
   initCodeBox();
+  initPins();
   new ResizeObserver(scheduleLayout).observe(textBody);
 }
 
@@ -49,11 +51,13 @@ export function renderDocumentView() {
   root.classList.toggle('is-empty', !doc);
   if (!doc) {
     closeCodeBox();
+    hidePins();
     clearText();
     return;
   }
   if (doc.id !== renderedDocId || doc.content !== renderedContent) {
     closeCodeBox();
+    hidePins();
     renderText(doc);
   }
   renderHeader(doc);

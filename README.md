@@ -60,6 +60,12 @@ npm run build      # produces a single self-contained dist/index.html
   **Merge…**. Dragging a selected row drags the whole selection. **Esc** ends selecting;
   **Delete** deletes the selection of the panel you used last. Each of these is one step for
   Undo.
+- **Pins**: a highlighted passage has a pin at its start and end. While the code box is open,
+  drag them to adjust the selection before coding. Click a code of your coding (its bracket or
+  name, or its card in the segment list) to highlight it with pins; dragging a pin moves that
+  end of the segment, character by character, and the segment is updated when you let go (Undo
+  reverts it; if it then overlaps a segment with the same code, they become one). Clicking
+  elsewhere or Esc hides the pins.
 - **Coding**: open a document and highlight a passage. A small box opens below the selection;
   type a code (existing codes are suggested, each with its parent codes as a small line above
   its name, so long names stay distinguishable) and press **Enter**. **⌘C / Ctrl+C** (or **⧉** in the box)
@@ -267,6 +273,7 @@ notifies `renderApp`, which re-renders the views.
 | `view/document/` | The document area: text and highlights, coder and memo columns, code box, View menu |
 | `view/tree.ts`, `codebookList.ts`, `codeDialog.ts`, `segmentList.ts`, `coderList.ts` | The panels and the code details dialog |
 | `view/csvCodebookDialog.ts` | Choosing the code, description and color columns of a CSV codebook |
+| `view/document/pins.ts` | Pins at both ends of a highlighted passage to adjust a selection or a coded segment |
 | `view/mergeDialog.ts` | Who coded which copy; keeping, renaming or merging authors |
 | `view/windows.ts` | Moving parts of the app into separate browser windows and back; tool windows; the window used last |
 | `view/challengeReview.ts`, `commentDialog.ts`, `occurrenceView.ts` | Reviewing and challenging another coder's codes; the comment dialog; the code occurrence table |
