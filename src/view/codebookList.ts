@@ -20,7 +20,6 @@ import { byOrder } from '../model/codeOrder';
 import {
   childCodes,
   codeById,
-  codeChain,
   codePath,
   codePathParts,
   codesInTreeOrder,
@@ -36,6 +35,7 @@ import { openCodeDialog } from './codeDialog';
 import { h } from './dom';
 import { byId } from './windows';
 import { actionSelect, Selection, TOP_LEVEL } from './multiSelect';
+import '@fortawesome/fontawesome-free/css/all.min.css';
 
 // The dragged codes' ids (several when dragging a selection); dataTransfer contents cannot be
 // read during dragover.
@@ -47,9 +47,6 @@ let lastContainer: HTMLElement | null = null;
 
 const selection = new Selection(() => lastContainer && renderCodebook(lastContainer));
 const selectedCodes = () => [...selection.keys];
-
-/** Turns the codebook's select mode (checkboxes) on or off. */
-export const toggleCodeSelectMode = () => selection.toggleMode();
 
 /** Deletes the selected codes (Delete key); returns false if nothing is selected. */
 export function deleteSelectedCodes(): boolean {
@@ -93,9 +90,6 @@ export function renderCodebook(container: HTMLElement) {
   lastContainer = container;
   if (!draggedCodeIds.length) container.classList.remove('dragging-code');
   selection.prune(new Set(project.codes.map((c) => c.id)));
-  const selectBtn = byId('btn-select-codes');
-  selectBtn?.classList.toggle('on', selection.active);
-  if (selectBtn) selectBtn.textContent = selection.active ? 'Done' : 'Select';
   // Opening and closing subcodes only applies to the indented view.
   const toggleBtn = byId('btn-toggle-codes');
   if (toggleBtn) {
@@ -144,11 +138,9 @@ export function renderCodebook(container: HTMLElement) {
   }
 
   const state: ListState = { counts: segmentCounts(), recent, visible, matches };
-  const topLevel = h('div', { class: 'code-top-drop' }, 'Drop here to move to the top level');
-  onDrop(topLevel, () => dropDragged(null, false));
   const rows = ui.codeView === 'path' ? pathRows(state, edited) : codeRows(null, 0, state);
   selection.order = rows.map((r) => r.dataset.id!);
-  container.replaceChildren(...(selection.active ? [selectionBar()] : []), topLevel, ...rows);
+  container.replaceChildren(...(selection.active ? [selectionBar()] : []), ...rows);
 }
 
 function selectionBar(): HTMLElement {
@@ -182,24 +174,6 @@ function selectionBar(): HTMLElement {
     ],
     ['code', 'codes'],
   );
-}
-
-/**
- * While a subcode is dragged, shows "Drop here to move to the top level" right above its level 1
- * code. If the strip can stay fully visible, the list scrolls by its height so the rows below it
- * stay under the cursor.
- */
-function showTopLevelDrop(list: HTMLElement, dragged: Code) {
-  const strip = list.querySelector<HTMLElement>('.code-top-drop');
-  if (!strip) return;
-  const rootId = codeChain(dragged)[0].id;
-  const rootRow = list.querySelector<HTMLElement>(`.code-row[data-id="${rootId}"]`);
-  (rootRow ?? list.firstElementChild)?.before(strip);
-  list.classList.add('dragging-code');
-  const style = getComputedStyle(strip);
-  const height = strip.offsetHeight + parseFloat(style.marginTop) + parseFloat(style.marginBottom);
-  const stripTopInView = strip.getBoundingClientRect().top - list.getBoundingClientRect().top;
-  if (stripTopInView - height >= 0) list.scrollTop += height;
 }
 
 function codeRows(parentId: string | null, depth: number, state: ListState): HTMLElement[] {
@@ -312,6 +286,34 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
   onDrop(asMerge, () => dropDragged(c.id, true));
 
   const isContext = !!state.visible && !state.matches.has(c.id);
+
+  const colorInput = h('input', {
+    type: 'color',
+    class: 'swatch-input',
+    value: c.color,
+    title: 'Change color',
+    tabIndex: -1,
+    onChange: (e: Event) => {
+      const color = (e.target as HTMLInputElement).value;
+      swatchSlot.style.setProperty('--code-color', color);
+      recolorCode(c.id, color);
+    },
+  }) as HTMLInputElement;
+
+  const swatchSlot = h(
+    'span',
+    {
+      class: 'swatch-slot',
+      title: 'Click to select · right-click to change color',
+      onContextmenu: (e: MouseEvent) => {
+        e.preventDefault();
+        colorInput.showPicker();
+      },
+    },
+    colorInput,
+  ) as HTMLElement;
+  swatchSlot.style.setProperty('--code-color', c.color);
+
   const row = h(
     'div',
     { class: 'code-row' + (isContext ? ' context' : ''), 'data-id': c.id, draggable: true, style: { paddingLeft: `${6 + depth * 16}px` } },
@@ -326,15 +328,11 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
             if (hasChildren) setCodeCollapsed(c.id, !collapsed);
           },
         },
-        hasChildren ? (collapsed ? '▸' : '▾') : '',
+        hasChildren
+          ? h('i', { class: `fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`, 'aria-hidden': 'true' })
+          : null,
       ),
-      h('input', {
-        type: 'color',
-        class: 'swatch-input',
-        value: c.color,
-        title: 'Change color',
-        onChange: (e: Event) => recolorCode(c.id, (e.target as HTMLInputElement).value),
-      }),
+      swatchSlot,
       h(
         'button',
         {
@@ -351,27 +349,27 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
       h(
         'span',
         { class: 'code-actions' },
-        rowButton('＋', `New subcode of “${c.name}”`, () => addSubcodeInteractive(c.id)),
-        rowButton('🗑', `Delete “${c.name}” (Undo brings it back)`, () => deleteCodeNow(c)),
+        rowButton('＋', `New subcode`, () => addSubcodeInteractive(c.id)),
+        rowButton('🗑', `Delete code (Undo brings it back)`, () => deleteCodeNow(c)),
       ),
       h('span', { class: 'badge', title: hasChildren ? `${own} with this code, ${total} including subcodes` : 'Coded segments' }, hasChildren && total !== own ? `${own} · ${total}` : String(own)),
     ),
     h('div', { class: 'drop-opts' }, asSub, asMerge),
   );
 
-  selection.bindRow(row, c.id, row.querySelector<HTMLElement>('.code-main')!, { hoverCheckbox: true });
+  selection.bindRow(row, c.id, swatchSlot, { hoverCheckbox: true });
+
+  // Font Awesome checkmark layered over the colored checkbox; shown via CSS when checked.
+  swatchSlot
+    .querySelector('.row-check')
+    ?.after(h('i', { class: 'fa-solid fa-check row-check-mark', 'aria-hidden': 'true' }));
+
   row.addEventListener('dragstart', (e) => {
     e.stopPropagation();
     draggedCodeIds = selection.has(c.id) ? selectedCodes() : [c.id];
     e.dataTransfer?.setData('text/plain', draggedCodeIds.length > 1 ? `${draggedCodeIds.length} codes` : c.name);
     setCompactDragImage(e, c, draggedCodeIds.length);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-    // Deferred so the drag image is taken before the list changes appearance.
-    (row.ownerDocument.defaultView ?? window).requestAnimationFrame(() => {
-      row.classList.add('dragging');
-      const list = row.closest<HTMLElement>('.panel-body');
-      if (list && c.parentId) showTopLevelDrop(list, c);
-    });
   });
   row.addEventListener('dragend', () => {
     draggedCodeIds = [];

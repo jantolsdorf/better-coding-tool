@@ -476,12 +476,13 @@ function editInPlace(note: HTMLElement, text: HTMLElement, m: Memo) {
 
 function boxActions(col: Column, s: Segment, code: Code | undefined): HTMLElement | null {
   const kind = col.col.kind;
-  const btn = (label: string, title: string, fn: () => void) =>
+  const btn = (label: string | Node, title: string, fn: () => void) =>
     h(
       'button',
       {
         class: 'stripe-btn',
         title,
+        'aria-label': title,
         onClick: (e: MouseEvent) => {
           e.stopPropagation();
           setHoverRange(null);
@@ -492,7 +493,11 @@ function boxActions(col: Column, s: Segment, code: Code | undefined): HTMLElemen
     );
   const consolidating = !!consolidationOf(s.docId);
   if (kind === 'consolidated' || (kind === 'mine' && !consolidating)) {
-    return h('span', { class: 'stripe-actions' }, btn('✕', 'Remove this segment', () => removeSegment(s.id)));
+    return h(
+      'span',
+      { class: 'stripe-actions' },
+      btn(h('i', { class: 'fa-solid fa-trash', 'aria-hidden': 'true' }), 'Remove this segment (can be undone)', () => removeSegment(s.id)),
+    );
   }
   if (!code) return null;
   const parts: HTMLElement[] = [];

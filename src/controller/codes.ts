@@ -20,6 +20,7 @@ import {
   subtreeOf,
   updateCode,
 } from '../model/codes';
+import { dropSegments } from '../model/coding';
 import { allConsolidated } from '../model/layers';
 import { commitUI, project, ui } from '../model/state';
 import type { Code, UIState } from '../model/types';
@@ -190,6 +191,8 @@ export function colorSubcodesLike(id: string, color: string) {
 export function saveCodeDetails(
   codeId: string,
   fields: { name: string; color: string; description: string; parentId: string | null },
+  /** Segments removed in the dialog; they are only deleted now, together with the other changes. */
+  removedSegmentIds: string[] = [],
 ): boolean {
   const name = fields.name.trim();
   if (!name) {
@@ -207,6 +210,8 @@ export function saveCodeDetails(
     notify(`A code named “${name}” already exists ${where}. Use “Merge into…” to combine them.`);
     return false;
   }
+  // One undo step for everything saved in the dialog.
+  dropSegments(removedSegmentIds);
   updateCode(codeId, { name, color: fields.color, description: fields.description.trim() || undefined, parentId: fields.parentId });
   return true;
 }

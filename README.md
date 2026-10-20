@@ -99,7 +99,8 @@ npm run build      # produces a single self-contained dist/index.html
   code's color; clicking jumps to it. The right panel lists each segment with its line range
   (e.g. `L6–L8`) and text. To color all coded passages at once, press **Highlight coded segments** in the
   header of the text column (or tick *View ▾ → Color coded text*); press it again to go back to plain text.
-- **Codebook**: change a code's color with its swatch; click its name to rename it, add a
+- **Codebook**: change a code's color with its swatch; click its name to open its details in their own
+  window (one per code; closing it or Esc discards changes) to rename it, add a
   description, set its parent code, see every segment coded with it across all documents,
   merge it into another code, or delete it. Hovering a code shows a checkbox (to select it), **＋**
   (new subcode, which takes the parent's color) and **🗑** (deletes the code at once, without

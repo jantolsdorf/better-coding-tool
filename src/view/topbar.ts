@@ -26,7 +26,7 @@ import {
 } from '../controller/transfer';
 import { canRedo, canUndo, project, savedBytes, ui } from '../model/state';
 import type { UIState } from '../model/types';
-import { clearCodeSelection, deleteSelectedCodes, setCodebookFilter, toggleCodeSelectMode } from './codebookList';
+import { clearCodeSelection, deleteSelectedCodes, setCodebookFilter } from './codebookList';
 import { openChallengeReview } from './challengeReview';
 import { toast } from './feedback';
 import { openOccurrenceView } from './occurrenceView';
@@ -73,7 +73,6 @@ export function initTopbar() {
   onClick('btn-sample', addSampleDocument);
   onClick('btn-add-code', addCodeFromPrompt);
   onClick('btn-select-docs', toggleDocSelectMode);
-  onClick('btn-select-codes', toggleCodeSelectMode);
   onClick('btn-toggle-codes', toggleAllCodesCollapsed);
 
   // Esc ends selecting; Delete/Backspace deletes the selection of the panel used last.
