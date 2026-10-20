@@ -22,7 +22,7 @@ import { project, ui } from '../../model/state';
 import { columnKeysInOrder, comparedColumns, memoColumns, tableColumns, TEXT_KEY } from '../../model/table';
 import type { Code, ColumnKey, Doc, Memo, MemoColumn, Segment, TableColumn } from '../../model/types';
 import { h } from '../dom';
-import { pinSegment, placePins } from './pins';
+import { activeSegment, onActiveSegmentChange, pinSegment, placePins } from './pins';
 import { focusSegment, gridEl, rangeFor, renderedContent, renderedDocId, setHoverRange } from './textView';
 
 interface Column {
@@ -33,6 +33,11 @@ interface Column {
 }
 
 const COLUMN_DND_TYPE = 'application/x-bct-column';
+
+// Highlights the code of the clicked segment (see pins.ts) without rebuilding the columns.
+onActiveSegmentChange((id) => {
+  gridEl?.querySelectorAll<Element>('[data-seg]').forEach((el) => el.classList.toggle('active', el.getAttribute('data-seg') === id));
+});
 
 let columns: Column[] = [];
 let memoCols: { col: MemoColumn; body: HTMLElement }[] = [];
@@ -330,6 +335,11 @@ function codeMark(
   );
   label.style.setProperty('--code-color', color);
 
+  // The clicked ("active") segment of the active coding stays highlighted.
+  if (col.col.kind === activeLayer()) {
+    for (const el of [brace, label, path]) el.setAttribute('data-seg', s.id);
+    if (s.id === activeSegment()) for (const el of [brace, label, path]) el.classList.add('active');
+  }
   const hover = (on: boolean) => {
     brace.classList.toggle('hot', on);
     label.classList.toggle('hot', on);

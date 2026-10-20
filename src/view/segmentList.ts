@@ -10,7 +10,7 @@ import { memosOf } from '../model/memos';
 import { ui } from '../model/state';
 import type { Doc, Memo, Segment } from '../model/types';
 import { openCodeDialog } from './codeDialog';
-import { pinSegment } from './document/pins';
+import { activeSegment, onActiveSegmentChange, pinSegment } from './document/pins';
 import { focusSegment, setHoverRange } from './document/textView';
 import { h, hexToRgba } from './dom';
 
@@ -28,7 +28,19 @@ export function initSegmentList(container: HTMLElement) {
   });
 }
 
+let listEl: HTMLElement | null = null;
+
+// The card of the clicked segment stays highlighted (see pins.ts), and is scrolled into view.
+onActiveSegmentChange((id) => {
+  listEl?.querySelectorAll<HTMLElement>('.seg-card').forEach((card) => {
+    const on = !!id && card.dataset.id === id && !card.classList.contains('memo-card');
+    card.classList.toggle('active', on);
+    if (on) card.scrollIntoView({ block: 'nearest' });
+  });
+});
+
 export function renderSegmentList(container: HTMLElement, countEl: HTMLElement, titleEl: HTMLElement) {
+  listEl = container;
   titleEl.textContent = activeLayer() === 'consolidated' ? 'Consolidated segments' : title;
   const doc = currentDoc();
   if (!doc) {
@@ -96,10 +108,10 @@ function memoCard(doc: Doc, m: Memo): HTMLElement {
 function segmentCard(doc: Doc, s: Segment): HTMLElement {
   const code = codeById(s.codeId);
   const color = code?.color ?? '#9ca3af';
-  return h(
+  const card = h(
     'div',
     {
-      class: 'seg-card',
+      class: 'seg-card' + (s.id === activeSegment() ? ' active' : ''),
       'data-id': s.id,
       style: { borderLeftColor: color },
       onMouseenter: () => setHoverRange(s.start, s.end, color),
@@ -142,4 +154,6 @@ function segmentCard(doc: Doc, s: Segment): HTMLElement {
     ),
     h('div', { class: 'seg-text' }, s.text),
   );
+  card.style.setProperty('--code-color', color);
+  return card;
 }

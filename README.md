@@ -64,8 +64,10 @@ npm run build      # produces a single self-contained dist/index.html
   drag them to adjust the selection before coding. Click a code of your coding (its bracket or
   name, or its card in the segment list) to highlight it with pins; dragging a pin moves that
   end of the segment, character by character, and the segment is updated when you let go (Undo
-  reverts it; if it then overlaps a segment with the same code, they become one). Clicking
-  elsewhere or Esc hides the pins.
+  reverts it; if it then overlaps a segment with the same code, they become one). The clicked
+  code stays highlighted (its name, bracket and line in the column, and its card in the segment
+  list) so you can see which code the highlighted passage belongs to. Clicking elsewhere or Esc
+  ends this.
 - **Coding**: open a document and highlight a passage. A small box opens below the selection;
   type a code (existing codes are suggested, each with its parent codes as a small line above
   its name, so long names stay distinguishable) and press **Enter**. **⌘C / Ctrl+C** (or **⧉** in the box)

@@ -2644,3 +2644,23 @@ body.pin-dragging * {
   cursor: ew-resize !important;
   user-select: none !important;
 }
+
+/* The clicked ("active") code: stays highlighted together with its passage until something else is clicked. */
+.brace.active {
+  opacity: 1;
+  border-width: 3px;
+}
+.code-line.active {
+  stroke-width: 2.4;
+  opacity: 1;
+}
+.code-label.active {
+  z-index: 3;
+  background: color-mix(in srgb, var(--code-color) 34%, var(--surface));
+  box-shadow: 0 0 0 1.5px var(--code-color);
+  font-weight: 700;
+}
+.seg-card.active {
+  background: color-mix(in srgb, var(--code-color) 14%, var(--surface));
+  box-shadow: 0 0 0 2px var(--code-color);
+}

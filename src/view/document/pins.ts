@@ -37,10 +37,29 @@ export function showPins(start: number, end: number, opts: PinOptions) {
 }
 
 export function hidePins() {
+  setActiveSegment(null);
   if (!state) return;
   state.layer.remove();
   state = null;
   setNamedHighlight('qc-edit', null, 0);
+}
+
+// The coded segment that was clicked ("active"): it has the pins, and its code is highlighted in
+// the column and the segment list until something else is clicked.
+let activeSegmentId: string | null = null;
+const activeListeners: ((id: string | null) => void)[] = [];
+
+export const activeSegment = () => activeSegmentId;
+
+/** Calls `fn` whenever a different segment becomes active (or none). */
+export function onActiveSegmentChange(fn: (id: string | null) => void) {
+  activeListeners.push(fn);
+}
+
+function setActiveSegment(id: string | null) {
+  if (id === activeSegmentId) return;
+  activeSegmentId = id;
+  activeListeners.forEach((fn) => fn(id));
 }
 
 export const pinsShown = () => !!state;
@@ -72,6 +91,7 @@ export function pinSegment(segmentId: string) {
       pinSegment(segmentId);
     },
   });
+  setActiveSegment(segmentId);
 }
 
 /** Positions the pins and the highlight for the current passage (e.g. after the layout changed). */
