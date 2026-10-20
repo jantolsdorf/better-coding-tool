@@ -86,7 +86,7 @@ export function openCodeDialog(codeId: string) {
                   'aria-label': 'Show in document',
                   disabled: gone,
                   onClick: () => {
-                    goToSegment(doc.id, s.start, s.end);
+                    goToSegment(doc.id, s.start, s.end, s.id);
                     // The text may be in the main window or in its own window. A page cannot bring
                     // back a minimized window, so say where the passage is shown.
                     const textDoc = textBody.ownerDocument;

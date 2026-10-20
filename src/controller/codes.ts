@@ -24,6 +24,7 @@ import { dropSegments } from '../model/coding';
 import { allConsolidated } from '../model/layers';
 import { commitUI, project, ui } from '../model/state';
 import type { Code, UIState } from '../model/types';
+import { pinSegment } from '../view/document/pins';
 import { focusSegment } from '../view/document/textView';
 import { confirmAction, ask, notify, toast } from '../view/feedback';
 
@@ -251,9 +252,16 @@ export function setCodeView(view: UIState['codeView']) {
 }
 
 /** Opens a document and scrolls to a coded passage in it. */
-export function goToSegment(docId: string, start: number, end: number) {
+/**
+ * Opens a document and scrolls to a passage. With the id of a segment of the active coding, that
+ * segment also becomes active (highlighted with its code, and pins to adjust it), as if clicked.
+ */
+export function goToSegment(docId: string, start: number, end: number, segmentId?: string) {
   ui.selectedDocId = docId;
   commitUI();
   // After rendering (which is synchronous); not tied to a frame of the main window, which may be in the background.
-  setTimeout(() => focusSegment(start, end), 0);
+  setTimeout(() => {
+    focusSegment(start, end);
+    if (segmentId) pinSegment(segmentId);
+  }, 0);
 }
