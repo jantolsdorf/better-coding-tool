@@ -108,6 +108,8 @@ export interface Project {
   consolidations: Record<string, Segment[]>;
   /** Your challenges of other coders' codes (see Challenge). */
   challenges: Challenge[];
+  /** The column id your coding had as one of the other coders, so its column keeps its place when you switch back. */
+  myColumnId?: string;
 }
 
 /** 'me', 'consolidated', or the id of an ExternalCoding. */

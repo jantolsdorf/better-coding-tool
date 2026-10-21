@@ -155,6 +155,24 @@ export function codeForPath(input: string | string[], colorForNew?: string): Cod
   return code!;
 }
 
+/**
+ * The code at a path in any codebook (e.g. another coder's), created if missing (with a position
+ * and the given color). Does not commit.
+ */
+export function codeInCodebook(codes: Code[], path: string[], color: string): Code {
+  let parentId: string | null = null;
+  let code: Code | undefined;
+  for (const name of path) {
+    code = findChildCode(parentId, name, codes);
+    if (!code) {
+      code = { id: uid('c'), name: name.trim(), color, parentId, order: nextOrder(parentId, codes), updatedAt: now() };
+      codes.push(code);
+    }
+    parentId = code.id;
+  }
+  return code!;
+}
+
 /** Creates a code; "Parent > Child" creates it as a subcode (see codeForPath). */
 export function createCode(name: string, color = nextColor()): Code {
   const code = codeForPath(name, color);

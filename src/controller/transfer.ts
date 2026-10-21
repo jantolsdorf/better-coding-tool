@@ -1,7 +1,7 @@
 // Importing and exporting: projects, REFI-QDA projects, other people's coding, codebooks, CSV.
 
 import { countExistingEntries, importCodebook, type CodebookEntry } from '../model/codebookEntries';
-import { addExternalCoding, hasExternalCoder, matchDocs } from '../model/coders';
+import { importCodings, matchDocs, type CodingData } from '../model/coders';
 import { currentDoc, docsInTreeOrder } from '../model/documents';
 import { codebookCSV, segmentsCSV, tableCSV } from '../model/formats/csv';
 import { csvCodebookEntries, parseCSV } from '../model/formats/csvCodebook';
@@ -19,9 +19,10 @@ import { commitUI, project, projectFingerprint, replaceProject, ui } from '../mo
 import { memoColumns, tableColumns } from '../model/table';
 import type { Doc, Project } from '../model/types';
 import { now, safeFileName } from '../model/util';
-import { ask, confirmAction, notify, toast } from '../view/feedback';
+import { confirmAction, notify, toast } from '../view/feedback';
 import { askCsvCodebookMapping } from '../view/csvCodebookDialog';
 import { downloadFile, pickFiles } from '../view/files';
+import { askCoderImport } from '../view/importCodersDialog';
 import { ImportController } from './importController';
 import { ImportView, type QdpxPurpose } from '../view/importView';
 
@@ -133,32 +134,16 @@ export async function importCoderInteractive() {
       importFailed(file, e);
       continue;
     }
-    const suggested = src.coderName || file.name.replace(/\.(json|zip)$/i, '');
-    const input = ask(`Whose coding is “${file.name}”?`, suggested);
-    if (input === null) continue;
-    const name = input.trim() || suggested;
-    if (hasExternalCoder(name) && !confirmAction(`A coding by “${name}” is already imported. Replace it?`)) continue;
-
-    const { missing } = matchDocs(src.docs);
-    const missingCoded = missing.filter((d) => src.segments.some((s) => s.docId === d.id));
-    let addTo: string | null = null;
-    if (missingCoded.length) {
-      const list = missingCoded.slice(0, 10).map((d) => `• ${d.name}`).join('\n');
-      const more = missingCoded.length > 10 ? `\n…and ${missingCoded.length - 10} more` : '';
-      if (
-        confirmAction(
-          `${missingCoded.length} document(s) coded by ${name} are not in your project (or their text differs):\n\n${list}${more}\n\n` +
-            `OK: add them to your project in a folder “From ${name}”.\nCancel: skip the coding of these documents.`,
-        )
-      ) {
-        addTo = `From ${name}`;
-      }
-    }
-    // Only documents that match, or missing coded ones the user agreed to add, are passed on.
-    const docs = src.docs.filter((d) => !missing.includes(d) || (addTo && missingCoded.includes(d)));
-    const res = addExternalCoding({ ...src, docs }, name, addTo);
-    const memos = res.memos ? ` and ${res.memos} memo(s)` : '';
-    toast(`Imported ${res.imported} segment(s)${memos} by ${name}${res.skipped ? `, skipped ${res.skipped}` : ''}.`);
+    // Everyone who coded in that project: its own coder, and the coders it contains.
+    const codings: CodingData[] = [
+      { coderName: src.coderName || file.name.replace(/\.(json|zip|qdpx)$/i, ''), codes: src.codes, segments: src.segments, memos: src.memos },
+      ...src.externalCodings,
+    ].filter((c, i) => i === 0 || c.segments.length || c.memos.length);
+    const choice = await askCoderImport(file.name, codings, matchDocs(src.docs).missing);
+    if (!choice) continue;
+    const results = importCodings(src.docs, choice.items, choice.addMissing ? `From ${file.name.replace(/\.[^.]+$/, '')}` : null);
+    const what = results.map((r) => `${r.name}: ${r.segments} segment(s) ${r.action === 'add' ? 'added' : r.action === 'merge' ? 'merged' : 'replaced'}${r.skipped ? `, ${r.skipped} skipped` : ''}`);
+    if (what.length) toast(`Imported from “${file.name}” — ${what.join('; ')}.`, 6000);
   }
 }
 

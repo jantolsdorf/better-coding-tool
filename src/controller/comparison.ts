@@ -1,7 +1,8 @@
 // User actions in the comparison view: other coders, consolidation, and the column layout.
 
 import { codePathParts } from '../model/codes';
-import { removeExternal, renameExternal } from '../model/coders';
+import { removeExternal } from '../model/coders';
+import { renameCoderInteractive as renameCoderByName } from './preferences';
 import {
   acceptIntoConsolidated,
   discardConsolidation,
@@ -15,18 +16,19 @@ import { comparedColumns, CONSOLIDATED_KEY, reorderedColumns } from '../model/ta
 import type { Code, ColumnKey, Doc, ExternalCoding, Segment, TableColumn } from '../model/types';
 import { occurrenceCSV } from '../model/formats/csv';
 import { now, safeFileName } from '../model/util';
-import { ask, confirmAction, toast } from '../view/feedback';
+import { confirmAction, toast } from '../view/feedback';
 import { downloadFile } from '../view/files';
 
 // ---------- other coders ----------
 
+/** Renames another coder (renaming to an existing name merges them, after asking). */
 export function renameCoderInteractive(x: ExternalCoding) {
-  const name = ask('Coder name:', x.coderName);
-  if (name?.trim()) renameExternal(x.id, name);
+  return renameCoderByName(x.coderName);
 }
 
 export function removeCoderInteractive(x: ExternalCoding) {
-  if (confirmAction(`Remove the imported coding of “${x.coderName}”?`)) removeExternal(x.id);
+  const n = x.segments.length;
+  if (confirmAction(`Remove the coding of “${x.coderName}”${n ? ` (${n} coded segment${n === 1 ? '' : 's'})` : ''}? You can undo this.`)) removeExternal(x.id);
 }
 
 /** Shows or hides a column next to the text (a coder's codes or memos, or the consolidated coding). */

@@ -2,7 +2,7 @@
 // folder per coder), the copies with identical text are combined into a new copy that holds
 // everyone's coding. Each segment and memo keeps its author, unless authors are merged into one.
 
-import { codeForPath, codePathParts, nextOrder } from './codes';
+import { codeForPath, codeInCodebook, codePathParts } from './codes';
 import { removeDocsData } from './documents';
 import { addOrMerge } from './segmentOps';
 import { commit, project } from './state';
@@ -59,21 +59,6 @@ export interface MergeOptions {
   folderId: string | null;
   newFolder?: string;
   removeOriginals: boolean;
-}
-
-/** The code at a path in a coder's codebook, created (with a position and color) if missing. */
-function codeIn(codes: Code[], path: string[], color: string): Code {
-  let parentId: string | null = null;
-  let code: Code | undefined;
-  for (const name of path) {
-    code = codes.find((c) => (c.parentId ?? null) === parentId && c.name.trim().toLowerCase() === name.trim().toLowerCase());
-    if (!code) {
-      code = { id: uid('c'), name: name.trim(), color, parentId, order: nextOrder(parentId, codes), updatedAt: now() };
-      codes.push(code);
-    }
-    parentId = code.id;
-  }
-  return code!;
 }
 
 interface Work {
@@ -135,7 +120,7 @@ export function mergeCopies(groups: CopyGroup[], opts: MergeOptions): Doc[] {
         const mine = target === opts.me;
         const coder = mine ? null : coderNamed(target);
         for (const { seg, path, color } of work.segs) {
-          const codeId = mine ? codeForPath(path, color).id : codeIn(coder!.codes, path, color).id;
+          const codeId = mine ? codeForPath(path, color).id : codeInCodebook(coder!.codes, path, color).id;
           addOrMerge(mine ? project.segments : coder!.segments, doc, seg.start, seg.end, codeId, undefined, target);
         }
         for (const m of work.memos) {

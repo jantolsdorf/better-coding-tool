@@ -11,7 +11,8 @@ import {
 } from '../controller/codes';
 import { addFilesFromPicker, addSampleDocument, createFolder } from '../controller/documents';
 import { redoChange, undoChange } from '../controller/history';
-import { cycleTheme, setCoderName } from '../controller/preferences';
+import { addCoderInteractive, cycleTheme, forgetCoderNow, renameCoderInteractive, switchCoderTo } from '../controller/preferences';
+import { projectCoders } from '../model/projectCoders';
 import {
   exportCodebook,
   exportProject,
@@ -30,6 +31,7 @@ import { clearCodeSelection, deleteSelectedCodes, setCodebookFilter } from './co
 import { openChallengeReview } from './challengeReview';
 import { toast } from './feedback';
 import { openOccurrenceView } from './occurrenceView';
+import { h } from './dom';
 import { openStartDialog } from './startDialog';
 import { clearDocSelection, deleteSelectedItems, toggleDocSelectMode } from './tree';
 import { closeViewMenu, initViewMenu, viewMenu } from './viewMenu';
@@ -40,7 +42,8 @@ const onClick = (id: string, fn: () => void) => $(id).addEventListener('click', 
 
 const THEME_LABELS: Record<UIState['theme'], string> = { auto: '◐ Auto', light: '☀ Light', dark: '☾ Dark' };
 
-let coderInput: HTMLInputElement;
+let coderBtn: HTMLButtonElement;
+let coderList: HTMLElement;
 let saveStatus: HTMLElement;
 let backupStatus: HTMLButtonElement;
 let undoBtn: HTMLButtonElement;
@@ -54,7 +57,8 @@ let filterOptions: HTMLElement;
 let viewMenuSlot: HTMLElement;
 
 export function initTopbar() {
-  coderInput = $<HTMLInputElement>('coder-name');
+  coderBtn = $<HTMLButtonElement>('btn-coder');
+  coderList = $('coder-list');
   saveStatus = $('save-status');
   backupStatus = $<HTMLButtonElement>('backup-status');
   backupStatus.addEventListener('click', exportProject);
@@ -136,10 +140,6 @@ export function initTopbar() {
   // Ticking options keeps the menu open.
   document.querySelector('.filter-menu')?.addEventListener('click', (e) => e.stopPropagation());
 
-  coderInput.addEventListener('change', () => {
-    // The coder always needs a name; clearing the field keeps the previous one.
-    if (!setCoderName(coderInput.value)) coderInput.value = project.coderName;
-  });
   themeBtn.addEventListener('click', cycleTheme);
   undoBtn.addEventListener('click', undoChange);
   redoBtn.addEventListener('click', redoChange);
@@ -185,7 +185,7 @@ export function renderTopbar() {
   // Highlighted while the filter works differently from the default.
   filterOptions.classList.toggle('on', ui.codeFilterSubcodes || !ui.codeFilterDescriptions);
   viewMenuSlot.replaceChildren(viewMenu());
-  if (document.activeElement !== coderInput) coderInput.value = project.coderName;
+  renderCoderMenu();
   undoBtn.disabled = !canUndo();
   redoBtn.disabled = !canRedo();
   const kb = savedBytes / 1024;
@@ -201,4 +201,34 @@ export function renderTopbar() {
   backupStatus.title = pending
     ? 'Your latest changes are only saved in this browser. Click to download a copy of the project (.zip).'
     : 'A downloaded copy contains all your changes.';
+}
+
+/** The coder menu: everyone coding in this project (switch with a click), a new coder, renaming. */
+function renderCoderMenu() {
+  coderBtn.replaceChildren(h('span', { class: 'muted' }, 'Coder '), h('strong', {}, project.coderName || 'Your name'), ' ▾');
+  const item = (label: Node | string, title: string, fn: () => void, extra = '') =>
+    h('button', { class: `coder-item${extra}`, title, onClick: fn }, label);
+  const coders = projectCoders();
+  coderList.replaceChildren(
+    h('div', { class: 'view-title' }, 'Coding as'),
+    ...coders.map((c) => {
+      const current = c.name === project.coderName;
+      const work = `${c.segments} code${c.segments === 1 ? '' : 's'}${c.memos ? ` · ${c.memos} memo${c.memos === 1 ? '' : 's'}` : ''}`;
+      return h(
+        'div',
+        { class: 'coder-row' + (current ? ' current' : '') },
+        item(
+          h('span', { class: 'coder-item-label' }, h('span', { class: 'coder-check' }, current ? '✓' : ''), h('span', { class: 'grow' }, c.name), h('span', { class: 'muted' }, work)),
+          current ? 'You are coding as this coder' : `Code as “${c.name}” from now on (earlier codes keep their author)`,
+          () => switchCoderTo(c.name),
+        ),
+        !current && !c.segments && !c.memos
+          ? h('button', { class: 'icon-btn', title: `Remove “${c.name}” from the list`, onClick: (e: MouseEvent) => (e.stopPropagation(), forgetCoderNow(c.name)) }, '✕')
+          : null,
+      );
+    }),
+    h('div', { class: 'menu-sep' }),
+    item('＋ New coder…', 'Add a coder and code as them from now on', addCoderInteractive),
+    item(`✎ Rename “${project.coderName || 'Your name'}”…`, 'Rename the current coder, also as author of their codes and memos', () => renameCoderInteractive()),
+  );
 }

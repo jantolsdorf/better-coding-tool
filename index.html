@@ -8,10 +8,10 @@
   <body>
     <header class="topbar">
       <div class="brand">Better Coding Tool</div>
-      <label class="coder-field">
-        Coder
-        <input id="coder-name" type="text" placeholder="Your name" />
-      </label>
+      <div class="menu coder-menu">
+        <button id="btn-coder" class="btn menu-toggle coder-btn" aria-haspopup="true" title="Who is coding: switch, add or rename coders"></button>
+        <div id="coder-list" class="menu-list left coder-list" hidden></div>
+      </div>
       <span id="save-status" class="muted small"></span>
       <button id="backup-status" class="backup-status" hidden></button>
       <span class="grow"></span>

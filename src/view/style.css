@@ -354,18 +354,42 @@ kbd {
 .menu-list button:hover {
   background: var(--accent-soft);
 }
-.coder-field {
+/* Who is coding: a menu to switch, add and rename coders. */
+.coder-btn {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.coder-list {
+  min-width: 260px;
+  padding: 6px;
+}
+.coder-row {
+  display: flex;
+  align-items: center;
+}
+.coder-list button.coder-item {
+  flex: 1;
+  width: 100%;
+}
+.coder-item-label {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--muted);
-  font-size: 13px;
+  width: 100%;
 }
-.coder-field input {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 8px;
-  width: 140px;
+.coder-check {
+  width: 14px;
+  color: var(--accent);
+  font-weight: 700;
+}
+.coder-row.current .coder-item {
+  font-weight: 600;
+}
+.menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
 }
 
 /* The three areas are placed and sized by layout.ts (order, flex-basis). */
@@ -2663,4 +2687,109 @@ body.pin-dragging * {
 .seg-card.active {
   background: color-mix(in srgb, var(--code-color) 14%, var(--surface));
   box-shadow: 0 0 0 2px var(--code-color);
+}
+
+/* ---------- start screen ---------- */
+
+.start-features {
+  margin: 4px 0 14px;
+  padding-left: 20px;
+  line-height: 1.5;
+  font-size: 13.5px;
+}
+.start-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: min(280px, 100%);
+  margin: 14px auto 6px;
+}
+.start-actions .btn {
+  padding: 8px 14px;
+  font-size: 14px;
+}
+.btn.ghost {
+  border-color: transparent;
+  background: none;
+  color: var(--accent);
+}
+.btn.ghost:hover {
+  background: var(--accent-soft);
+}
+.start-files {
+  text-align: center;
+}
+.faq-item {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+}
+.faq-item summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.faq-answer {
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.faq-answer p {
+  margin: 8px 0;
+}
+.faq-answer ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.faq-answer li {
+  margin-bottom: 4px;
+}
+.modal-foot[hidden] {
+  display: none;
+}
+
+/* A small dialog asking for one text (e.g. a coder's name). */
+dialog.modal.ask-text {
+  width: min(420px, 92vw);
+}
+
+/* Importing coders: one row per coder in the file. */
+dialog.modal.import-coders {
+  width: min(720px, 94vw);
+}
+.import-coder {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.2fr) minmax(0, 0.8fr) minmax(220px, 1.2fr);
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.import-coder.head {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.import-coder .field {
+  padding: 3px 7px;
+}
+.import-note {
+  display: block;
+  font-size: 11px;
+  margin-top: 2px;
+}
+.import-coders .check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.import-coders .check-row[hidden] {
+  display: none;
+}
+.import-summary {
+  font-size: 12px;
+  margin-top: 10px;
 }

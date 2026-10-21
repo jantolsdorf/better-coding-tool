@@ -16,13 +16,25 @@ npm run build      # produces a single self-contained dist/index.html
 
 ## Features
 
-- **Getting started**: on first use the tool asks whether to start a new project or open a
+- **Getting started**: on first use the start screen lists the main features and offers
+  *Open a project file…*, *Start a new project* and a short **FAQ** (data stays local and the tool
+  makes no network requests; how a browser tool works offline; the basic workflow; several
+  coders). It asks whether to start a new project or open a
   project file (this app's `.zip`/`.json`, or a REFI-QDA `.qdpx`). Your name is only asked for a
   new project, or when the opened file does not say who coded it. **New** in
   the top bar offers the same choice, says what would be replaced, and offers to download a copy
   first if the current project has changes that were not downloaded. It labels your coding in
   exports and in other people's comparison view; change it any time in the top bar. When you
   open a project coded under another name, you're asked who continues coding it.
+- **Who is coding** (**Coder ▾** in the top bar): every coder has their own, independent coding,
+  exactly like an imported coder. The current coder's coding is *yours* (editable); everyone else
+  is listed under **Other coders**, each with their own column. The menu lists all coders with
+  their numbers of codes and memos; click one (or **↪** in *Other coders*) to code as them — your
+  coding moves to *Other coders* and theirs becomes yours. **＋ New coder…** starts an empty
+  coding for someone new, **✎ Rename “…”…** renames the current coder (✎ in *Other coders* renames
+  the others); renaming to an existing name merges the two codings. All coders share the codebook
+  of the project. Projects from older versions that kept several coders in one coding are split
+  by author when opened.
 - **Layout**: arrange the three areas (documents & codebook, text, coded segments) in any
   order by dragging their ⋮⋮ grip onto another area, and change the width of the side areas
   by dragging their inner edge. Drag the handles between *Documents*, *Codebook* and *Other
@@ -184,6 +196,13 @@ npm run build      # produces a single self-contained dist/index.html
     columns `file, line, text` and then one column per coder, in the order of the comparison
     view. Each cell lists the codes on that line, separated by semicolons.
   - *Export segments to CSV*: one row per coded segment, for every coder.
+- **Importing coders with the same name**: importing a project (Compare ▾ → Add a coder) shows
+  every coder in the file — its own coder and the coders it contains — with their work. A new
+  name is added as a new coder; for a name that is already here (or is you) choose **Merge**
+  (codes matched by name and position, identical or overlapping codes combined, missing codes
+  created), **Replace** (their coding here is dropped first) or **Skip**; or change the name to
+  import them as someone else. Coded documents that are not in the project can be added to a
+  folder *From …*.
 - **Comparing coders**: choose **Import ▾ → Other coder's coding** in the top bar (or
   **Compare ▾ → ＋ Add a coder to compare…** in the top bar, or *Other coders → Import…*) and pick another
   person's exported project. Their coding appears as an extra column next to the text; each additional coder gets
@@ -269,7 +288,8 @@ notifies `renderApp`, which re-renders the views.
 | `controller/comparison.ts` | Other coders, consolidation, column order and widths |
 | `controller/challenges.ts` | Challenge mode, challenging and withdrawing, challenge export |
 | `controller/transfer.ts` | All imports and exports |
-| `controller/preferences.ts`, `history.ts` | Coder name, theme, layout; undo/redo |
+| `controller/preferences.ts`, `history.ts` | Who is coding (switch, add, rename), theme, layout; undo/redo |
+| `model/projectCoders.ts` | The people coding in this project and the authors of codes and memos |
 | **`src/view/`** | Rendering and DOM events |
 | `view/app.ts` | Sets up all views and re-renders them |
 | `view/document/` | The document area: text and highlights, coder and memo columns, code box, View menu |

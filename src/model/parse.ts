@@ -1,6 +1,7 @@
 // Creating and validating projects (e.g. from files or local storage).
 
 import { ensureCodeOrder } from './codeOrder';
+import { now, uid } from './util';
 import type { Challenge, Code, Doc, ExternalCoding, Folder, Memo, Project, Segment } from './types';
 
 export function emptyProject(coderName = ''): Project {
@@ -40,7 +41,7 @@ export function parseProject(data: unknown): Project {
   // Projects from before custom ordering get positions (alphabetical per level).
   ensureCodeOrder(codes);
   for (const x of externalCodings) ensureCodeOrder(x.codes);
-  return {
+  const result: Project = {
     format: 'bct-project',
     version: 1,
     coderName: typeof d.coderName === 'string' ? d.coderName : '',
@@ -51,10 +52,41 @@ export function parseProject(data: unknown): Project {
     memos: arr<Memo>(d.memos).filter(validMemo),
     externalCodings,
     consolidations: parseConsolidations(d, validSegment),
+    myColumnId: typeof d.myColumnId === 'string' ? d.myColumnId : undefined,
     challenges: arr<Challenge>(d.challenges).filter(
       (c) => validRange(c) && typeof c.coderName === 'string' && typeof c.comment === 'string' && Array.isArray(c.codePath),
     ),
   };
+  splitByAuthor(result);
+  return result;
+}
+
+/**
+ * Every coder has their own coding. Older projects could hold the work of several coders in
+ * one (told apart by author); everything not by the current coder becomes that coder's coding.
+ */
+function splitByAuthor(p: Project) {
+  const me = p.coderName;
+  if (!me) return;
+  const byAuthor = new Map<string, { segments: Segment[]; memos: Memo[] }>();
+  const of = (name: string) => {
+    if (!byAuthor.has(name)) byAuthor.set(name, { segments: [], memos: [] });
+    return byAuthor.get(name)!;
+  };
+  p.segments = p.segments.filter((s) => (s.author && s.author !== me ? (of(s.author).segments.push(s), false) : true));
+  p.memos = p.memos.filter((m) => (m.author && m.author !== me ? (of(m.author).memos.push(m), false) : true));
+  for (const [name, work] of byAuthor) {
+    let x = p.externalCodings.find((c) => c.coderName === name);
+    if (!x) {
+      x = { id: uid('x'), coderName: name, codes: [], segments: [], memos: [], importedAt: now() };
+      p.externalCodings.push(x);
+    }
+    // Their segments use codes of the shared codebook; copy the ones their codebook lacks.
+    const known = new Set(x.codes.map((c) => c.id));
+    x.codes.push(...p.codes.filter((c) => !known.has(c.id)).map((c) => ({ ...c })));
+    x.segments.push(...work.segments);
+    x.memos.push(...work.memos);
+  }
 }
 
 /** Per-document consolidations; older files had one project-wide list, which is split by document. */

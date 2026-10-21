@@ -112,3 +112,57 @@ export function choose<T>({ title, message, choices, cancelLabel = 'Cancel' }: C
 /** Explains that the browser did not open a new window. */
 export const popupBlocked = () =>
   toast('The browser blocked the new window. Allow pop-ups for this page (usually an icon in the address bar) and try again.', 7000);
+
+interface AskTextOptions {
+  title: string;
+  message?: string;
+  label?: string;
+  initial?: string;
+  placeholder?: string;
+  okLabel?: string;
+}
+
+/**
+ * Asks for a short text in a dialog of the app (instead of the browser's prompt). Resolves with the
+ * trimmed text, or undefined if cancelled. Enter confirms, Esc cancels; OK needs some text.
+ */
+export function askText({ title, message, label, initial = '', placeholder = '', okLabel = 'OK' }: AskTextOptions): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    let result: string | undefined;
+    const input = h('input', { type: 'text', class: 'field', value: initial, placeholder, spellcheck: 'false', autocomplete: 'off' });
+    const ok = h('button', { type: 'submit', class: 'btn primary' }, okLabel);
+    const cancel = h('button', { type: 'button', class: 'btn' }, 'Cancel');
+    const form = h(
+      'form',
+      { class: 'modal-inner', method: 'dialog' },
+      h('div', { class: 'modal-head' }, h('strong', {}, title)),
+      h(
+        'div',
+        { class: 'modal-body' },
+        message ? h('p', { class: 'muted' }, message) : null,
+        label ? h('label', { class: 'label' }, label) : null,
+        input,
+      ),
+      h('div', { class: 'modal-foot' }, h('span', { class: 'grow' }), cancel, ok),
+    );
+    const dlg = h('dialog', { class: 'modal ask-text' }, form);
+    const update = () => (ok.disabled = !input.value.trim());
+    input.addEventListener('input', update);
+    update();
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!input.value.trim()) return;
+      result = input.value.trim();
+      dlg.close();
+    });
+    cancel.addEventListener('click', () => dlg.close());
+    dlg.addEventListener('close', () => {
+      dlg.remove();
+      resolve(result);
+    });
+    currentDocument().body.append(dlg);
+    dlg.showModal();
+    input.focus();
+    input.select();
+  });
+}
