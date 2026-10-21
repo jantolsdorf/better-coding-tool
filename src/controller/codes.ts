@@ -28,12 +28,20 @@ import { pinSegment } from '../view/document/pins';
 import { focusSegment } from '../view/document/textView';
 import { confirmAction, ask, notify, toast } from '../view/feedback';
 
-export function addCodeFromPrompt() {
-  const name = ask('New code name (use “Parent > Child” to create a subcode):');
-  const parts = splitCodePath(name ?? '');
-  if (!parts.length) return;
-  if (findCodeByPath(parts)) return notify(`“${parts.join(' > ')}” already exists.`);
-  createCode(name!);
+/**
+ * Creates a code from the "New code" dialog ("Parent > Child" creates a subcode). Returns false
+ * (after saying why) if the name is empty or the code exists, so the dialog stays open.
+ */
+export function createCodeFromDialog(name: string, color: string, description: string): boolean {
+  const parts = splitCodePath(name);
+  if (!parts.length) return (notify('Enter a name for the code.'), false);
+  if (findCodeByPath(parts)) return (notify(`“${parts.join(' > ')}” already exists.`), false);
+  // Subcodes take their level 1 code's color, like when typing them in the code box.
+  const parent = parts.length > 1 ? findCodeByPath(parts.slice(0, 1)) : undefined;
+  const parentId = parent ? findCodeByPath(parts.slice(0, -1))?.id : undefined;
+  if (parentId) ui.collapsedCodes = ui.collapsedCodes.filter((x) => x !== parentId);
+  createCode(parts.join(' > '), parent?.color ?? color, description.trim() || undefined);
+  return true;
 }
 
 /**

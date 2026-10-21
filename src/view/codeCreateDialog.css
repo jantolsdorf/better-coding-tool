@@ -1,0 +1,141 @@
+/* The + Code dialog: a new code, or auto-coding (see codeCreateDialog.ts, autoCodeTab.ts). */
+
+dialog.modal.code-create {
+  width: min(680px, 94vw);
+}
+.code-create .modal-inner {
+  max-height: 88vh;
+}
+.cc-tabs {
+  display: flex;
+  gap: 4px;
+}
+.cc-tab {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.cc-tab.on {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.cc-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 16px 14px;
+}
+.cc-panel .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cc-hint {
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+.cc-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 12px;
+}
+
+/* Auto-code tab */
+.ac-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+.ac-row label,
+.ac-paragraph-options label,
+.ac-doc,
+.ac-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.ac-code-note {
+  display: block;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.ac-paragraph-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 0 22px;
+  font-size: 13px;
+}
+.ac-paragraph-options[hidden] {
+  display: none;
+}
+.ac-paragraph-options textarea {
+  margin-left: 22px;
+  width: calc(100% - 22px);
+}
+.ac-docs-label {
+  display: flex;
+  align-items: center;
+}
+.ac-all {
+  font-weight: 500;
+  color: var(--text);
+}
+.ac-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 150px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+.ac-preview {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  max-height: 220px;
+  overflow: auto;
+}
+.ac-preview p {
+  margin: 4px 0;
+}
+.ac-summary {
+  font-weight: 600;
+}
+.ac-example {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  border-top: 1px solid var(--border);
+}
+.ac-example-where {
+  flex: none;
+  width: 150px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-example-text {
+  min-width: 0;
+  white-space: pre-wrap;
+}
+.ac-more {
+  font-size: 12px;
+}

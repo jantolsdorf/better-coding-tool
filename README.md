@@ -72,6 +72,16 @@ npm run build      # produces a single self-contained dist/index.html
   **Merge…**. Dragging a selected row drags the whole selection. **Esc** ends selecting;
   **Delete** deletes the selection of the panel you used last. Each of these is one step for
   Undo.
+- **+ Code** (codebook) opens a dialog with two tabs. **New code**: a name (“parent code > subcode”
+  creates a subcode; existing codes are suggested), color and description. **Auto-code** (also
+  in the codebook's ⋯ menu): enter words or phrases (one per line; `*` stands for any letters
+  within a word, e.g. `password*`; *Whole words only* and *Match upper/lower case* are options),
+  the code to apply (existing or new), and whether to code **each occurrence** or **the paragraph
+  containing it** — a paragraph ends at every line break, at empty lines, or at custom separators
+  such as `Interviewer:` / `Participant:` (a new paragraph starts where one occurs). Choose the
+  documents (*All documents* at once). A live preview shows how many occurrences and passages
+  would be coded, with examples. Passages go into your coding (overlapping ones with the same
+  code are combined); one Undo reverts the whole auto-coding.
 - **Pins**: a highlighted passage has a pin at its start and end. While the code box is open,
   drag them to adjust the selection before coding. Click a code of your coding (its bracket or
   name, or its card in the segment list) to highlight it with pins; dragging a pin moves that
@@ -274,6 +284,7 @@ notifies `renderApp`, which re-renders the views.
 | `model/memos.ts` | Memos (notes on passages) |
 | `model/table.ts` | Which coder columns are shown, and their order |
 | `model/consolidation.ts` | Per-document consolidation |
+| `model/autoCode.ts` | Auto-coding: finding occurrences and paragraphs, preview, applying |
 | `model/mergeDocs.ts` | Merging copies of a document (identical text) with everyone's coding, by author |
 | `model/challenges.ts`, `model/occurrence.ts` | Challenges of other coders' codes; code occurrence per document and coder |
 | `model/codebookEntries.ts` | The codebook in portable form (codebook import/export) |
@@ -286,6 +297,7 @@ notifies `renderApp`, which re-renders the views.
 | `controller/coding.ts` | Reading what was typed in the code box (`memo:`, `code:`, `?`), coding passages |
 | `controller/memos.ts` | Adding, editing and deleting memos |
 | `controller/comparison.ts` | Other coders, consolidation, column order and widths |
+| `controller/autoCode.ts` | Checking auto-code choices, coding, messages |
 | `controller/challenges.ts` | Challenge mode, challenging and withdrawing, challenge export |
 | `controller/transfer.ts` | All imports and exports |
 | `controller/preferences.ts`, `history.ts` | Who is coding (switch, add, rename), theme, layout; undo/redo |
@@ -296,6 +308,7 @@ notifies `renderApp`, which re-renders the views.
 | `view/tree.ts`, `codebookList.ts`, `codeDialog.ts`, `segmentList.ts`, `coderList.ts` | The panels and the code details dialog |
 | `view/csvCodebookDialog.ts` | Choosing the code, description and color columns of a CSV codebook |
 | `view/document/pins.ts` | Pins at both ends of a highlighted passage to adjust a selection or a coded segment |
+| `view/codeCreateDialog.ts`, `autoCodeTab.ts`, `codeCreateDialog.css` | The + Code dialog: new code and auto-coding tabs |
 | `view/mergeDialog.ts` | Who coded which copy; keeping, renaming or merging authors |
 | `view/windows.ts` | Moving parts of the app into separate browser windows and back; tool windows; the window used last |
 | `view/challengeReview.ts`, `commentDialog.ts`, `occurrenceView.ts` | Reviewing and challenging another coder's codes; the comment dialog; the code occurrence table |

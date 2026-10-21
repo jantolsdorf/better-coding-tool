@@ -2,7 +2,6 @@
 // menus and keyboard shortcuts.
 
 import {
-  addCodeFromPrompt,
   deleteCodebookInteractive,
   setCodeFilterOption,
   setCodeSort,
@@ -31,6 +30,7 @@ import { clearCodeSelection, deleteSelectedCodes, setCodebookFilter } from './co
 import { openChallengeReview } from './challengeReview';
 import { toast } from './feedback';
 import { openOccurrenceView } from './occurrenceView';
+import { openCodeCreateDialog } from './codeCreateDialog';
 import { h } from './dom';
 import { openStartDialog } from './startDialog';
 import { clearDocSelection, deleteSelectedItems, toggleDocSelectMode } from './tree';
@@ -75,7 +75,8 @@ export function initTopbar() {
   onClick('btn-add-folder', () => createFolder());
   onClick('btn-empty-add', addFilesFromPicker);
   onClick('btn-sample', addSampleDocument);
-  onClick('btn-add-code', addCodeFromPrompt);
+  onClick('btn-add-code', () => openCodeCreateDialog('code'));
+  onClick('btn-auto-code', () => openCodeCreateDialog('auto'));
   onClick('btn-select-docs', toggleDocSelectMode);
   onClick('btn-toggle-codes', toggleAllCodesCollapsed);
 

@@ -174,8 +174,9 @@ export function codeInCodebook(codes: Code[], path: string[], color: string): Co
 }
 
 /** Creates a code; "Parent > Child" creates it as a subcode (see codeForPath). */
-export function createCode(name: string, color = nextColor()): Code {
+export function createCode(name: string, color = nextColor(), description?: string): Code {
   const code = codeForPath(name, color);
+  if (description) code.description = description;
   commit();
   return code;
 }
