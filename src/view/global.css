@@ -15,6 +15,7 @@
   --selected: #f1f2f5;
   --chip: #f0f1f4;
   --border: #e2e5ea;
+  --border-clear: #000;
   --border-strong: #c7cbd3;
   --text: #1f2430;
   --text-2: #374151;
@@ -63,6 +64,7 @@
     --selected: #232730;
     --chip: #2a2f38;
     --border: #2f343e;
+    --border-clear: #fff;
     --border-strong: #4a505c;
     --text: #e6e8ec;
     --text-2: #c9cdd4;
