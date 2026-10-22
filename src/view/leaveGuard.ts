@@ -5,6 +5,7 @@
 // and buttons cannot be changed. So when the user chooses to stay, this page then shows its own
 // dialog with a download button.
 
+import './leaveGuard.css';
 import { exportProject, hasChangesNotDownloaded } from '../controller/transfer';
 import { h } from './dom';
 

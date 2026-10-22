@@ -321,7 +321,8 @@ notifies `renderApp`, which re-renders the views.
 | `view/leaveGuard.ts` | Warning before closing the tab, with an offer to download a copy |
 | `view/layout.ts`, `splitters.ts` | Rearranging and resizing the main areas and sidebar panels |
 | `view/dom.ts`, `feedback.ts`, `files.ts` | DOM helpers; messages and questions; file picking and downloads |
-| `view/style.css` | Styles, including the light and dark themes |
+| `view/global.css` | Global styles: light and dark themes, base elements, buttons, menus, layout, dialogs |
+| `view/**/*.css` next to a view | That view's own styles (e.g. `document/document.css`, `codebookList.css`), imported by its module |
 
 Segments are stored as character offsets into the document text; line numbers are derived
 from them. Colored highlights use the CSS Custom Highlight API (current Chrome, Edge, Safari

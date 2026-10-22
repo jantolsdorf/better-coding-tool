@@ -1,0 +1,63 @@
+/* The top bar: brand, the coder menu, the backup status (topbar.ts). */
+
+.topbar {
+  height: 48px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.brand {
+  font-weight: 700;
+  margin-right: 12px;
+}
+/* Who is coding: a menu to switch, add and rename coders. */
+.coder-btn {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.coder-list {
+  min-width: 260px;
+  padding: 6px;
+}
+.coder-list button.coder-item {
+  flex: 1;
+  width: 100%;
+}
+.coder-item-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.coder-check {
+  width: 14px;
+  color: var(--accent);
+  font-weight: 700;
+}
+.coder-row.current .coder-item {
+  font-weight: 600;
+}
+/* Whether the latest changes are in a downloaded copy (top bar). */
+.backup-status {
+  border: none;
+  background: none;
+  font-size: 12px;
+  color: var(--ok);
+  padding: 2px 6px;
+  border-radius: 5px;
+  white-space: nowrap;
+  cursor: default;
+}
+.backup-status.pending {
+  color: var(--warn);
+  cursor: pointer;
+}
+.backup-status.pending:hover {
+  background: var(--hover);
+  text-decoration: underline;
+}

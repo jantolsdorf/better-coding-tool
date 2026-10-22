@@ -1,6 +1,7 @@
 // Importing the coders of another project: for each coder in the file, add them as a new coder,
 // or — when a coder with that name exists here (possibly you) — merge into or replace their coding.
 
+import './importCodersDialog.css';
 import { coderExists, type CoderImport, type CodingData, type ImportAction } from '../model/coders';
 import { project } from '../model/state';
 import type { Doc } from '../model/types';

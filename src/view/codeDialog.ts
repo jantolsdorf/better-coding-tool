@@ -1,5 +1,6 @@
 // Code details: rename, recolor, describe, nest, merge, delete, and retrieve all coded segments.
 
+import './codeDialog.css';
 import {
   colorSubcodesLike,
   deleteCodeInteractive,

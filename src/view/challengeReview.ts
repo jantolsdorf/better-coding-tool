@@ -1,6 +1,7 @@
 // Reviewing another coder's codes to challenge the ones you do not agree with: either all
 // passages of one code across all documents, or all codes of one document in text order.
 
+import './compareWindows.css';
 import { challengeInteractive, exportChallengesCSV, setChallengeMode, withdrawChallenge } from '../controller/challenges';
 import { goToSegment } from '../controller/codes';
 import { setColumnVisible } from '../controller/comparison';

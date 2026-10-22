@@ -4,6 +4,7 @@
 // The coder's name is only asked when starting a new project (an opened project already says who
 // coded it) — or when an opened file does not say.
 
+import './startDialog.css';
 import { setCoderName } from '../controller/preferences';
 import {
   exportProject,

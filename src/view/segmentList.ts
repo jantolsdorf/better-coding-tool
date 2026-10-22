@@ -1,5 +1,6 @@
 // The coded segments panel: the passages of the open document in the active coding.
 
+import './segmentList.css';
 import { removeSegment } from '../controller/coding';
 import { removeMemo } from '../controller/memos';
 import { codeById } from '../model/codes';

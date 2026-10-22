@@ -1,6 +1,7 @@
 // The top bar (coder name, undo/redo, view menu, import/export menus, theme) and the page-wide buttons,
 // menus and keyboard shortcuts.
 
+import './topbar.css';
 import {
   deleteCodebookInteractive,
   setCodeFilterOption,

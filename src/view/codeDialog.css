@@ -1,0 +1,85 @@
+/* The code details window: retrieved segments, merge, subcode color (codeDialog.ts). */
+
+/* Long code paths must not stretch the dialog footer. */
+select.merge-select {
+  flex: 0 1 240px;
+  min-width: 120px;
+  max-width: 240px;
+  text-overflow: ellipsis;
+}
+.retrieval {
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.retrieval-doc {
+  margin: 8px 0;
+}
+.retrieval-title {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.retrieval-seg {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  border-left: 3px solid;
+  margin: 0 0 5px 0;
+}
+.retrieval-seg .seg-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+}
+.retrieval-seg .seg-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; /* lines shown when collapsed */
+  overflow: hidden;
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+.retrieval-seg.expanded .seg-text {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+.retrieval-seg .seg-jump {
+  flex: none;
+  background: none;
+  border: none;
+  padding: 6px;
+  color: inherit;
+  opacity: 0.5;
+  cursor: pointer;
+}
+.retrieval-seg .seg-jump:hover,
+.retrieval-seg .seg-jump:focus-visible {
+  opacity: 1;
+}
+.btn.subcode-color {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* A segment removed in the code dialog (deleted only when the dialog is saved). */
+.retrieval-seg.removed .seg-body {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.retrieval-seg .seg-jump:disabled {
+  opacity: 0.2;
+  cursor: default;
+}

@@ -1,0 +1,40 @@
+/* The document list: folders and documents (tree.ts). */
+
+.tree-row.selected {
+  background: var(--selected);
+  box-shadow: inset 2px 0 0 var(--border-strong);
+}
+.tree-row.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.tree-row.drop {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  background: var(--accent-soft);
+}
+.tree-icon {
+  flex: none;
+  font-size: 13px;
+}
+.tree-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-actions {
+  display: none;
+  flex: none;
+}
+.tree-row:hover .tree-actions {
+  display: flex;
+}
+.tree-row:hover .badge {
+  display: none;
+}
+#tree.drop {
+  background: var(--accent-soft);
+}

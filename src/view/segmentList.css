@@ -1,0 +1,89 @@
+/* The list of coded segments and memos beside the text (segmentList.ts). */
+
+#segments-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 10px 12px;
+}
+.seg-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid;
+  border-radius: 6px;
+  padding: 6px 8px 7px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.seg-card:hover {
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.1);
+}
+.seg-card.flash {
+  animation: flash 1.4s ease-out;
+}
+.seg-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.seg-code {
+  border: none;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seg-lines {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.seg-text {
+  margin-top: 5px;
+  width: 100%;
+  line-height: 1.45;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Memos in the side list. */
+.seg-card.memo-card {
+  background: var(--memo-bg);
+  border-color: var(--memo-border);
+  border-left-color: var(--memo-line);
+  color: var(--memo-text);
+}
+.memo-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.memo-note {
+  margin-top: 4px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.seg-card.memo-card .memo-passage {
+  color: inherit;
+  opacity: 0.7;
+  font-style: italic;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.seg-card.active {
+  background: color-mix(in srgb, var(--code-color) 14%, var(--surface));
+  box-shadow: 0 0 0 2px var(--code-color);
+}

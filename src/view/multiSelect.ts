@@ -2,6 +2,7 @@
 // them together. Cmd/Ctrl-click toggles a row, Shift-click selects a range; in select mode
 // (the panel's "Select" button) a plain click toggles too. The selection is view state only.
 
+import './multiSelect.css';
 import { h } from './dom';
 
 export class Selection {

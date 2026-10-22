@@ -1,0 +1,58 @@
+/* The start screen: features, actions and FAQ (startDialog.ts). */
+
+.start-choice {
+  margin-top: 16px;
+}
+.start-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--danger-soft);
+  color: var(--warn);
+  font-size: 13px;
+}
+.start-features {
+  margin: 4px 0 14px;
+  padding-left: 20px;
+  line-height: 1.5;
+  font-size: 13.5px;
+}
+.start-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: min(280px, 100%);
+  margin: 14px auto 6px;
+}
+.start-actions .btn {
+  padding: 8px 14px;
+  font-size: 14px;
+}
+.start-files {
+  text-align: center;
+}
+.faq-item {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+}
+.faq-item summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.faq-answer {
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.faq-answer p {
+  margin: 8px 0;
+}
+.faq-answer ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.faq-answer li {
+  margin-bottom: 4px;
+}

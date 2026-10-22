@@ -4,7 +4,8 @@
 //   controller/  handles user actions: asks and confirms, updates the model, gives feedback
 // Every committed change to the model notifies subscribers, which re-render the whole view.
 
-import './view/style.css';
+// Global styles first, so the styles of the views (imported by their modules) come after them.
+import './view/global.css';
 import { commit, onSaveError, project, subscribe } from './model/state';
 import { initApp, renderApp } from './view/app';
 import { notify } from './view/feedback';

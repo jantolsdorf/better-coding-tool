@@ -162,7 +162,7 @@ export function applyHighlights(doc: Doc | null) {
     css += `::highlight(${name}){background-color:${hexToRgba(code.color, 0.3)};}\n`;
   });
   dynStyle.textContent = css;
-  // Passages with a memo in a visible memo column are underlined (styled in style.css), so they
+  // Passages with a memo in a visible memo column are underlined (styled in document.css), so they
   // don't clash with code colors.
   const memoRanges = (ui.showMemos ? memoColumns([doc.id]) : [])
     .flatMap((c) => c.memos)

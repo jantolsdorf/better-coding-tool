@@ -1,6 +1,7 @@
 // Choosing how a CSV file maps to a codebook: which columns hold codes (parent › child ›
 // sub-child, left to right), which describe the codes of a level, and which holds the color.
 
+import './csvCodebookDialog.css';
 import {
   csvCodebookEntries,
   descriptionTarget,

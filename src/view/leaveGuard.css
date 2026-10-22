@@ -1,0 +1,5 @@
+/* The dialog offering a download before leaving with changes not downloaded (leaveGuard.ts). */
+
+dialog.backup {
+  width: min(480px, 92vw);
+}

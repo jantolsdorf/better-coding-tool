@@ -2,6 +2,7 @@
 // character by character. Used for a new selection (while the code box is open) and for a coded
 // segment of the active coding (dragging changes the segment).
 
+import './pins.css';
 import { resizeSegmentTo } from '../../controller/coding';
 import { codeById } from '../../model/codes';
 import { layerSegments } from '../../model/layers';

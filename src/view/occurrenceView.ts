@@ -1,6 +1,7 @@
 // Code occurrence across coders: for each document, which codes each coder used at all (with
 // how often), regardless of where in the text. Codes that not every coder used stand out.
 
+import './compareWindows.css';
 import { exportOccurrenceCSV } from '../controller/comparison';
 import { docsInTreeOrder, folderPath, getDoc } from '../model/documents';
 import { codeOccurrence, occurrenceAgreement, type OccurrenceRow } from '../model/occurrence';

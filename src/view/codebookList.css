@@ -1,0 +1,256 @@
+/* The codebook panel: code rows, dragging and drop targets, filter, hover actions (codebookList.ts). */
+
+.code-row.context .code-name {
+  color: var(--muted);
+}
+.code-row {
+  position: relative;
+  padding: 1px 1px;
+  border-radius: 5px;
+}
+.code-row:hover {
+  background: var(--hover);
+}
+.code-main {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.code-row.dragging {
+  opacity: 0.4;
+  transform: scale(0.94);
+  transform-origin: left center;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+/* What follows the cursor while dragging a code. */
+.code-drag-ghost {
+  position: fixed;
+  top: -100px;
+  left: -100px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  padding: 3px 9px 3px 6px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--accent-border);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.code-drag-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.code-row.drag-over {
+  background: var(--accent-soft);
+  outline: 1px solid var(--accent-border);
+}
+/* Two drop targets appear below a code while another code is dragged over it; the code's name
+   stays visible above them. */
+.drop-opts {
+  display: none;
+  gap: 6px;
+  padding: 5px 0 3px 17px;
+}
+.code-row.drag-over .drop-opts {
+  display: flex;
+}
+.drop-opt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  border: 1px dashed var(--accent-border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--accent);
+}
+.drop-opt.merge {
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+.drop-opt.over {
+  background: var(--accent);
+  border-style: solid;
+  color: #fff;
+}
+.drop-opt.merge.over {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+.drop-opt.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+/* Shown above the dragged code's level 1 code while a subcode is dragged. */
+.code-top-drop {
+  display: none;
+  margin: 4px 4px 4px;
+  padding: 6px;
+  border: 1px dashed var(--border);
+  border-radius: 5px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.dragging-code .code-top-drop {
+  display: block;
+}
+.code-top-drop.over {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.code-parent {
+  color: var(--muted);
+  font-size: 12px;
+}
+.code-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 3px 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.code-name:hover {
+  text-decoration: underline;
+}
+/* The codebook filter field and its options menu. */
+.filter-row {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.filter-row input {
+  flex: 1;
+}
+.filter-menu {
+  left: auto;
+  right: 0;
+  min-width: 220px;
+  padding: 6px;
+}
+#btn-filter-options.on {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 4px;
+}
+.filter-menu input[type='checkbox'] {
+  flex: none;
+  padding: 0;
+  border: none;
+}
+/* Custom code order: a line shows where a dragged code will be placed. */
+.code-row.insert-before > .code-main {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.code-row.insert-after > .code-main {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.code-main:hover .row-check.hover-check,
+.row-check.hover-check.shown {
+  visibility: visible;
+}
+.code-actions {
+  display: none;
+  flex: none;
+  gap: 1px;
+}
+.code-main:hover .code-actions {
+  display: inline-flex;
+}
+.code-row.dragging .code-actions {
+  display: none;
+}
+.icon-btn.code-action {
+  padding: 0 3px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.icon-btn.code-action:hover {
+  color: var(--text);
+}
+.swatch-slot {
+  --check-size: 16px;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--check-size);
+  height: var(--check-size);
+  flex: none;
+}
+.swatch-slot .swatch-input {
+  width: var(--check-size);
+  height: var(--check-size);
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+}
+.swatch-slot .swatch-input::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch-slot .swatch-input::-webkit-color-swatch { border: none; border-radius: 3px; }
+.swatch-slot .swatch-input::-moz-color-swatch { border: none; border-radius: 3px; }
+.swatch-slot .row-check {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  width: var(--check-size);
+  height: var(--check-size);
+  border-radius: 3px;
+  background: var(--code-color);
+  /* inner ring marks it as a checkbox while keeping the color */
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--code-color), white 55%);
+  cursor: pointer;
+  opacity: 0;
+}
+.swatch-slot .row-check:focus-visible {
+  outline: 2px solid var(--code-color);
+  outline-offset: 1px;
+}
+/* Show the checkbox when hovering the swatch, while selecting, or when selected */
+.swatch-slot:hover .row-check,
+.swatch-slot .row-check.shown,
+.swatch-slot .row-check:checked,
+.code-row.multi-selected .swatch-slot .row-check {
+  opacity: 1;
+}
+/* Checked: solid color, no ring */
+.swatch-slot .row-check:checked,
+.code-row.multi-selected .swatch-slot .row-check {
+  box-shadow: none;
+}
+.swatch-slot .row-check-mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  line-height: 1;
+  color: white;
+  pointer-events: none;
+  opacity: 0;
+  margin: auto;
+}
+.swatch-slot .row-check:checked + .row-check-mark,
+.code-row.multi-selected .swatch-slot .row-check-mark {
+  opacity: 1;
+}

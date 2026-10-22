@@ -2,6 +2,7 @@
 // coded each, and lets you keep, rename or merge authors, choose whose coding becomes yours,
 // and where the merged copies go.
 
+import './mergeDialog.css';
 import { folderChain, folderPath } from '../model/documents';
 import { authorsOf, type CopyGroup, type MergeOptions } from '../model/mergeDocs';
 import { project } from '../model/state';

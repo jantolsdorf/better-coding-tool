@@ -1,0 +1,44 @@
+/* Importing coders: one row per coder in the file (importCodersDialog.ts). */
+
+/* Importing coders: one row per coder in the file. */
+dialog.modal.import-coders {
+  width: min(720px, 94vw);
+}
+.import-coder {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.2fr) minmax(0, 0.8fr) minmax(220px, 1.2fr);
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.import-coder.head {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.import-coder .field {
+  padding: 3px 7px;
+}
+.import-note {
+  display: block;
+  font-size: 11px;
+  margin-top: 2px;
+}
+.import-coders .check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.import-coders .check-row[hidden] {
+  display: none;
+}
+.import-summary {
+  font-size: 12px;
+  margin-top: 10px;
+}

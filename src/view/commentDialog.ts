@@ -1,5 +1,6 @@
 // A small dialog for writing a comment about a passage, e.g. why you challenge a code.
 
+import './commentDialog.css';
 import { currentDocument } from './windows';
 import { h } from './dom';
 

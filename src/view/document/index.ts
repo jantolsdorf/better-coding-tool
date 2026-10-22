@@ -1,5 +1,6 @@
 // The document area: header, text with highlights, coder columns, and the code box.
 
+import './document.css';
 import { acceptMatchingSegments, setTextColored, setTextWidth, startConsolidationOf } from '../../controller/comparison';
 import { setChallengeMode } from '../../controller/challenges';
 import { compareCodings, isConsolidated, matchingItems } from '../../model/consolidation';

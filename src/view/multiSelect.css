@@ -1,0 +1,48 @@
+/* Selecting several documents or codes: the selection bar and checkboxes (multiSelect.ts). */
+
+.select-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  margin-bottom: 2px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--accent-border);
+  font-size: 12px;
+}
+.select-count {
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.select-action {
+  max-width: 84px;
+  font-size: 12px;
+  padding: 1px 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+.select-bar .icon-btn.danger:hover {
+  color: var(--danger);
+}
+.row-check {
+  flex: none;
+  margin: 0 0 0 0;
+  pointer-events: none;
+}
+.tree-row.multi-selected,
+.code-row.multi-selected > .code-main {
+  background: var(--accent-soft);
+}
+/* Codebook rows: checkbox, ＋ (new subcode) and 🗑 appear while hovering a code. */
+.row-check.hover-check {
+  pointer-events: auto;
+  cursor: pointer;
+  visibility: hidden;
+}

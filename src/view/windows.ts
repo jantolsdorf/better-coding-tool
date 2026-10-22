@@ -7,6 +7,7 @@
 // the clipboard) uses the window used last (`currentDocument()` / `currentWindow()`), and
 // document-wide listeners are added to every window through `onEveryDocument()`.
 
+import './windows.css';
 import { h } from './dom';
 import { popupBlocked } from './feedback';
 

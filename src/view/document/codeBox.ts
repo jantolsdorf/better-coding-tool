@@ -2,6 +2,7 @@
 // suggested); "memo: …" adds a memo instead, and "code: …" forces a code. Everything works from
 // the keyboard, so coding a passage takes no clicks beyond the selection.
 
+import './codeBox.css';
 import { codePassage, inVivoName, parseEntry, setCodeBoxHelp, setCodeBoxSubcodes, setCodeTarget, type Entry } from '../../controller/coding';
 import { addMemoToPassage } from '../../controller/memos';
 import {

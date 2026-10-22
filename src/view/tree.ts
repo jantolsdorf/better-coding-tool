@@ -1,6 +1,7 @@
 // The document list: folders and documents, with drag and drop to move them or add files, and
 // multiple selection to move or delete several at once.
 
+import './tree.css';
 import {
   addTextFiles,
   anyFolderExpanded,

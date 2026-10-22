@@ -1,0 +1,255 @@
+/* The code box that opens when text is selected: input, suggestions, help (codeBox.ts). */
+
+.code-popup {
+  position: absolute;
+  z-index: 20;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  padding: 8px;
+}
+.popup-meta,
+.popup-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+.popup-meta {
+  margin: 0 2px 6px;
+}
+.popup-hint {
+  margin: 6px 2px 0;
+}
+.popup-target {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  margin: 0 2px 6px;
+}
+.popup-target:empty {
+  display: none;
+}
+.popup-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.popup-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+.popup-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.popup-color {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.popup-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: min(300px, 40vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.popup-list li .grow {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.popup-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.popup-list li:hover,
+.popup-list li.active {
+  background: var(--accent-soft);
+}
+.popup-list li.create {
+  color: var(--accent);
+}
+.popup-list li.empty {
+  cursor: default;
+  color: var(--muted);
+  background: none;
+  font-size: 13px;
+}
+.popup-applied {
+  font-size: 12px;
+  margin: 6px 2px 0;
+}
+.popup-applied:empty {
+  display: none;
+}
+/* Code / Memo badge in the code box. */
+.entry-kind {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 7px;
+  border-radius: 9px;
+  margin-right: 6px;
+}
+.entry-kind.code {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.entry-kind.memo {
+  background: var(--memo-bg);
+  color: var(--memo-text);
+  box-shadow: inset 0 0 0 1px var(--memo-border);
+}
+.popup-meta {
+  display: flex;
+  align-items: center;
+}
+.help-toggle {
+  font-weight: 700;
+  font-size: 12px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.code-popup.memo-mode .popup-input {
+  background: var(--memo-bg);
+  color: var(--memo-text);
+  border-color: var(--memo-border);
+}
+.code-popup.memo-mode .popup-color {
+  visibility: hidden;
+}
+.popup-list li.create.memo {
+  color: var(--memo-text);
+  background: var(--memo-bg);
+}
+.memo-swatch {
+  background: var(--memo-border);
+}
+.popup-help {
+  margin: 8px 2px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--head);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.popup-help[hidden] {
+  display: none;
+}
+.popup-help {
+  position: relative;
+}
+.help-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+.popup-list li kbd {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.help-title {
+  font-weight: 700;
+  color: var(--muted);
+  margin: 4px 0 2px;
+}
+.help-title:first-child {
+  margin-top: 0;
+}
+.help-row {
+  display: grid;
+  grid-template-columns: 158px 1fr;
+  gap: 8px;
+}
+.help-row code {
+  font-size: 11.5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+  align-self: start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Code box suggestions: parent path as a breadcrumb above the name; long names wrap. */
+.popup-list li {
+  align-items: flex-start;
+}
+.popup-list li > .swatch {
+  margin-top: 3px;
+  flex: none;
+}
+.sugg-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.sugg-path {
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sugg-part {
+  font-weight: 600;
+}
+.sugg-sep {
+  color: var(--faint);
+}
+.sugg-name {
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sugg-count {
+  flex: none;
+  margin-top: 1px;
+}
+.popup-list li.create .sugg-path {
+  color: var(--accent);
+  opacity: 0.8;
+}
+/* Copy button in the code box. */
+.copy-toggle {
+  font-size: 13px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  line-height: 1;
+  color: var(--muted);
+}
+.copy-toggle:hover {
+  color: var(--text);
+}
+.copy-toggle.done {
+  color: var(--ok);
+  font-weight: 700;
+}
+/* "+ Subcodes" switch in the code box. */
+.seg-toggle.subcodes-toggle {
+  font-size: 11px;
+  padding: 0 7px;
+  line-height: 18px;
+}

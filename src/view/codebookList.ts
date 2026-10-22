@@ -2,6 +2,7 @@
 // sorting, dragging a code onto another to nest or merge it, and multiple selection to move,
 // merge, recolor or delete several codes at once.
 
+import './codebookList.css';
 import {
   addSubcodeInteractive,
   anyCodeExpanded,
@@ -35,7 +36,7 @@ import { openCodeDialog } from './codeDialog';
 import { h } from './dom';
 import { byId } from './windows';
 import { actionSelect, Selection, TOP_LEVEL } from './multiSelect';
-import '@fortawesome/fontawesome-free/css/all.min.css';
+import '@fortawesome/fontawesome-free/css/solid.min.css';
 
 // The dragged codes' ids (several when dragging a selection); dataTransfer contents cannot be
 // read during dragover.
