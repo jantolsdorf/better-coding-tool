@@ -8,31 +8,10 @@ import { docsInTreeOrder, folderChain, normalizeText } from '../documents';
 import { emptyProject } from '../parse';
 import { project } from '../state';
 import type { Code, Doc, ExternalCoding, Folder, Project, Segment } from '../types';
-import { PALETTE, uid } from '../util';
+import { uid } from '../util';
+import { attr, byLocal, children, codeXml, parseCodes, uuid, type ExportCode } from './refiCodebook';
 
 const NS = 'urn:QDA-XML:project:1.0';
-
-function uuid(): string {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  const b = crypto.getRandomValues(new Uint8Array(16));
-  b[6] = (b[6] & 0x0f) | 0x40;
-  b[8] = (b[8] & 0x3f) | 0x80;
-  const x = [...b].map((n) => n.toString(16).padStart(2, '0')).join('');
-  return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}`;
-}
-
-/** Text safe for XML: escaped, and without the control characters XML 1.0 forbids. */
-function xml(s: string): string {
-  return s
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f￾￿]/g, '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-const attr = (name: string, value: string | number | undefined | null) =>
-  value === undefined || value === null || value === '' ? '' : ` ${name}="${xml(String(value))}"`;
 
 /** Code point index for every UTF-16 index of `text` (length + 1 entries). */
 function codePointIndex(text: string): Uint32Array {
@@ -50,14 +29,6 @@ function codePointIndex(text: string): Uint32Array {
 }
 
 // ---------- export ----------
-
-interface ExportCode {
-  guid: string;
-  name: string;
-  color: string;
-  description?: string;
-  children: ExportCode[];
-}
 
 /**
  * The project as a .qdpx file. Your coding and the coding of every other coder become the
@@ -91,14 +62,6 @@ export function buildQdpx() {
   // In the custom order, so other programs show the codes in the same order.
   for (const u of users) for (const c of codesInTreeOrder(null, 0, u.codes)) codeGuid.set(c, nodeFor(codePathParts(c, u.codes), c).guid);
 
-  const codeXml = (c: ExportCode, indent: string): string =>
-    `${indent}<Code${attr('guid', c.guid)}${attr('name', c.name)} isCodable="true"${attr('color', c.color)}` +
-    (c.description || c.children.length
-      ? `>\n` +
-      (c.description ? `${indent}  <Description>${xml(c.description)}</Description>\n` : '') +
-      c.children.map((k) => codeXml(k, indent + '  ')).join('') +
-      `${indent}</Code>\n`
-      : '/>\n');
 
   const files: Record<string, Uint8Array> = {};
   const docGuid = new Map<string, string>();
@@ -180,10 +143,6 @@ export function isQdpx(entries: string[]): boolean {
   return entries.some((n) => /\.qde$/i.test(n));
 }
 
-const byLocal = (el: Element | Document, name: string) =>
-  [...el.getElementsByTagNameNS('*', name)] as Element[];
-const children = (el: Element, name: string) => [...el.children].filter((c) => c.localName === name);
-
 /**
  * Reads a .qdpx file. Call `qdpxToProject` afterwards to decide whose coding becomes "yours";
  * `users` tells you whether there is a choice to make.
@@ -209,27 +168,10 @@ export function parseQdpx(bytes: Uint8Array): ParsedQdpx {
 
   const userNames = new Map(byLocal(root, 'User').map((u) => [u.getAttribute('guid') ?? '', u.getAttribute('name') || 'Unnamed coder']));
 
-  // Codebook: nested Code elements. Names are made unique among siblings, and ">" is replaced
-  // because it separates a code from its subcodes here.
-  const codes: Code[] = [];
-  const codeByGuid = new Map<string, Code>();
-  const walkCodes = (els: Element[], parentId: string | null) => {
-    const used = new Set<string>();
-    for (const [order, el] of els.entries()) {
-      let name = (el.getAttribute('name') || 'Unnamed code').replace(/[>›]/g, '/').trim();
-      for (let n = 2; used.has(name.toLowerCase()); n++) name = `${name.replace(/ \(\d+\)$/, '')} (${n})`;
-      used.add(name.toLowerCase());
-      const color = expandColor(el.getAttribute('color')) ?? PALETTE[codes.length % PALETTE.length];
-      const description = children(el, 'Description')[0]?.textContent?.trim() || undefined;
-      const code: Code = { id: uid('c'), name, color, description, parentId, order, updatedAt: new Date().toISOString() };
-      codes.push(code);
-      codeByGuid.set(el.getAttribute('guid') ?? '', code);
-      walkCodes(children(el, 'Code'), code.id);
-    }
-  };
+  // Codebook: nested Code elements (see refiCodebook.ts).
   const codebook = byLocal(root, 'CodeBook')[0];
   const codesEl = codebook && children(codebook, 'Codes')[0];
-  if (codesEl) walkCodes(children(codesEl, 'Code'), null);
+  const { codes, byGuid: codeByGuid } = codesEl ? parseCodes(codesEl) : { codes: [] as Code[], byGuid: new Map<string, Code>() };
 
   // Text sources and their coded selections, collected per user.
   const docs: Doc[] = [];
@@ -323,13 +265,6 @@ export function qdpxToProject(parsed: ParsedQdpx, mine: string | null): Project 
     .filter((u) => u.guid !== mine)
     .map((u): ExternalCoding => ({ id: uid('x'), coderName: u.name, codes: codes.map((c) => ({ ...c })), segments: segmentsByUser.get(u.guid)!, memos: [], importedAt: new Date().toISOString() }));
   return p;
-}
-
-function expandColor(c: string | null): string | null {
-  const m = c?.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (!m) return null;
-  const hex = m[1].length === 3 ? [...m[1]].map((x) => x + x).join('') : m[1];
-  return `#${hex.toLowerCase()}`;
 }
 
 /**

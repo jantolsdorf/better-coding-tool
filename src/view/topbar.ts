@@ -121,6 +121,8 @@ export function initTopbar() {
   onClick('btn-export-segments', exportSegmentsCSV);
   onClick('btn-export-codebook', () => exportCodebook('json'));
   onClick('btn-export-codebook-csv', () => exportCodebook('csv'));
+  onClick('btn-export-codebook-qdc', () => exportCodebook('qdc'));
+  onClick('btn-import-codebook-qdc-top', importCodebookInteractive);
   onClick('btn-new-project', () => openStartDialog({ firstUse: false }));
 
   // Codebook filter, sort and display

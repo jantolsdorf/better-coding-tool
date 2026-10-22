@@ -156,7 +156,11 @@ npm run build      # produces a single self-contained dist/index.html
     it to another level). The custom order is saved in the project (each code's `order` among
     its siblings) and used by all exports (project, codebook JSON/CSV, REFI-QDA); projects and
     imports without it get an alphabetical order per level, and new codes go last.
-  - **⋯ menu**: export the codebook only (JSON, re-importable, or CSV), or import a codebook.
+  - **⋯ menu**: export the codebook only (JSON, re-importable; CSV; or **REFI-QDA Codebook
+    (.qdc)**, the open exchange format MAXQDA, NVivo, ATLAS.ti, QualCoder and others read and
+    write), or import a codebook (also *Import ▾ → REFI-QDA codebook (.qdc)*). A .qdc keeps the
+    hierarchy, colors, descriptions and the custom order; on import, subcodes without a color
+    take their parent's, and “>” in a name becomes “/”.
     Importing accepts a codebook file or any exported project and only adds codes (matched by
     path, i.e. name and position); you can choose whether existing codes take the imported color
     and description. Consolidation matches other coders' codes by path in the same way.
@@ -285,6 +289,7 @@ notifies `renderApp`, which re-renders the views.
 | `model/table.ts` | Which coder columns are shown, and their order |
 | `model/consolidation.ts` | Per-document consolidation |
 | `model/autoCode.ts` | Auto-coding: finding occurrences and paragraphs, preview, applying |
+| `model/formats/refiCodebook.ts` | REFI-QDA Codebook (.qdc) export and import; code elements shared with the .qdpx project format |
 | `model/mergeDocs.ts` | Merging copies of a document (identical text) with everyone's coding, by author |
 | `model/challenges.ts`, `model/occurrence.ts` | Challenges of other coders' codes; code occurrence per document and coder |
 | `model/codebookEntries.ts` | The codebook in portable form (codebook import/export) |

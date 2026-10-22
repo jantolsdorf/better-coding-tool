@@ -6,6 +6,7 @@ import { currentDoc, docsInTreeOrder } from '../model/documents';
 import { codebookCSV, segmentsCSV, tableCSV } from '../model/formats/csv';
 import { csvCodebookEntries, parseCSV } from '../model/formats/csvCodebook';
 import {
+  CODEBOOK_FILE_TYPES,
   PROJECT_FILE_TYPES,
   buildCodebookJson,
   buildProjectZip,
@@ -14,6 +15,7 @@ import {
   readJson,
 } from '../model/formats/projectFile';
 import { buildQdpx } from '../model/formats/refi';
+import { buildQdc } from '../model/formats/refiCodebook';
 import { emptyProject, parseProject } from '../model/parse';
 import { commitUI, project, projectFingerprint, replaceProject, ui } from '../model/state';
 import { memoColumns, tableColumns } from '../model/table';
@@ -150,8 +152,10 @@ export async function importCoderInteractive() {
 // ---------- codebook ----------
 
 /** Just the code system (names, colors, descriptions, hierarchy), without documents or coding. */
-export function exportCodebook(kind: 'json' | 'csv') {
+export function exportCodebook(kind: 'json' | 'csv' | 'qdc') {
   if (kind === 'csv') return downloadFile(`codebook-${exportName()}-${today()}.csv`, codebookCSV(), 'text/csv');
+  // The open REFI-QDA codebook format, for MAXQDA, NVivo, ATLAS.ti and others.
+  if (kind === 'qdc') return downloadFile(`codebook-${exportName()}-${today()}.qdc`, buildQdc(project.codes), 'application/xml');
   downloadFile(`codebook-${exportName()}-${today()}.json`, buildCodebookJson(), 'application/json');
 }
 
@@ -159,11 +163,11 @@ const CSV_TYPES = '.csv,.tsv,text/csv,text/tab-separated-values';
 const isCsv = (file: File) => /\.(csv|tsv)$/i.test(file.name) || /csv|tab-separated/.test(file.type);
 
 /**
- * Adds codes from an exported codebook, the codebook of an exported project, or a spreadsheet
- * (CSV, whose columns are chosen in a dialog).
+ * Adds codes from an exported codebook, the codebook of an exported project, a REFI-QDA codebook
+ * (.qdc) or project, or a spreadsheet (CSV, whose columns are chosen in a dialog).
  */
 export async function importCodebookInteractive() {
-  const [file] = await pickFiles(`${PROJECT_FILE_TYPES},${CSV_TYPES}`, false);
+  const [file] = await pickFiles(`${CODEBOOK_FILE_TYPES},${CSV_TYPES}`, false);
   if (!file) return;
   if (isCsv(file)) return importCodebookCsv(file);
   let entries: CodebookEntry[];

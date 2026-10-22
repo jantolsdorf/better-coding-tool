@@ -9,12 +9,15 @@ import { parseProject } from '../parse';
 import { project } from '../state';
 import { codebookCSV } from './csv';
 import { isQdpx, parseQdpx } from './refi';
+import { isQdc, parseQdc } from './refiCodebook';
 
 const PROJECT_JSON = 'project.json';
 const CODEBOOK_FORMAT = 'bct-codebook';
 
 /** File types accepted wherever a project can be imported. */
 export const PROJECT_FILE_TYPES = '.zip,.json,.qdpx,application/zip,application/json';
+/** Files a codebook can be read from (besides CSV): codebook and project files, and REFI-QDA codebooks. */
+export const CODEBOOK_FILE_TYPES = `${PROJECT_FILE_TYPES},.qdc,application/xml,text/xml`;
 
 const isZip = (bytes: Uint8Array) => bytes[0] === 0x50 && bytes[1] === 0x4b;
 
@@ -110,10 +113,12 @@ export function buildCodebookJson(): string {
   return JSON.stringify(data, null, 1);
 }
 
-/** The codebook in a codebook file, an exported project (.zip/.json), or a REFI-QDA project. */
+/** The codebook in a codebook file, an exported project (.zip/.json), or a REFI-QDA project or codebook (.qdc). */
 export function readCodebookFile(bytes: Uint8Array): CodebookEntry[] {
   // Only the codebook of a REFI-QDA project is needed, so no coder has to be chosen.
   if (isQdpxFile(bytes)) return codebookEntries(parseQdpx(bytes).codes);
+  const text = new TextDecoder().decode(bytes).replace(/^\uFEFF/, '');
+  if (isQdc(text)) return codebookEntries(parseQdc(text));
   const data = readJson(bytes);
   const d = data as { format?: string; codes?: unknown };
   return d?.format === CODEBOOK_FORMAT && Array.isArray(d.codes)
