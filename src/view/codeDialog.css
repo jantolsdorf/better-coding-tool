@@ -19,7 +19,7 @@ select.merge-select {
   gap: 6px;
   align-items: center;
   font-weight: 600;
-  font-size: 13px;
+  
   margin-bottom: 4px;
 }
 .retrieval-seg {

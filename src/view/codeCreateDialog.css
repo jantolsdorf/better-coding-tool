@@ -36,8 +36,7 @@ dialog.modal.code-create {
   gap: 8px;
 }
 .cc-hint {
-  font-size: 12px;
-  margin: 6px 0 0;
+    margin: 6px 0 0;
 }
 .cc-actions {
   display: flex;
@@ -45,8 +44,7 @@ dialog.modal.code-create {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
-  font-size: 12px;
-}
+  }
 
 /* Auto-code tab */
 .ac-row {
@@ -54,8 +52,7 @@ dialog.modal.code-create {
   flex-wrap: wrap;
   gap: 6px 18px;
   margin-top: 6px;
-  font-size: 13px;
-}
+  }
 .ac-row label,
 .ac-paragraph-options label,
 .ac-doc,
@@ -67,16 +64,14 @@ dialog.modal.code-create {
 }
 .ac-code-note {
   display: block;
-  font-size: 11px;
-  margin-top: 3px;
+    margin-top: 3px;
 }
 .ac-paragraph-options {
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin: 8px 0 0 22px;
-  font-size: 13px;
-}
+  }
 .ac-paragraph-options[hidden] {
   display: none;
 }
@@ -101,14 +96,12 @@ dialog.modal.code-create {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 8px;
-  font-size: 13px;
-}
+  }
 .ac-preview {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 10px;
-  font-size: 13px;
-  max-height: 220px;
+    max-height: 220px;
   overflow: auto;
 }
 .ac-preview p {
@@ -127,8 +120,7 @@ dialog.modal.code-create {
   flex: none;
   width: 150px;
   color: var(--muted);
-  font-size: 12px;
-  overflow: hidden;
+    overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -137,5 +129,4 @@ dialog.modal.code-create {
   white-space: pre-wrap;
 }
 .ac-more {
-  font-size: 12px;
-}
+  }

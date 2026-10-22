@@ -46,7 +46,7 @@
   --text-size: 15px;
   --text-line: 1.7;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 14px;
+  
   color: var(--text);
 }
 /* Dark theme: follows the system unless the user picked light or dark explicitly. */
@@ -172,12 +172,12 @@ dialog {
   color: var(--muted);
 }
 .small {
-  font-size: 12px;
+  
 }
 .pad {
   padding: 4px 10px;
   margin: 0;
-  font-size: 13px;
+  
   line-height: 1.45;
 }
 .row {
@@ -219,7 +219,7 @@ dialog {
 }
 .btn.small {
   padding: 2px 8px;
-  font-size: 12px;
+  
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
@@ -232,7 +232,7 @@ dialog {
   padding: 2px 5px;
   border-radius: 4px;
   color: var(--muted);
-  font-size: 13px;
+  
   line-height: 1.2;
 }
 .icon-btn:hover {
@@ -240,7 +240,7 @@ dialog {
   color: var(--text);
 }
 .badge {
-  font-size: 11px;
+  
   color: var(--muted);
   background: var(--chip);
   border-radius: 9px;
@@ -278,7 +278,7 @@ kbd {
   border-bottom-width: 2px;
   border-radius: 4px;
   padding: 0 4px;
-  font-size: 12px;
+  
   background: var(--surface);
 }
 .menu {
@@ -306,7 +306,7 @@ kbd {
   text-transform: none;
   letter-spacing: 0;
   font-weight: 400;
-  font-size: 13px;
+  
   color: var(--text);
 }
 .btn:disabled {
@@ -385,7 +385,7 @@ kbd {
   cursor: grab;
   color: var(--faint);
   letter-spacing: -2px;
-  font-size: 11px;
+  
   padding: 0 4px 0 0;
   user-select: none;
 }
@@ -471,7 +471,7 @@ kbd {
   align-items: center;
   gap: 4px;
   padding: 8px 10px 6px;
-  font-size: 11px;
+  
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -534,13 +534,13 @@ body.resizing-rows {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 3px 8px;
-  font-size: 13px;
+  
 }
 .panel-tools select {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 2px 4px;
-  font-size: 12px;
+  
   color: var(--muted);
 }
 mark {
@@ -567,7 +567,7 @@ mark {
   width: 12px;
   flex: none;
   color: var(--muted);
-  font-size: 11px;
+  
   text-align: center;
 }
 .swatch-input {
@@ -603,7 +603,7 @@ body.resizing {
   background: var(--surface);
   border-radius: 12px;
   padding: 1px 9px;
-  font-size: 12px;
+  
   cursor: pointer;
 }
 .seg-toggle.on {
@@ -661,7 +661,7 @@ dialog.modal::backdrop {
 }
 .label {
   display: block;
-  font-size: 12px;
+  
   font-weight: 600;
   color: var(--muted);
   margin: 12px 0 5px;
@@ -698,7 +698,7 @@ textarea.field {
   color: #fff;
   padding: 8px 14px;
   border-radius: 8px;
-  font-size: 13px;
+  
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
   transition: opacity 0.4s;
 }
@@ -715,7 +715,7 @@ textarea.field {
   padding: 6px;
 }
 .view-title {
-  font-size: 11px;
+  
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -731,7 +731,7 @@ textarea.field {
   gap: 8px;
   padding: 4px 6px;
   border-radius: 5px;
-  font-size: 13px;
+  
   cursor: pointer;
 }
 .view-item:hover {
@@ -742,7 +742,7 @@ textarea.field {
   cursor: default;
 }
 .view-note {
-  font-size: 11px;
+  
   margin: 6px 6px 2px;
 }
 .choose-dialog {
@@ -757,14 +757,14 @@ textarea.field {
 }
 .choose-dialog h2 {
   margin: 0 0 6px;
-  font-size: 15px;
+  
   font-weight: 600;
   line-height: 1.4;
 }
 .choose-dialog p {
   margin: 0 0 14px;
   color: var(--muted);
-  font-size: 13px;
+  
   line-height: 1.5;
 }
 .choose-list {
@@ -805,7 +805,7 @@ textarea.field {
 }
 .choose-detail {
   color: var(--muted);
-  font-size: 12px;
+  
   font-weight: 400;
 }
 .choose-list button.primary .choose-detail {
@@ -836,7 +836,7 @@ textarea.field {
 /* Open or close all folders / subcodes at once. */
 .icon-btn.expand-all {
   flex: none;
-  font-size: 14px;
+  
   line-height: 1;
   padding: 1px 4px;
   color: var(--muted);

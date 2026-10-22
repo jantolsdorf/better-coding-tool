@@ -18,7 +18,7 @@ export function codePathOptions(id: string): HTMLDataListElement {
 
 export function autoCodeTab(close: () => void): HTMLElement {
   // ---- inputs ----
-  const phrases = h('textarea', { class: 'field', rows: 4, placeholder: 'One word or phrase per line, e.g.\npassword manager\nforgot* my password*   (* = any letters)' });
+  const phrases = h('textarea', { class: 'field', rows: 3, placeholder: 'One word or phrase per line, e.g.\nbird is the word\nbi* is the *ord (* = any leading or trailing letters)' });
   const matchCase = h('input', { type: 'checkbox' });
   const wholeWords = h('input', { type: 'checkbox', checked: true });
 
@@ -34,7 +34,7 @@ export function autoCodeTab(close: () => void): HTMLElement {
   const breakLine = radio(breakName, 'line', true);
   const breakBlank = radio(breakName, 'blank');
   const breakCustom = radio(breakName, 'custom');
-  const separators = h('textarea', { class: 'field', rows: 2, placeholder: 'One separator per line, e.g.\nInterviewer:\nParticipant:' });
+  const separators = h('textarea', { class: 'field', rows: 3, placeholder: 'One separator per line, e.g.\nInterviewer:\nParticipant:' });
   const paragraphOptions = h(
     'div',
     { class: 'ac-paragraph-options' },
@@ -114,7 +114,8 @@ export function autoCodeTab(close: () => void): HTMLElement {
           : 'Enter words or phrases to see what would be coded.';
       preview.replaceChildren(h('p', { class: 'muted' }, why));
       applyBtn.disabled = true;
-      applyBtn.textContent = 'Auto-code';
+      applyBtn.title = applyBtn.disabled ? "Check required settings above before applying auto-coding." : "Apply auto-coding now."
+      applyBtn.textContent = 'Apply auto-coding';
       return;
     }
     const res = previewAutoCode([...chosen], opts);
@@ -156,10 +157,9 @@ export function autoCodeTab(close: () => void): HTMLElement {
   return h(
     'div',
     { class: 'cc-panel ac-panel' },
-    h('label', { class: 'label' }, 'Words or phrases'),
+    h('label', { class: 'label' }, 'Words or phrases you want to auto-code'),
     phrases,
-    h('div', { class: 'ac-row' }, h('label', {}, wholeWords, ' Whole words only'), h('label', {}, matchCase, ' Match upper/lower case')),
-    h('p', { class: 'muted cc-hint' }, '* stands for any letters within a word: “password*” also finds “passwords”, “*trust” also “distrust”.'),
+    h('div', { class: 'ac-row' }, h('label', {}, wholeWords, ' Whole words/ phrases only'), h('label', {}, matchCase, ' Match upper/lower case')),
     h('label', { class: 'label' }, 'Code them as'),
     h('div', { class: 'row' }, color, code),
     codeNote,

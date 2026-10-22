@@ -17,14 +17,14 @@ dialog.modal.occurrence-dialog {
   gap: 6px 8px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  
 }
 .review-tools select.field {
   max-width: 280px;
   padding: 3px 6px;
 }
 .review-label {
-  font-size: 12px;
+  
   font-weight: 600;
   color: var(--muted);
 }
@@ -38,7 +38,7 @@ dialog.modal.occurrence-dialog {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  
   white-space: nowrap;
 }
 .review-body,
@@ -47,7 +47,7 @@ dialog.modal.occurrence-dialog {
 }
 .review-doc {
   margin: 14px 0 6px;
-  font-size: 12px;
+  
   font-weight: 700;
   color: var(--muted);
 }
@@ -65,7 +65,7 @@ dialog.modal.occurrence-dialog {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  
 }
 .review-code {
   font-weight: 600;
@@ -74,7 +74,7 @@ dialog.modal.occurrence-dialog {
 }
 .review-text {
   margin-top: 4px;
-  font-size: 13px;
+  
   line-height: 1.45;
   white-space: pre-wrap;
 }
@@ -86,14 +86,14 @@ dialog.modal.occurrence-dialog {
   padding: 5px 8px;
   border-radius: 5px;
   background: color-mix(in srgb, var(--danger) 9%, transparent);
-  font-size: 13px;
+  
   white-space: pre-wrap;
 }
 .btn.small.challenge-btn {
   color: var(--danger);
 }
 .occ-summary {
-  font-size: 13px;
+  
   margin: 4px 0 10px;
 }
 .occ-section {
@@ -104,16 +104,16 @@ dialog.modal.occurrence-dialog {
   align-items: center;
   gap: 8px;
   margin-bottom: 4px;
-  font-size: 13px;
+  
 }
 .occ-agreement {
-  font-size: 12px;
+  
   color: var(--muted);
 }
 .occ-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  
 }
 .occ-table th,
 .occ-table td {
@@ -122,7 +122,7 @@ dialog.modal.occurrence-dialog {
   text-align: left;
 }
 .occ-table th {
-  font-size: 11px;
+  
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;

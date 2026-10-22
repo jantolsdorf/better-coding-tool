@@ -90,13 +90,10 @@
           <div class="panel-head">
             <span class="grow">Codebook</span>
             <button id="btn-add-code" class="btn small" title="Add a code, or auto-code words and phrases">+ Code</button>
-            <button id="btn-popout-codes" class="icon-btn popout-btn" title="Open in a separate window">⧉</button>
+            <button id="btn-auto-code" class="btn small" title="Code all occurrences of words or phrases (or their paragraphs) in chosen documents">Auto-code</button>
             <div class="menu">
-              <button class="btn small menu-toggle" title="Export or import the codebook only" aria-haspopup="true">⋯</button>
+              <button class="btn small menu-toggle" title="Export or import the codebook only" aria-haspopup="true">Export / Import</button>
               <div class="menu-list left" hidden>
-                <button id="btn-auto-code" title="Code all occurrences of words or phrases (or their paragraphs) in chosen documents">
-                  Auto-code…
-                </button>
                 <button id="btn-export-codebook" title="Codes with colors, descriptions and hierarchy; can be imported into another project">
                   Export codebook
                 </button>
@@ -115,6 +112,7 @@
                 </button>
               </div>
             </div>
+            <button id="btn-popout-codes" class="icon-btn popout-btn" title="Open in a separate window">⧉</button>
           </div>
           <div class="panel-tools">
             <div class="filter-row">
@@ -134,13 +132,13 @@
               </div>
             </div>
             <select id="code-view" title="Show subcodes indented, or as “Parent > Child” paths">
-              <option value="tree">Indented</option>
-              <option value="path">A &gt; B</option>
+              <option value="tree">View: Indented</option>
+              <option value="path">View: A &gt; B</option>
             </select>
             <select id="code-sort" title="Sort codes">
-              <option value="name">A–Z</option>
-              <option value="recent">Last edited</option>
-              <option value="custom" title="Drag codes above or below each other to set the order">Custom (drag)</option>
+              <option value="name">Sort: A–Z</option>
+              <option value="recent">Sort: Last edited</option>
+              <option value="custom" title="Drag codes above or below each other to set the order">Sort: Custom (drag)</option>
             </select>
             <button id="btn-toggle-codes" class="icon-btn expand-all" title="Close all subcodes">⊟</button>
           </div>

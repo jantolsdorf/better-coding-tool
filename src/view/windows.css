@@ -25,7 +25,7 @@ body.popout .area-grip {
   align-items: center;
   gap: 6px;
   padding: 8px 10px;
-  font-size: 12px;
+  
   color: var(--muted);
 }
 .panel.popped {
@@ -43,7 +43,7 @@ body.popout .area-grip {
 .icon-btn.popout-btn {
   flex: none;
   padding: 0 4px;
-  font-size: 13px;
+  
   color: var(--muted);
 }
 .icon-btn.popout-btn:hover {

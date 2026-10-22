@@ -11,10 +11,10 @@ dialog.modal.import-coders {
   align-items: center;
   padding: 6px 0;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  
 }
 .import-coder.head {
-  font-size: 11px;
+  
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
@@ -25,7 +25,7 @@ dialog.modal.import-coders {
 }
 .import-note {
   display: block;
-  font-size: 11px;
+  
   margin-top: 2px;
 }
 .import-coders .check-row {
@@ -33,12 +33,12 @@ dialog.modal.import-coders {
   align-items: flex-start;
   gap: 6px;
   margin-top: 12px;
-  font-size: 13px;
+  
 }
 .import-coders .check-row[hidden] {
   display: none;
 }
 .import-summary {
-  font-size: 12px;
+  
   margin-top: 10px;
 }

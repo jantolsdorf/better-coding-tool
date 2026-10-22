@@ -2,7 +2,7 @@
 
 .comment-context {
   margin-top: 12px;
-  font-size: 12px;
+  
 }
 .comment-quote {
   margin: 6px 0 10px;
@@ -10,10 +10,10 @@
   border-left: 3px solid var(--border);
   max-height: 140px;
   overflow: auto;
-  font-size: 13px;
+  
   white-space: pre-wrap;
 }
 .comment-hint {
-  font-size: 11px;
+  
   margin-top: 4px;
 }
