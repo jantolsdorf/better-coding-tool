@@ -14,7 +14,7 @@ import { lineLabel } from '../model/lines';
 import { project, subscribe } from '../model/state';
 import { byName } from '../model/util';
 import { textBody } from './document/textView';
-import { toast } from './feedback';
+import { confirmAction, toast } from './feedback';
 import { closeToolWindow, openToolWindow } from './windows';
 import { h, hexToRgba } from './dom';
 
@@ -209,16 +209,16 @@ export function openCodeDialog(codeId: string) {
         { class: 'modal-foot' },
         h('button', {
           class: 'btn danger',
-          onClick: () => {
-            if (deleteCodeInteractive(code, segs.length)) close();
+          onClick: async () => {
+            if (await deleteCodeInteractive(code, segs.length)) close();
           },
         }, 'Delete code'),
         others.length ? mergeSelect : null,
         others.length
           ? h('button', {
               class: 'btn',
-              onClick: () => {
-                if (mergeSelect.value && mergeCodeInteractive(code, mergeSelect.value)) close();
+              onClick: async () => {
+                if (mergeSelect.value && (await mergeCodeInteractive(code, mergeSelect.value))) close();
               },
             }, 'Merge')
           : null,
@@ -248,9 +248,11 @@ export function openCodeDialog(codeId: string) {
     e.returnValue = '';
   });
   // Esc discards, as in a dialog (unless a dialog inside the window is open), after asking if anything changed.
-  root.ownerDocument.addEventListener('keydown', (e) => {
+  root.ownerDocument.addEventListener('keydown', async (e) => {
     if (e.key !== 'Escape' || root.ownerDocument.querySelector('dialog[open]')) return;
-    if (!unsaved() || win.confirm('Discard your changes to this code?')) close();
+    if (!unsaved()) return close();
+    const discard = await confirmAction('Your changes to this code are lost.', { title: 'Discard your changes?', confirm: 'Discard changes', cancel: 'Keep editing', danger: true });
+    if (discard) close();
   });
   nameInput.focus();
 }

@@ -447,7 +447,7 @@ function stickyNote(doc: Doc, m: Memo, editable: boolean): HTMLElement {
                 removeMemo(m.id);
               },
             },
-            '✕',
+            h('i', { class: 'fa-solid fa-trash', 'aria-hidden': 'true' }),
           )
         : null,
     ),

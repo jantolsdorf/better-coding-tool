@@ -136,7 +136,8 @@
 
 .text-body {
   padding: 12px 20px 45vh 0;
-  font-size: var(--text-size);
+  /* --text-zoom: the reader's text size (A− / A+ in the text column header). */
+  font-size: calc(var(--text-size) * var(--text-zoom, 1));
   line-height: var(--text-line);
 }
 
@@ -152,7 +153,7 @@
   text-align: right;
   color: var(--faint);
 
-  line-height: calc(var(--text-size) * var(--text-line));
+  line-height: calc(var(--text-size) * var(--text-zoom, 1) * var(--text-line));
   font-variant-numeric: tabular-nums;
   user-select: none;
 }
@@ -164,7 +165,7 @@
 .lt {
   flex: 1;
   min-width: 0;
-  min-height: calc(var(--text-size) * var(--text-line));
+  min-height: calc(var(--text-size) * var(--text-zoom, 1) * var(--text-line));
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -497,11 +498,10 @@ body.resizing .col-resizer:hover {
 }
 
 .sticky-lines {
+  font-size: small;
   border: none;
   background: none;
   padding: 0;
-
-  font-weight: 700;
   color: inherit;
   opacity: 0.7;
   cursor: pointer;
@@ -564,4 +564,19 @@ body.resizing .col-resizer:hover {
   background: color-mix(in srgb, var(--code-color) 34%, var(--surface));
   box-shadow: 0 0 0 1.5px var(--code-color);
   font-weight: 700;
+}
+/* Text size: A− 100 % A+ in the text column header. */
+.text-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-right: 6px;
+}
+.text-zoom .head-btn {
+  min-width: 22px;
+}
+.text-zoom-value {
+  min-width: 38px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }

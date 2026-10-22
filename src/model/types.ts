@@ -171,6 +171,8 @@ export interface UIState {
   codeTarget: 'mine' | 'consolidated';
   /** Whether the help section of the code box is open. */
   codeBoxHelp: boolean;
+  /** Size of the document text, relative to the normal size (1 = 100 %). */
+  textZoom: number;
   /** Whether code box suggestions also list all subcodes of matching codes. */
   codeBoxSubcodes: boolean;
   /** Challenge mode: other coders' codes in the document columns can be challenged (⚑). */

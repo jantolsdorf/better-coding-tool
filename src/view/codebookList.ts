@@ -36,7 +36,7 @@ import { openCodeDialog } from './codeDialog';
 import { h } from './dom';
 import { byId } from './windows';
 import { actionSelect, Selection, TOP_LEVEL } from './multiSelect';
-import '@fortawesome/fontawesome-free/css/solid.min.css';
+import '@fortawesome/fontawesome-free/css/all.min.css';
 
 // The dragged codes' ids (several when dragging a selection); dataTransfer contents cannot be
 // read during dragover.
@@ -52,7 +52,7 @@ const selectedCodes = () => [...selection.keys];
 /** Deletes the selected codes (Delete key); returns false if nothing is selected. */
 export function deleteSelectedCodes(): boolean {
   if (!selection.size) return false;
-  if (deleteCodesInteractive(selectedCodes())) selection.clear();
+  void deleteCodesInteractive(selectedCodes()).then((deleted) => deleted && selection.clear());
   return true;
 }
 
@@ -64,7 +64,7 @@ function dropDragged(targetId: string | null, merge: boolean) {
   if (!ids.length) return;
   if (merge && targetId) {
     if (ids.length === 1) mergeDroppedCode(ids[0], targetId);
-    else if (mergeCodesInteractive(ids, targetId)) selection.clear();
+    else void mergeCodesInteractive(ids, targetId).then((merged) => merged && selection.clear());
   } else if (ids.length === 1) moveCode(ids[0], targetId);
   else moveCodesTo(ids, targetId);
 }
@@ -168,8 +168,8 @@ function selectionBar(): HTMLElement {
       actionSelect('Move…', 'Make the selected codes subcodes of another code', [[TOP_LEVEL, '(top level)'], ...targets], (v) =>
         moveCodesTo(selectedCodes(), v === TOP_LEVEL ? null : v),
       ),
-      actionSelect('Merge…', 'Merge the selected codes into another code', mergeTargets, (v) => {
-        if (mergeCodesInteractive(selectedCodes(), v)) selection.clear();
+      actionSelect('Merge…', 'Merge the selected codes into another code', mergeTargets, async (v) => {
+        if (await mergeCodesInteractive(selectedCodes(), v)) selection.clear();
       }),
       h('button', { class: 'icon-btn danger', title: 'Delete the selected codes (Delete)', onClick: deleteSelectedCodes }, '🗑'),
     ],

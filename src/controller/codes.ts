@@ -26,7 +26,7 @@ import { commitUI, project, ui } from '../model/state';
 import type { Code, UIState } from '../model/types';
 import { pinSegment } from '../view/document/pins';
 import { focusSegment } from '../view/document/textView';
-import { confirmAction, ask, notify, toast } from '../view/feedback';
+import { askText, confirmAction, notify, toast } from '../view/feedback';
 
 /**
  * Creates a code from the "New code" dialog ("Parent > Child" creates a subcode). Returns false
@@ -34,8 +34,8 @@ import { confirmAction, ask, notify, toast } from '../view/feedback';
  */
 export function createCodeFromDialog(name: string, color: string, description: string): boolean {
   const parts = splitCodePath(name);
-  if (!parts.length) return (notify('Enter a name for the code.'), false);
-  if (findCodeByPath(parts)) return (notify(`“${parts.join(' > ')}” already exists.`), false);
+  if (!parts.length) return (notify('Enter a name for the code.', 'Name missing'), false);
+  if (findCodeByPath(parts)) return (notify(`“${parts.join(' > ')}” already exists.`, 'Code exists'), false);
   // Subcodes take their level 1 code's color, like when typing them in the code box.
   const parent = parts.length > 1 ? findCodeByPath(parts.slice(0, 1)) : undefined;
   const parentId = parent ? findCodeByPath(parts.slice(0, -1))?.id : undefined;
@@ -64,13 +64,13 @@ export function moveCode(id: string, parentId: string | null) {
 }
 
 /** Asks for a name and creates a subcode of `parentId` (it takes the parent's color). */
-export function addSubcodeInteractive(parentId: string) {
+export async function addSubcodeInteractive(parentId: string) {
   const parent = codeById(parentId);
   if (!parent) return;
-  const name = ask(`New subcode of “${parent.name}”:`)?.trim();
+  const name = await askText({ title: `New subcode of “${parent.name}”`, label: 'Name', placeholder: 'e.g. Distrust', okLabel: 'Create subcode' });
   if (!name) return;
-  if (/[>›]/.test(name)) return notify('A code name cannot contain “>”; it separates a code from its subcodes.');
-  if (findChildCode(parentId, name)) return notify(`“${parent.name}” already has a subcode named “${name}”.`);
+  if (/[>›]/.test(name)) return notify('A code name cannot contain “>”; it separates a code from its subcodes.', 'Invalid name');
+  if (findChildCode(parentId, name)) return notify(`“${parent.name}” already has a subcode named “${name}”.`, 'Subcode exists');
   ui.collapsedCodes = ui.collapsedCodes.filter((x) => x !== parentId);
   createCode([...codePathParts(parent), name].join(' > '));
 }
@@ -82,21 +82,23 @@ export function deleteCodeNow(code: Code) {
 }
 
 /** Merges a dragged code into another after confirmation. */
-export function mergeDroppedCode(fromId: string, intoId: string) {
+export async function mergeDroppedCode(fromId: string, intoId: string) {
   const from = codeById(fromId);
   const into = codeById(intoId);
   if (!from || !into) return;
   const n = project.segments.filter((s) => s.codeId === from.id).length;
-  if (confirmAction(`Merge “${from.name}” into “${into.name}”?\n\nIts ${n} segment(s) and any subcodes move to “${into.name}”, and “${from.name}” is removed.`)) {
+  const question = `Its ${n} segment(s) and any subcodes move to “${into.name}”, and “${from.name}” is removed.`;
+  if (await confirmAction(question, { title: `Merge “${from.name}” into “${into.name}”?`, confirm: 'Merge' })) {
     mergeCode(from.id, into.id);
   }
 }
 
 /** Merges a code into another from the code details dialog; returns whether it was merged. */
-export function mergeCodeInteractive(code: Code, targetId: string): boolean {
+export async function mergeCodeInteractive(code: Code, targetId: string): Promise<boolean> {
   const target = codeById(targetId);
   if (!target) return false;
-  if (!confirmAction(`Merge “${code.name}” into “${target.name}”? All segments and subcodes move to “${target.name}” and “${code.name}” is removed.`)) {
+  const question = `All segments and subcodes move to “${target.name}”, and “${code.name}” is removed.`;
+  if (!(await confirmAction(question, { title: `Merge “${code.name}” into “${target.name}”?`, confirm: 'Merge' }))) {
     return false;
   }
   mergeCode(code.id, target.id);
@@ -104,14 +106,15 @@ export function mergeCodeInteractive(code: Code, targetId: string): boolean {
 }
 
 /** Deletes a code after confirmation; returns whether it was deleted. */
-export function deleteCodeInteractive(code: Code, segments: number): boolean {
-  if (!confirmAction(`Delete code “${code.name}” and remove it from ${segments} segment(s)?`)) return false;
+export async function deleteCodeInteractive(code: Code, segments: number): Promise<boolean> {
+  const question = segments ? `It is removed from ${segments} coded segment(s). You can undo this.` : 'You can undo this.';
+  if (!(await confirmAction(question, { title: `Delete code “${code.name}”?`, confirm: 'Delete code', danger: true }))) return false;
   deleteCode(code.id);
   return true;
 }
 
 /** Deletes the whole codebook, and with it your coded segments, after confirmation. */
-export function deleteCodebookInteractive() {
+export async function deleteCodebookInteractive() {
   const codes = project.codes.length;
   if (!codes) return toast('The codebook is already empty.');
   const segments = project.segments.length;
@@ -121,10 +124,10 @@ export function deleteCodebookInteractive() {
     consolidated ? `${consolidated} consolidated segment${consolidated === 1 ? '' : 's'}` : '',
   ].filter(Boolean);
   const question =
-    `Delete the whole codebook (${codes} code${codes === 1 ? '' : 's'})?` +
-    (removes.length ? `\n\nThis also removes your ${removes.join(' and ')}.` : '') +
-    '\nDocuments, memos and other coders’ coding are kept. You can undo this (⌘Z / Ctrl+Z).';
-  if (!confirmAction(question)) return;
+    (removes.length ? `This also removes your ${removes.join(' and ')}.\n` : '') +
+    'Documents, memos and other coders’ coding are kept. You can undo this (⌘Z / Ctrl+Z).';
+  const title = `Delete the whole codebook (${codes} code${codes === 1 ? '' : 's'})?`;
+  if (!(await confirmAction(question, { title, confirm: 'Delete codebook', danger: true }))) return;
   deleteAllCodes();
   ui.collapsedCodes = [];
   commitUI();
@@ -155,12 +158,13 @@ export function placeCodesAt(ids: string[], targetId: string, after: boolean) {
 }
 
 /** Merges several codes into another after confirmation; returns whether they were merged. */
-export function mergeCodesInteractive(ids: string[], intoId: string): boolean {
+export async function mergeCodesInteractive(ids: string[], intoId: string): Promise<boolean> {
   const into = codeById(intoId);
   const from = ids.filter((id) => id !== intoId);
   if (!into || !from.length) return false;
   const n = project.segments.filter((s) => from.includes(s.codeId)).length;
-  if (!confirmAction(`Merge ${plural(from.length, 'code')} into “${into.name}”?\n\nTheir ${plural(n, 'segment')} and any subcodes move to “${into.name}”, and the merged codes are removed.`)) {
+  const question = `Their ${plural(n, 'segment')} and any subcodes move to “${into.name}”, and the merged codes are removed.`;
+  if (!(await confirmAction(question, { title: `Merge ${plural(from.length, 'code')} into “${into.name}”?`, confirm: 'Merge' }))) {
     return false;
   }
   mergeCodes(from, intoId);
@@ -168,12 +172,12 @@ export function mergeCodesInteractive(ids: string[], intoId: string): boolean {
 }
 
 /** Deletes several codes after confirmation; returns whether they were deleted. */
-export function deleteCodesInteractive(ids: string[]): boolean {
+export async function deleteCodesInteractive(ids: string[]): Promise<boolean> {
   const n = project.segments.filter((s) => ids.includes(s.codeId)).length;
   const question =
-    `Delete ${plural(ids.length, 'code')}${n ? ` and remove ${n === 1 ? 'it' : 'them'} from ${plural(n, 'segment')}` : ''}?` +
-    '\nSubcodes that are not selected move up one level. You can undo this (⌘Z / Ctrl+Z).';
-  if (!confirmAction(question)) return false;
+    (n ? `They are removed from ${plural(n, 'coded segment')}. ` : '') +
+    'Subcodes that are not selected move up one level. You can undo this (⌘Z / Ctrl+Z).';
+  if (!(await confirmAction(question, { title: `Delete ${plural(ids.length, 'code')}?`, confirm: 'Delete', danger: true }))) return false;
   deleteCodes(ids);
   return true;
 }
@@ -205,18 +209,18 @@ export function saveCodeDetails(
 ): boolean {
   const name = fields.name.trim();
   if (!name) {
-    notify('The code name cannot be empty.');
+    notify('The code name cannot be empty.', 'Name missing');
     return false;
   }
   if (/[>›]/.test(name)) {
-    notify('A code name cannot contain “>”; it separates a code from its subcodes.');
+    notify('A code name cannot contain “>”; it separates a code from its subcodes.', 'Invalid name');
     return false;
   }
   // Names only need to be unique among the codes with the same parent.
   const clash = findChildCode(fields.parentId, name);
   if (clash && clash.id !== codeId) {
     const where = fields.parentId ? `under “${codeById(fields.parentId)?.name}”` : 'at the top level';
-    notify(`A code named “${name}” already exists ${where}. Use “Merge into…” to combine them.`);
+    notify(`A code named “${name}” already exists ${where}. Use “Merge into…” to combine them.`, 'Name already used');
     return false;
   }
   // One undo step for everything saved in the dialog.

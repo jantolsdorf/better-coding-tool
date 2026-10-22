@@ -77,11 +77,24 @@ export async function renameCoderInteractive(from = project.coderName) {
   });
   if (!to || to === from) return;
   const other = projectCoders().find((c) => c.name === to);
-  if (other && !confirmAction(`“${to}” already exists. Merge the coding of “${from}” into “${to}”? Codes are matched by name and position; overlapping identical codes are combined. You can undo this.`)) return;
+  if (other) {
+    const question = `A coder named “${to}” already exists. Their codings are merged: codes are matched by name and position, overlapping identical codes are combined. You can undo this.`;
+    if (!(await confirmAction(question, { title: `Merge “${from}” into “${to}”?`, confirm: 'Merge coders' }))) return;
+  }
   renameCoder(from, to);
 }
 
 /** Removes a coder without any codes or memos from the list. */
 export function forgetCoderNow(name: string) {
   forgetCoder(name);
+}
+
+// ---------- text size ----------
+
+export const TEXT_ZOOM = { min: 0.6, max: 2.5, step: 0.1 };
+
+/** Sets the size of the document text (1 = normal), within sensible limits. */
+export function setTextZoom(zoom: number) {
+  ui.textZoom = Math.round(Math.min(TEXT_ZOOM.max, Math.max(TEXT_ZOOM.min, zoom)) * 10) / 10;
+  commitUI();
 }

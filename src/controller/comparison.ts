@@ -26,9 +26,10 @@ export function renameCoderInteractive(x: ExternalCoding) {
   return renameCoderByName(x.coderName);
 }
 
-export function removeCoderInteractive(x: ExternalCoding) {
+export async function removeCoderInteractive(x: ExternalCoding) {
   const n = x.segments.length;
-  if (confirmAction(`Remove the coding of “${x.coderName}”${n ? ` (${n} coded segment${n === 1 ? '' : 's'})` : ''}? You can undo this.`)) removeExternal(x.id);
+  const question = `${n ? `Their ${n} coded segment${n === 1 ? ' is' : 's are'} removed from this project. ` : ''}You can undo this.`;
+  if (await confirmAction(question, { title: `Remove the coding of “${x.coderName}”?`, confirm: 'Remove coder', danger: true })) removeExternal(x.id);
 }
 
 /** Shows or hides a column next to the text (a coder's codes or memos, or the consolidated coding). */
@@ -65,10 +66,11 @@ export function startConsolidationOf(doc: Doc) {
   startConsolidation(doc.id);
 }
 
-export function finishConsolidationInteractive(doc: Doc) {
-  const ok = confirmAction(
-    `Finish the consolidation of “${doc.name}”?\n\nThe consolidated coding becomes your coding of this document. ` +
-      'Your current coding of it is kept under “Other coders” so you can still compare against it. Other documents are not changed.',
+export async function finishConsolidationInteractive(doc: Doc) {
+  const ok = await confirmAction(
+    'The consolidated coding becomes your coding of this document. Your current coding of it is kept under “Other coders”, ' +
+      'so you can still compare against it. Other documents are not changed.',
+    { title: `Finish the consolidation of “${doc.name}”?`, confirm: 'Finish consolidation' },
   );
   if (!ok) return;
   const res = finishConsolidation(doc.id);
@@ -78,8 +80,13 @@ export function finishConsolidationInteractive(doc: Doc) {
   toast(`Done. Your previous coding of this document is kept as “${res.keptAs.coderName}”.`, 5000);
 }
 
-export function discardConsolidationInteractive(doc: Doc) {
-  if (confirmAction(`Discard the consolidated coding of “${doc.name}”? Your own coding is not changed.`)) discardConsolidation(doc.id);
+export async function discardConsolidationInteractive(doc: Doc) {
+  const ok = await confirmAction('Your own coding is not changed. You can undo this.', {
+    title: `Discard the consolidated coding of “${doc.name}”?`,
+    confirm: 'Discard consolidation',
+    danger: true,
+  });
+  if (ok) discardConsolidation(doc.id);
 }
 
 /** A segment of a coder's column, with its code identified by path in that coder's codebook. */

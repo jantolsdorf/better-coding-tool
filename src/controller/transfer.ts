@@ -21,7 +21,7 @@ import { commitUI, project, projectFingerprint, replaceProject, ui } from '../mo
 import { memoColumns, tableColumns } from '../model/table';
 import type { Doc, Project } from '../model/types';
 import { now, safeFileName } from '../model/util';
-import { confirmAction, notify, toast } from '../view/feedback';
+import { choose, notify, toast } from '../view/feedback';
 import { askCsvCodebookMapping } from '../view/csvCodebookDialog';
 import { downloadFile, pickFiles } from '../view/files';
 import { askCoderImport } from '../view/importCodersDialog';
@@ -42,7 +42,7 @@ const exportName = () => safeFileName(project.coderName || 'project');
 class ImportCancelled extends Error {}
 
 const importFailed = (file: File, e: unknown) => {
-  if (!(e instanceof ImportCancelled)) notify(`Could not import “${file.name}”: ${(e as Error).message}`);
+  if (!(e instanceof ImportCancelled)) notify(`Could not import “${file.name}”: ${(e as Error).message}`, 'Import failed');
 };
 
 /** Reads a project: an exported .zip (via its project.json), a plain .json, or a REFI-QDA .qdpx. */
@@ -192,16 +192,24 @@ async function importCodebookCsv(file: File) {
   if (mapping) addCodebookEntries(file, csvCodebookEntries(rows, mapping));
 }
 
-function addCodebookEntries(file: File, entries: CodebookEntry[]) {
+async function addCodebookEntries(file: File, entries: CodebookEntry[]) {
   if (!entries.length) return toast('The codebook is empty.');
   const existing = countExistingEntries(entries);
   const fresh = entries.length - existing;
   let update = false;
   if (existing) {
-    update = confirmAction(
-      `“${file.name}” has ${entries.length} code(s): ${fresh} new, ${existing} already in your codebook (same name at the same place).\n\n` +
-        'OK: also update color and description of those existing codes.\nCancel: only add the new codes.',
-    );
+    // Two ways to import (or none): a choice with both spelled out, not OK/Cancel.
+    const choice = await choose({
+      title: `Import the codebook “${file.name}”?`,
+      message: `It has ${entries.length} code(s): ${fresh} new, ${existing} already in your codebook (same name at the same place).`,
+      choices: [
+        { label: 'Add new codes and update existing ones', detail: 'existing codes take the imported color and description', value: 'update' as const, primary: true },
+        { label: 'Only add the new codes', detail: 'existing codes stay as they are', value: 'add' as const },
+      ],
+      cancelLabel: 'Cancel import',
+    });
+    if (!choice) return;
+    update = choice === 'update';
   }
   const res = importCodebook(entries, update);
   toast(`Added ${res.added} code(s)${res.updated ? `, updated ${res.updated}` : ''}.`);

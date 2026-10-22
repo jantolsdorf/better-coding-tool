@@ -19,7 +19,7 @@ import { identicalGroups, mergeCopies } from '../model/mergeDocs';
 import { SAMPLE_NAME, SAMPLE_TEXT } from '../model/sample';
 import { commitUI, project, ui } from '../model/state';
 import type { Doc, Folder } from '../model/types';
-import { ask, confirmAction, toast } from '../view/feedback';
+import { askText, confirmAction, toast } from '../view/feedback';
 import { pickFiles } from '../view/files';
 import { askMergeOptions } from '../view/mergeDialog';
 
@@ -61,31 +61,32 @@ export function addSampleDocument() {
   addDocuments([{ name: SAMPLE_NAME, content: SAMPLE_TEXT }], ui.selectedFolderId);
 }
 
-export function createFolder(parentId: string | null = ui.selectedFolderId) {
-  const name = ask('Folder name:');
+export async function createFolder(parentId: string | null = ui.selectedFolderId) {
+  const name = await askText({ title: 'New folder', label: 'Name', placeholder: 'e.g. Wave 1', okLabel: 'Create folder' });
   if (!name?.trim()) return;
   expand(parentId);
   addFolder(name, parentId);
 }
 
-export function renameFolderInteractive(f: Folder) {
-  const name = ask('Rename folder:', f.name);
+export async function renameFolderInteractive(f: Folder) {
+  const name = await askText({ title: `Rename folder “${f.name}”`, label: 'New name', initial: f.name, okLabel: 'Rename' });
   if (name?.trim()) renameFolder(f.id, name);
 }
 
-export function deleteFolderInteractive(f: Folder) {
+export async function deleteFolderInteractive(f: Folder) {
   const c = folderContents(f.id);
-  const what = c.docs.length || c.folders ? ` with ${c.folders} subfolder(s) and ${c.docs.length} document(s) including their coding` : '';
-  if (confirmAction(`Delete folder “${f.name}”${what}?`)) deleteFolder(f.id);
+  const what = c.docs.length || c.folders ? `Its ${c.folders} subfolder(s) and ${c.docs.length} document(s) are deleted too, including their coding. ` : '';
+  if (await confirmAction(`${what}You can undo this.`, { title: `Delete folder “${f.name}”?`, confirm: 'Delete folder', danger: true })) deleteFolder(f.id);
 }
 
-export function renameDocInteractive(d: Doc) {
-  const name = ask('Rename document:', d.name);
+export async function renameDocInteractive(d: Doc) {
+  const name = await askText({ title: `Rename “${d.name}”`, label: 'New name', initial: d.name, okLabel: 'Rename' });
   if (name?.trim()) renameDoc(d.id, name);
 }
 
-export function deleteDocInteractive(d: Doc, codedSegments: number) {
-  if (confirmAction(`Delete “${d.name}”${codedSegments ? ` and its ${codedSegments} coded segment(s)` : ''}?`)) deleteDoc(d.id);
+export async function deleteDocInteractive(d: Doc, codedSegments: number) {
+  const question = `${codedSegments ? `Its ${codedSegments} coded segment(s) are deleted too. ` : ''}You can undo this.`;
+  if (await confirmAction(question, { title: `Delete “${d.name}”?`, confirm: 'Delete document', danger: true })) deleteDoc(d.id);
 }
 
 /** Moves a dragged document or folder into a folder (null = top level). */
@@ -138,7 +139,7 @@ export function moveItemsTo(items: TreeItem[], folderId: string | null) {
 }
 
 /** Deletes several documents and folders after confirmation; returns whether they were deleted. */
-export function deleteItemsInteractive(items: TreeItem[]): boolean {
+export async function deleteItemsInteractive(items: TreeItem[]): Promise<boolean> {
   const docIds = items.filter((i) => i.type === 'doc').map((i) => i.id);
   const folderIds = items.filter((i) => i.type === 'folder').map((i) => i.id);
   const inside = docsInFolders(folderIds).filter((d) => !docIds.includes(d.id));
@@ -148,8 +149,8 @@ export function deleteItemsInteractive(items: TreeItem[]): boolean {
     .filter(Boolean)
     .join(' and ');
   const extra = inside.length ? ` with ${plural(inside.length, 'more document')} inside` : '';
-  const coding = segments ? `\n\nThis also removes ${plural(segments, 'coded segment')} and all memos and other coders’ coding of these documents.` : '';
-  if (!confirmAction(`Delete ${what}${extra}?${coding}\n\nYou can undo this (⌘Z / Ctrl+Z).`)) return false;
+  const coding = segments ? `This also removes ${plural(segments, 'coded segment')} and all memos and other coders’ coding of these documents.\n` : '';
+  if (!(await confirmAction(`${coding}You can undo this (⌘Z / Ctrl+Z).`, { title: `Delete ${what}${extra}?`, confirm: 'Delete', danger: true }))) return false;
   deleteItems(docIds, folderIds);
   return true;
 }

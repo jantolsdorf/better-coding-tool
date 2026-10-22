@@ -41,7 +41,7 @@
 .seg-lines {
   margin-left: auto;
   color: var(--muted);
-  
+  font-size: small;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

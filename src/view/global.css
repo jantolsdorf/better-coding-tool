@@ -864,3 +864,21 @@ textarea.field {
 dialog.modal.ask-text {
   width: min(420px, 92vw);
 }
+
+/* Messages and confirmations (feedback.ts: notify, confirmAction). */
+dialog.modal.message-dialog {
+  width: min(460px, 92vw);
+}
+.message-text {
+  margin: 14px 0 4px;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+.btn.danger-solid {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.btn.danger-solid:hover {
+  filter: brightness(0.92);
+}

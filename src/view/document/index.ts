@@ -4,6 +4,7 @@ import './document.css';
 import { acceptMatchingSegments, setTextColored, setTextWidth, startConsolidationOf } from '../../controller/comparison';
 import { setChallengeMode } from '../../controller/challenges';
 import { compareCodings, isConsolidated, matchingItems } from '../../model/consolidation';
+import { setTextZoom, TEXT_ZOOM } from '../../controller/preferences';
 import { currentDoc, folderPath } from '../../model/documents';
 import { activeLayer, consolidationOf, layerSegments } from '../../model/layers';
 import { project, ui } from '../../model/state';
@@ -72,7 +73,16 @@ export function renderDocumentView() {
 /** The text column's header button that colors all coded text (otherwise only on hover). */
 function renderTextHead() {
   const on = ui.colorText && ui.showCodes;
+  textCol.style.setProperty('--text-zoom', String(ui.textZoom));
+  const zoom = Math.round(ui.textZoom * 100);
   textHeadActions.replaceChildren(
+    h(
+      'span',
+      { class: 'text-zoom', title: 'Text size' },
+      h('button', { class: 'icon-btn head-btn', title: 'Smaller text', disabled: ui.textZoom <= TEXT_ZOOM.min, onClick: () => setTextZoom(ui.textZoom - TEXT_ZOOM.step) }, 'A−'),
+      h('button', { class: 'icon-btn head-btn text-zoom-value', title: 'Normal size (100 %)', onClick: () => setTextZoom(1) }, `${zoom} %`),
+      h('button', { class: 'icon-btn head-btn', title: 'Larger text', disabled: ui.textZoom >= TEXT_ZOOM.max, onClick: () => setTextZoom(ui.textZoom + TEXT_ZOOM.step) }, 'A+'),
+    ),
     h(
       'button',
       {

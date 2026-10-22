@@ -87,8 +87,6 @@ function onSelectionDone() {
 function openCodeBox(doc: Doc, start: number, end: number) {
   closeCodeBox();
   const range = rangeFor(start, end);
-  const rects = range.getClientRects();
-  const last = rects[rects.length - 1] ?? range.getBoundingClientRect();
   const grid = gridEl.getBoundingClientRect();
 
   const input = h('input', {
@@ -183,11 +181,9 @@ function openCodeBox(doc: Doc, start: number, end: number) {
   );
   gridEl.append(el);
 
-  // Place the box just below the end of the selection so the selected text stays visible.
   const width = Math.min(460, grid.width - 16);
   el.style.width = `${width}px`;
-  el.style.left = `${Math.max(8, Math.min(last.left - grid.left, grid.width - width - 8))}px`;
-  el.style.top = `${last.bottom - grid.top + 8}px`;
+  placeBox(el, start, end, width);
 
   popup = {
     el, docId: doc.id, start, end, input, color, kind, list, applied, target, help, hint,
@@ -203,6 +199,8 @@ function openCodeBox(doc: Doc, start: number, end: number) {
     popup.inVivo = inVivoName(doc.content.slice(a, b));
     meta.textContent = `${lineLabel(doc, a, b)} · ${b - a} characters`;
     setNamedHighlight('qc-pending', rangeFor(a, b), 10);
+    // The box follows the end of the passage (e.g. down when the selection grows downwards).
+    placeBox(el, a, b, width);
     refreshSuggestions();
   };
   showPins(start, end, { onChange: adjust, onCommit: (a, b) => {
@@ -216,6 +214,20 @@ function openCodeBox(doc: Doc, start: number, end: number) {
   renderApplied();
   input.focus({ preventScroll: true });
   el.scrollIntoView({ block: 'nearest' });
+}
+
+/**
+ * Places the box one text line below the end of the passage [start, end), so the passage stays
+ * visible; horizontally where the passage ends, within the text area.
+ */
+function placeBox(el: HTMLElement, start: number, end: number, width: number) {
+  const range = rangeFor(start, end);
+  const rects = range.getClientRects();
+  const last = rects[rects.length - 1] ?? range.getBoundingClientRect();
+  const grid = gridEl.getBoundingClientRect();
+  const lineHeight = parseFloat(getComputedStyle(textBody).lineHeight) || 24;
+  el.style.left = `${Math.max(8, Math.min(last.left - grid.left, grid.width - width - 8))}px`;
+  el.style.top = `${last.bottom - grid.top + lineHeight}px`;
 }
 
 /** Copies the passage the box was opened for (the text selection itself is gone once the box has focus). */

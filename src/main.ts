@@ -12,7 +12,7 @@ import { notify } from './view/feedback';
 import { openStartDialog } from './view/startDialog';
 
 onSaveError(() =>
-  notify('Saving to local storage failed (the browser storage is probably full). Export your project now so you do not lose work.'),
+  notify('Saving to local storage failed (the browser storage is probably full). Export your project now so you do not lose work.', 'Could not save'),
 );
 initApp();
 subscribe(renderApp);

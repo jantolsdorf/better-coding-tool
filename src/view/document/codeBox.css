@@ -253,3 +253,9 @@
   padding: 0 7px;
   line-height: 18px;
 }
+
+/* While a pin is dragged, the box lets the pointer reach the text below it (and shows that text). */
+body.pin-dragging .code-popup {
+  pointer-events: none;
+  opacity: 0.35;
+}

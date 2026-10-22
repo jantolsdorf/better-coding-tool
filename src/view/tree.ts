@@ -46,7 +46,7 @@ export const toggleDocSelectMode = () => selection.toggleMode();
 /** Deletes the selected documents and folders (Delete key); returns false if nothing is selected. */
 export function deleteSelectedItems(): boolean {
   if (!selection.size) return false;
-  if (deleteItemsInteractive(selectedItems())) selection.clear();
+  void deleteItemsInteractive(selectedItems()).then((deleted) => deleted && selection.clear());
   return true;
 }
 

@@ -83,7 +83,8 @@ npm run build      # produces a single self-contained dist/index.html
   would be coded, with examples. Passages go into your coding (overlapping ones with the same
   code are combined); one Undo reverts the whole auto-coding.
 - **Pins**: a highlighted passage has a pin at its start and end. While the code box is open,
-  drag them to adjust the selection before coding. Click a code of your coding (its bracket or
+  drag them to adjust the selection before coding (the box sits one line below the passage and
+  follows it; while dragging it lets the pointer through to the text). Click a code of your coding (its bracket or
   name, or its card in the segment list) to highlight it with pins; dragging a pin moves that
   end of the segment, character by character, and the segment is updated when you let go (Undo
   reverts it; if it then overlaps a segment with the same code, they become one). The clicked
@@ -122,6 +123,8 @@ npm run build      # produces a single self-contained dist/index.html
   memos, the consolidated coding, and each other coder's codes and memos. The menu stays open
   while you tick boxes. Hidden columns are also left out of the table CSV export; the two
   switches only affect the screen.
+- **Text size**: **A−** / **A+** in the header of the text column make the document text smaller or
+  larger (60–250 %); click the percentage for 100 %. The setting is remembered.
 - **Display**: the text stays plain and readable. The column next to it shows a thin
   bracket in the code's color for each coded segment, spanning its lines and open towards the
   text, and a line from its middle to the code's name (overlapping codes get brackets side by
@@ -320,7 +323,7 @@ notifies `renderApp`, which re-renders the views.
 | `view/topbar.ts`, `startDialog.ts` | Top bar, menus, keyboard shortcuts; the start dialog (new project or open a file) |
 | `view/leaveGuard.ts` | Warning before closing the tab, with an offer to download a copy |
 | `view/layout.ts`, `splitters.ts` | Rearranging and resizing the main areas and sidebar panels |
-| `view/dom.ts`, `feedback.ts`, `files.ts` | DOM helpers; messages and questions; file picking and downloads |
+| `view/dom.ts`, `feedback.ts`, `files.ts` | DOM helpers; messages and questions as dialogs of the app (`notify`, `confirmAction` with a named confirm button, `askText`, `choose`; never the browser's alert/confirm/prompt); file picking and downloads |
 | `view/global.css` | Global styles: light and dark themes, base elements, buttons, menus, layout, dialogs |
 | `view/**/*.css` next to a view | That view's own styles (e.g. `document/document.css`, `codebookList.css`), imported by its module |
 

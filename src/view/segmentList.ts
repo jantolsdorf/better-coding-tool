@@ -98,7 +98,7 @@ function memoCard(doc: Doc, m: Memo): HTMLElement {
             removeMemo(m.id);
           },
         },
-        '✕',
+        h('i', { class: 'fa-solid fa-trash', 'aria-hidden': 'true' }),
       ),
     ),
     h('div', { class: 'memo-note' }, m.note),
@@ -150,7 +150,7 @@ function segmentCard(doc: Doc, s: Segment): HTMLElement {
             removeSegment(s.id);
           },
         },
-        '✕',
+        h('i', { class: 'fa-solid fa-trash', 'aria-hidden': 'true' }),
       ),
     ),
     h('div', { class: 'seg-text' }, s.text),

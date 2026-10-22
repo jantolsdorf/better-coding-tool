@@ -1,8 +1,8 @@
-// Messages and questions to the user. Controllers use these instead of calling the browser's
-// dialogs directly, so all user interaction goes through the view layer.
+// Messages and questions to the user, as dialogs of the app (never the browser's own alert,
+// confirm or prompt). Controllers use these, so all user interaction goes through the view layer.
 
 import { h } from './dom';
-import { currentDocument, currentWindow } from './windows';
+import { currentDocument } from './windows';
 
 /** A short message that disappears by itself. */
 export function toast(message: string, ms = 3500) {
@@ -19,14 +19,85 @@ export function toast(message: string, ms = 3500) {
   setTimeout(() => t.remove(), ms + 400);
 }
 
-/** A message the user has to acknowledge. */
-export const notify = (message: string) => currentWindow().alert(message);
+interface DialogButton<T> {
+  label: string;
+  value: T;
+  kind?: 'primary' | 'danger';
+}
 
-/** A yes/no question (OK = yes). */
-export const confirmAction = (question: string) => currentWindow().confirm(question);
+/**
+ * A dialog of the app (instead of the browser's alert/confirm): a title, a message (line breaks
+ * kept) and buttons. Esc or clicking outside resolves with `cancel`. The button at `focus` has
+ * the focus, so Enter chooses it.
+ */
+function showDialog<T>(opts: { title: string; message: string; buttons: DialogButton<T>[]; cancel: T; focus: number }): Promise<T> {
+  return new Promise((resolve) => {
+    let result = opts.cancel;
+    const dlg = h('dialog', { class: 'modal message-dialog' });
+    const buttons = opts.buttons.map((b) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn' + (b.kind === 'primary' ? ' primary' : b.kind === 'danger' ? ' danger-solid' : ''),
+          onClick: () => {
+            result = b.value;
+            dlg.close();
+          },
+        },
+        b.label,
+      ),
+    );
+    dlg.append(
+      h(
+        'div',
+        { class: 'modal-inner' },
+        h('div', { class: 'modal-head' }, h('strong', {}, opts.title)),
+        h('div', { class: 'modal-body' }, h('p', { class: 'message-text' }, opts.message)),
+        h('div', { class: 'modal-foot' }, h('span', { class: 'grow' }), ...buttons),
+      ),
+    );
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg) dlg.close();
+    });
+    dlg.addEventListener('close', () => {
+      dlg.remove();
+      resolve(result);
+    });
+    // In the window used last (parts of the app can be in separate windows).
+    currentDocument().body.append(dlg);
+    dlg.showModal();
+    buttons[opts.focus]?.focus();
+  });
+}
 
-/** A question with a text answer; null when cancelled. */
-export const ask = (question: string, suggestion?: string) => currentWindow().prompt(question, suggestion);
+/** A message the user has to acknowledge (e.g. why something could not be done). */
+export function notify(message: string, title = 'Please note'): Promise<void> {
+  return showDialog({ title, message, buttons: [{ label: 'OK', value: undefined, kind: 'primary' }], cancel: undefined, focus: 0 });
+}
+
+interface ConfirmOptions {
+  title?: string;
+  /** The label of the confirming button, saying what it does (e.g. "Delete", "Merge"). */
+  confirm: string;
+  cancel?: string;
+  /** For actions that remove something: the button is red and Enter means Cancel. */
+  danger?: boolean;
+}
+
+/** A question to confirm an action; resolves true if confirmed. */
+export function confirmAction(question: string, { title = 'Please confirm', confirm, cancel = 'Cancel', danger = false }: ConfirmOptions): Promise<boolean> {
+  return showDialog({
+    title,
+    message: question,
+    buttons: [
+      { label: cancel, value: false },
+      { label: confirm, value: true, kind: danger ? 'danger' : 'primary' },
+    ],
+    cancel: false,
+    focus: danger ? 0 : 1,
+  });
+}
 
 export interface Choice<T> {
   label: string;

@@ -32,7 +32,7 @@ export function renderCoderList(container: HTMLElement) {
           '↪',
         ),
         h('button', { class: 'icon-btn', title: 'Rename (an existing name merges the two)', onClick: () => renameCoderInteractive(x) }, '✎'),
-        h('button', { class: 'icon-btn', title: 'Remove this coder', onClick: () => removeCoderInteractive(x) }, '✕'),
+        h('button', { class: 'icon-btn', title: 'Remove this coder', onClick: () => removeCoderInteractive(x) }, h('i', { class: 'fa-solid fa-trash', 'aria-hidden': 'true' }),),
       ),
     ),
   );
