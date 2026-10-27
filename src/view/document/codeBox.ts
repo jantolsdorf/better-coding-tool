@@ -9,6 +9,7 @@ import {
   codeById,
   codePath,
   codePathParts,
+  codesInTreeOrder,
   findChildCode,
   findCodeByPath,
   isCodeInSubtree,
@@ -53,6 +54,8 @@ interface Popup {
   pathExists: boolean;
   /** Index into items, or -1 for "use the typed text". */
   active: number;
+  /** Tab going through a code's subcodes: which ones, the one shown, and the box's text then. */
+  tabCycle?: { parentPath: string; ids: string[]; index: number; value: string };
   counts: Map<string, number>;
 }
 
@@ -283,7 +286,7 @@ function helpSection(onClose: () => void): HTMLElement {
     row('↵', 'apply the code or save the memo, and close'),
     row('⇧↵', 'apply and keep the box open to add another code or memo'),
     row('↑ ↓', 'choose a suggestion'),
-    row('Tab', 'complete the suggestion, or (with nothing typed) put the highlighted words in the box to edit them'),
+    row('Tab', 'complete the suggestion (“par” → “Parent”); Tab again goes through its subcodes, ⇧Tab back, “>” goes a level deeper. With nothing typed: put the highlighted words in the box to edit them'),
     row('⌘C / Ctrl+C', 'copy the selected text (or click ⧉)'),
     row('Esc', 'close without changes'),
   );
@@ -515,6 +518,48 @@ function apply(keepOpen: boolean) {
   p.input.focus({ preventScroll: true });
 }
 
+/** A code's direct subcodes in the codebook's custom order. */
+const subcodesInOrder = (parentId: string) => codesInTreeOrder(parentId).filter((c) => c.parentId === parentId);
+
+/**
+ * Tab in the box, as in a shell: "par" completes to the suggested code's path ("Parent"); Tab on
+ * a code's path (or on "Parent >") goes through its subcodes ("Parent > Sub", then the next one;
+ * Shift+Tab backwards). Typing ">" after a subcode goes one level deeper.
+ */
+function tabComplete(back: boolean) {
+  const p = popup;
+  if (!p) return;
+  const set = (path: string) => {
+    p.input.value = p.entry.prefix + path;
+    refreshSuggestions();
+    const end = p.input.value.length;
+    p.input.setSelectionRange(end, end);
+  };
+  // Going on through the same subcodes, if the text is still what the last Tab put there.
+  const cycle = p.tabCycle;
+  if (cycle && cycle.value === p.input.value) {
+    cycle.index = (cycle.index + (back ? -1 : 1) + cycle.ids.length) % cycle.ids.length;
+    set(`${cycle.parentPath} > ${codeById(cycle.ids[cycle.index])!.name}`);
+    cycle.value = p.input.value;
+    return;
+  }
+  p.tabCycle = undefined;
+  // On a code's full path (or with ">" after it): its subcodes.
+  const parts = splitCodePath(p.entry.text);
+  const parent = parts.length ? findCodeByPath(parts) : undefined;
+  const subs = parent ? subcodesInOrder(parent.id) : [];
+  if (parent && subs.length) {
+    const index = back ? subs.length - 1 : 0;
+    const parentPath = codePath(parent);
+    set(`${parentPath} > ${subs[index].name}`);
+    p.tabCycle = { parentPath, ids: subs.map((c) => c.id), index, value: p.input.value };
+    return;
+  }
+  // Otherwise: complete to the chosen (or first) suggestion's path.
+  const pick = p.items[p.active >= 0 ? p.active : 0];
+  if (pick) set(codePath(pick));
+}
+
 function onKey(e: KeyboardEvent) {
   const p = popup;
   if (!p) return;
@@ -526,10 +571,9 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault();
     p.active = Math.max(p.active - 1, -1);
     renderList();
-  } else if (e.key === 'Tab' && p.active >= 0) {
+  } else if (e.key === 'Tab' && p.entry.kind === 'code' && p.entry.text.trim()) {
     e.preventDefault();
-    p.input.value = p.entry.prefix + p.items[p.active].name;
-    refreshSuggestions();
+    tabComplete(e.shiftKey);
   } else if (e.key === 'Tab' && p.entry.kind === 'code' && !p.entry.text.trim() && p.inVivo) {
     // Put the in-vivo name into the box to edit it before applying.
     e.preventDefault();
