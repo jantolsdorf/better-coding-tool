@@ -1,4 +1,4 @@
-/* The code details window: retrieved segments, merge, subcode color (codeDialog.ts). */
+/* The code details (modal or own window): retrieved segments, merge, subcode color (codeDialog.ts). */
 
 /* Long code paths must not stretch the dialog footer. */
 select.merge-select {

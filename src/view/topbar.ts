@@ -27,7 +27,7 @@ import {
 } from '../controller/transfer';
 import { canRedo, canUndo, project, savedBytes, ui } from '../model/state';
 import type { UIState } from '../model/types';
-import { clearCodeSelection, deleteSelectedCodes, setCodebookFilter } from './codebookList';
+import { clearCodeSelection, copySelectedCodes, deleteSelectedCodes, setCodebookFilter } from './codebookList';
 import { openChallengeReview } from './challengeReview';
 import { toast } from './feedback';
 import { openOccurrenceView } from './occurrenceView';
@@ -81,7 +81,8 @@ export function initTopbar() {
   onClick('btn-select-docs', toggleDocSelectMode);
   onClick('btn-toggle-codes', toggleAllCodesCollapsed);
 
-  // Esc ends selecting; Delete/Backspace deletes the selection of the panel used last.
+  // Esc ends selecting; Delete/Backspace deletes the selection of the panel used last; ⌘C / Ctrl+C
+  // copies the selected codes' names (unless text is selected).
   let lastPanel: 'docs' | 'codes' = 'docs';
   // On the panels' contents, which go along when a panel moves to a separate window.
   for (const [sel, name] of [['.panel.docs', 'docs'], ['.panel.codes', 'codes']] as const) {
@@ -96,6 +97,8 @@ export function initTopbar() {
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       const done = lastPanel === 'codes' ? deleteSelectedCodes() : deleteSelectedItems();
       if (done) e.preventDefault();
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c' && lastPanel === 'codes' && doc.getSelection()?.isCollapsed !== false) {
+      if (copySelectedCodes()) e.preventDefault();
     }
   }));
   onClick('btn-import-coder', importCoderInteractive);

@@ -200,3 +200,11 @@ export function openToolWindow(key: string, title: string, onClose: () => void, 
 }
 
 export const closeToolWindow = (key: string) => toolWindows.get(key)?.close();
+
+/** Brings an open tool window to the front. Returns false if it is not open. */
+export function focusToolWindow(key: string): boolean {
+  const open = toolWindows.get(key);
+  if (!open || open.closed) return false;
+  open.focus();
+  return true;
+}

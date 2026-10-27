@@ -42,3 +42,32 @@ export async function copyText(text: string): Promise<boolean> {
     return ok;
   }
 }
+
+const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * Copies rows of cells as a table, the way spreadsheets do: as an HTML table (which apps like
+ * Miro paste as a table or as one sticky note per cell) and as tab-separated text. Resolves false
+ * if the browser refused.
+ */
+export async function copyTable(rows: string[][]): Promise<boolean> {
+  const clean = (s: string) => s.replace(/[\t\r\n]+/g, ' ');
+  const tsv = rows.map((r) => r.map(clean).join('\t')).join('\n');
+  const html =
+    '<meta charset="utf-8"><table>' +
+    rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('') +
+    '</table>';
+  const win = currentWindow();
+  try {
+    await win.navigator.clipboard.write([
+      new (win as Window & typeof globalThis).ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([tsv], { type: 'text/plain' }),
+      }),
+    ]);
+    return true;
+  } catch {
+    // Without rich clipboard support, at least the tab-separated text.
+    return copyText(tsv);
+  }
+}

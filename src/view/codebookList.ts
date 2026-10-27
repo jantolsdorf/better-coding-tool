@@ -21,6 +21,7 @@ import { byOrder } from '../model/codeOrder';
 import {
   childCodes,
   codeById,
+  codeChain,
   codePath,
   codePathParts,
   codesInTreeOrder,
@@ -34,6 +35,8 @@ import type { Code } from '../model/types';
 import { byName } from '../model/util';
 import { openCodeDialog } from './codeDialog';
 import { h } from './dom';
+import { toast } from './feedback';
+import { copyTable, copyText } from './files';
 import { byId } from './windows';
 import { actionSelect, Selection, TOP_LEVEL } from './multiSelect';
 import '@fortawesome/fontawesome-free/css/all.min.css';
@@ -57,6 +60,36 @@ export function deleteSelectedCodes(): boolean {
 }
 
 export const clearCodeSelection = () => selection.clear();
+
+const selectedInOrder = () => selection.order.filter((id) => selection.has(id)).flatMap((id) => codeById(id) ?? []);
+
+const copied = (ok: boolean, n: number, how: string) =>
+  toast(ok ? `Copied ${n === 1 ? 'the code name' : `${n} code names`} ${how}.` : 'Could not copy to the clipboard.');
+
+/** Copies the selected codes' names, one per line in the order shown (⌘C / Ctrl+C); returns false if nothing is selected. */
+export function copySelectedCodes(): boolean {
+  if (!selection.size) return false;
+  const names = selectedInOrder().map((c) => c.name);
+  void copyText(names.join('\n')).then((ok) => copied(ok, names.length, 'as text'));
+  return true;
+}
+
+/**
+ * Copies the selected codes' names as a table: one column per top-level code, holding the
+ * selected codes of its branch in the order shown (e.g. to paste into Miro as sticky notes).
+ */
+function copySelectedCodesAsTable() {
+  const columns = new Map<string, string[]>();
+  for (const c of selectedInOrder()) {
+    const top = codeChain(c)[0].id;
+    if (!columns.has(top)) columns.set(top, []);
+    columns.get(top)!.push(c.name);
+  }
+  const cols = [...columns.values()];
+  const height = Math.max(...cols.map((col) => col.length));
+  const rows = Array.from({ length: height }, (_, i) => cols.map((col) => col[i] ?? ''));
+  void copyTable(rows).then((ok) => copied(ok, selection.size, 'as a table'));
+}
 
 /** Moves or merges the dragged codes onto a code (null = top level). */
 function dropDragged(targetId: string | null, merge: boolean) {
@@ -171,6 +204,12 @@ function selectionBar(): HTMLElement {
       actionSelect('Merge…', 'Merge the selected codes into another code', mergeTargets, async (v) => {
         if (await mergeCodesInteractive(selectedCodes(), v)) selection.clear();
       }),
+      h('button', { class: 'btn small', title: 'Copy the selected codes’ names, one per line (⌘C / Ctrl+C)', onClick: copySelectedCodes }, 'Copy as text'),
+      h(
+        'button',
+        { class: 'btn small', title: 'Copy the selected codes’ names as a table: one column per top-level code (pastes into Miro as a table or sticky notes)', onClick: copySelectedCodesAsTable },
+        'Copy as table',
+      ),
       h('button', { class: 'icon-btn danger', title: 'Delete the selected codes (Delete)', onClick: deleteSelectedCodes }, '🗑'),
     ],
     ['code', 'codes'],
