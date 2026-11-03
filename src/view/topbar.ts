@@ -31,6 +31,7 @@ import { clearCodeSelection, copySelectedCodes, deleteSelectedCodes, setCodebook
 import { openChallengeReview } from './challengeReview';
 import { toast } from './feedback';
 import { openOccurrenceView } from './occurrenceView';
+import { openAiCodeDialog } from './aiCodeDialog';
 import { openCodeCreateDialog } from './codeCreateDialog';
 import { h } from './dom';
 import { openStartDialog } from './startDialog';
@@ -78,6 +79,7 @@ export function initTopbar() {
   onClick('btn-sample', addSampleDocument);
   onClick('btn-add-code', () => openCodeCreateDialog('code'));
   onClick('btn-auto-code', () => openCodeCreateDialog('auto'));
+  onClick('btn-ai-code', () => void openAiCodeDialog());
   onClick('btn-select-docs', toggleDocSelectMode);
   onClick('btn-toggle-codes', toggleAllCodesCollapsed);
 

@@ -102,6 +102,7 @@ export function openStartDialog({ firstUse }: { firstUse: boolean }) {
         'Is my data sent anywhere?',
         true,
         h('p', {}, 'No. Everything stays on your computer. The tool makes no network requests: no upload, no account, no tracking, no fonts or scripts from other servers.'),
+        h('p', {}, 'The one exception is AI coding, and only if you use it: you set up an AI service yourself (its address and your key), and the tool shows what will be sent and where before you send it. With an AI server on your own computer, even that stays local.'),
         h('p', {}, 'Your documents, codes and memos are saved in this browser’s local storage, on this computer and in this browser only. To keep a backup, move to another computer or share your work, use “Export project”: it downloads a file that you keep or pass on yourself.'),
         h('p', { class: 'muted' }, 'Clearing the browser’s data for this site (or a private window being closed) deletes what is stored there, so export regularly.'),
       ),

@@ -29,6 +29,7 @@ import {
   lastEditedByCode,
   matchesCodeQuery,
   segmentCounts,
+  subtreeOf,
 } from '../model/codes';
 import { project, ui } from '../model/state';
 import type { Code } from '../model/types';
@@ -50,6 +51,8 @@ let filterText = '';
 let lastContainer: HTMLElement | null = null;
 
 const selection = new Selection(() => lastContainer && renderCodebook(lastContainer));
+// A parent code's checkbox also selects its subcodes on the second click.
+selection.childrenOf = (id) => subtreeOf(id).filter((c) => c.id !== id).map((c) => c.id);
 const selectedCodes = () => [...selection.keys];
 
 /** Deletes the selected codes (Delete key); returns false if nothing is selected. */

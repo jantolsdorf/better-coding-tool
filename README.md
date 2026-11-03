@@ -9,6 +9,7 @@ It needs no server: everything is stored in the browser's `localStorage`.
 npm install
 npm run dev        # development server at http://localhost:5173
 npm run build      # produces a single self-contained dist/index.html
+npm test           # unit tests (Vitest); npm run test:watch reruns them on changes
 ```
 
 `dist/index.html` can be opened directly from disk or shared with colleagues. Note that
@@ -269,6 +270,14 @@ npm run build      # produces a single self-contained dist/index.html
   compare (yours and every imported coder), *Only differences*, and **Export CSV** (one row per
   document and code, with each coder's count).
 
+## Tests
+
+`tests/*.test.ts` test the model and controllers with [Vitest](https://vitest.dev) in a simulated
+browser (happy-dom): code paths, auto-coding (occurrences, paragraphs) and AI coding (batching,
+prompts, parsing answers, finding quotes, applying, the API settings, and the requests with a
+mocked `fetch`, so no network is used). `tests/helpers.ts` starts each test with an empty project.
+The views are not covered by tests.
+
 ## Code layout
 
 The code follows the model–view–controller pattern. Dependencies point one way:
@@ -292,6 +301,7 @@ notifies `renderApp`, which re-renders the views.
 | `model/table.ts` | Which coder columns are shown, and their order |
 | `model/consolidation.ts` | Per-document consolidation |
 | `model/autoCode.ts` | Auto-coding: finding occurrences and paragraphs, preview, applying |
+| `model/aiCoding.ts`, `aiSettings.ts` | AI coding: text units and requests, prompts, parsing answers into suggestions, applying; the API settings (stored outside the project) |
 | `model/formats/refiCodebook.ts` | REFI-QDA Codebook (.qdc) export and import; code elements shared with the .qdpx project format |
 | `model/mergeDocs.ts` | Merging copies of a document (identical text) with everyone's coding, by author |
 | `model/challenges.ts`, `model/occurrence.ts` | Challenges of other coders' codes; code occurrence per document and coder |
@@ -306,6 +316,7 @@ notifies `renderApp`, which re-renders the views.
 | `controller/memos.ts` | Adding, editing and deleting memos |
 | `controller/comparison.ts` | Other coders, consolidation, column order and widths |
 | `controller/autoCode.ts` | Checking auto-code choices, coding, messages |
+| `controller/aiCoding.ts` | AI coding: requests to an OpenAI-compatible API (the only network access, only when started), running a job, applying accepted suggestions |
 | `controller/challenges.ts` | Challenge mode, challenging and withdrawing, challenge export |
 | `controller/transfer.ts` | All imports and exports |
 | `controller/preferences.ts`, `history.ts` | Who is coding (switch, add, rename), theme, layout; undo/redo |
@@ -317,6 +328,8 @@ notifies `renderApp`, which re-renders the views.
 | `view/csvCodebookDialog.ts` | Choosing the code, description and color columns of a CSV codebook |
 | `view/document/pins.ts` | Pins at both ends of a highlighted passage to adjust a selection or a coded segment |
 | `view/codeCreateDialog.ts`, `autoCodeTab.ts`, `codeCreateDialog.css` | The + Code dialog: new code and auto-coding tabs |
+| `view/aiCodeDialog.ts`, `aiSettingsDialog.ts`, `aiCode.css` | AI coding: choosing codes, documents, splitting and examples; reviewing suggestions; the API settings |
+| `view/docPicker.ts` | The document checklist shared by auto-coding and AI coding |
 | `view/mergeDialog.ts` | Who coded which copy; keeping, renaming or merging authors |
 | `view/windows.ts` | Moving parts of the app into separate browser windows and back; tool windows; the window used last |
 | `view/challengeReview.ts`, `commentDialog.ts`, `occurrenceView.ts` | Reviewing and challenging another coder's codes; the comment dialog; the code occurrence table |

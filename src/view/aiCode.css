@@ -1,0 +1,260 @@
+/* AI coding: the settings dialog and the AI coding dialog with its review (aiSettingsDialog.ts, aiCodeDialog.ts). */
+
+dialog.modal.ai-settings {
+  width: min(560px, 94vw);
+}
+dialog.modal.ai-code {
+  width: min(880px, 95vw);
+}
+.ai-code .modal-inner {
+  max-height: 90vh;
+}
+.ai-settings .row,
+.ai-setup .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-intro {
+  margin: 12px 0 0;
+}
+.ai-note {
+  margin: 6px 0 0;
+  font-size: 0.92em;
+}
+.ai-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.ai-check select.field {
+  padding: 2px 6px;
+}
+.ai-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  margin-top: 14px;
+}
+.ai-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+input.field.ai-num {
+  width: 96px;
+}
+.ai-status {
+  margin: 12px 0 0;
+  min-height: 1.2em;
+  white-space: pre-wrap;
+}
+.ai-status.ok {
+  color: var(--ok);
+}
+.ai-status.error,
+.ai-message.error {
+  color: var(--danger);
+}
+
+/* Setup */
+.ai-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  color: var(--text);
+}
+.ai-codes {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 0;
+  margin-top: 6px;
+}
+.ai-code-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.ai-code-row:hover {
+  background: var(--accent-soft);
+}
+.ai-code-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.ai-tag {
+  flex: none;
+  font-size: 0.8em;
+  color: var(--warn);
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  padding: 0 6px;
+  opacity: 0.85;
+}
+.ai-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ai-choices > label {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.ai-choices .ac-paragraph-options {
+  margin-left: 24px;
+}
+.ai-summary p {
+  margin: 4px 0;
+}
+.ai-privacy {
+  background: var(--flash);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+/* Review */
+.ai-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+progress.ai-progress {
+  flex: 1;
+  height: 8px;
+}
+.ai-message {
+  margin: 10px 0 0;
+}
+.ai-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 10px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.ai-counts {
+  font-weight: 600;
+}
+.ai-toolbar select.field {
+  max-width: 200px;
+  text-overflow: ellipsis;
+}
+.ai-problems {
+  margin: 8px 0;
+  color: var(--warn);
+}
+.ai-problems summary {
+  cursor: pointer;
+}
+.ai-problems ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+.ai-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+}
+.ai-sugg {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.ai-sugg.accepted {
+  border-color: var(--ok-border);
+  background: var(--ok-bg);
+}
+.ai-sugg.rejected {
+  opacity: 0.55;
+}
+.ai-sugg-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ai-sugg-code {
+  overflow-wrap: anywhere;
+}
+.ai-sugg-where {
+  font-size: 0.9em;
+}
+.ai-sugg-text {
+  margin: 6px 0;
+  padding: 2px 0 2px 10px;
+  border-left: 3px solid;
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+/* The paragraph around the coded sentences. */
+.ai-context {
+  color: var(--muted);
+}
+mark.ai-coded {
+  color: var(--text);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.ai-sugg-reason {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-style: italic;
+}
+.ai-sugg-actions {
+  display: flex;
+  gap: 6px;
+}
+.ai-sugg-actions .fits.on {
+  background: var(--ok-soft);
+  border-color: var(--ok-border);
+  color: var(--ok);
+}
+.ai-sugg-actions .misfit.on {
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+/* The prompt in the settings */
+.ai-prompt {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.ai-prompt > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+textarea.field.ai-prompt-text {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.9em;
+}
+.ai-format {
+  margin: 4px 0 0;
+  font-size: 0.88em;
+}
+.ai-format code {
+  overflow-wrap: anywhere;
+}
+.ai-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}

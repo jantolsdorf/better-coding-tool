@@ -5,8 +5,9 @@
 import { runAutoCode } from '../controller/autoCode';
 import { parsePhrases, previewAutoCode, type AutoCodeOptions, type ParagraphBreak } from '../model/autoCode';
 import { codePath, codesInTreeOrder, findCodeByPath, nextColor, splitCodePath } from '../model/codes';
-import { currentDoc, docsInTreeOrder, folderPath, getDoc } from '../model/documents';
+import { getDoc } from '../model/documents';
 import { lineLabel } from '../model/lines';
+import { docPicker } from './docPicker';
 import { h } from './dom';
 
 const PREVIEW_ITEMS = 8;
@@ -46,38 +47,7 @@ export function autoCodeTab(close: () => void): HTMLElement {
   );
 
   // ---- documents ----
-  const docs = docsInTreeOrder();
-  const open = currentDoc();
-  const chosen = new Set(open ? [open.id] : docs.map((d) => d.id));
-  const allBox = h('input', { type: 'checkbox' });
-  const docList = h('div', { class: 'ac-docs' });
-  const docLabel = (id: string) => {
-    const d = getDoc(id)!;
-    const path = folderPath(d.folderId);
-    return path ? `${path} / ${d.name}` : d.name;
-  };
-  const renderDocs = () => {
-    allBox.checked = chosen.size === docs.length && docs.length > 0;
-    allBox.indeterminate = chosen.size > 0 && chosen.size < docs.length;
-    docList.replaceChildren(
-      ...docs.map((d) => {
-        const box = h('input', { type: 'checkbox', checked: chosen.has(d.id) });
-        box.addEventListener('change', () => {
-          if (box.checked) chosen.add(d.id);
-          else chosen.delete(d.id);
-          renderDocs();
-          update();
-        });
-        return h('label', { class: 'ac-doc' }, box, ` ${docLabel(d.id)}`);
-      }),
-    );
-  };
-  allBox.addEventListener('change', () => {
-    chosen.clear();
-    if (allBox.checked) docs.forEach((d) => chosen.add(d.id));
-    renderDocs();
-    update();
-  });
+  const { chosen, allBox, list: docList } = docPicker(() => update());
 
   // ---- preview and applying ----
   const preview = h('div', { class: 'ac-preview' });
@@ -151,7 +121,6 @@ export function autoCodeTab(close: () => void): HTMLElement {
   for (const el of [phrases, code, separators]) el.addEventListener('input', update);
   for (const el of [matchCase, wholeWords, scopeOcc, scopePara, breakLine, breakBlank, breakCustom]) el.addEventListener('change', update);
 
-  renderDocs();
   renderPreview();
 
   return h(

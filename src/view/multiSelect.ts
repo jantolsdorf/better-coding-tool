@@ -4,6 +4,27 @@
 
 import './multiSelect.css';
 import { h } from './dom';
+import { toast } from './feedback';
+
+/**
+ * A checkbox click on a row with children (a parent code) goes through three steps: the row only,
+ * then the row with all its children, then nothing. A short message says what the next click does.
+ * Changes `keys` and returns nothing; `children` are all descendants' keys.
+ */
+export function cycleWithChildren(keys: Set<string>, key: string, children: string[], noun: [string, string] = ['subcode', 'subcodes']) {
+  const n = children.length;
+  const what = `${n} ${n === 1 ? noun[0] : noun[1]}`;
+  if (!keys.has(key)) {
+    keys.add(key);
+    if (n) toast(`Click the checkbox again to also select its ${what}.`, 3000);
+  } else if (n && !children.every((k) => keys.has(k))) {
+    children.forEach((k) => keys.add(k));
+    toast(`Selected with its ${what}. Click again to deselect them all.`, 3000);
+  } else {
+    keys.delete(key);
+    children.forEach((k) => keys.delete(k));
+  }
+}
 
 export class Selection {
   readonly keys = new Set<string>();
@@ -11,6 +32,8 @@ export class Selection {
   mode = false;
   /** Keys of the rows in the order they are shown, for Shift-click ranges. */
   order: string[] = [];
+  /** A row's descendants (e.g. a code's subcodes): its checkbox then also selects them (see cycleWithChildren). */
+  childrenOf?: (key: string) => string[];
   private anchor: string | null = null;
 
   constructor(private readonly onChange: () => void) {}
@@ -76,7 +99,13 @@ export class Selection {
         // Ticking a row's own checkbox selects it, even outside select mode.
         if ((e.target as Element).closest('.row-check')) {
           e.stopImmediatePropagation();
-          this.toggle(key);
+          const children = this.childrenOf?.(key) ?? [];
+          if (children.length) {
+            cycleWithChildren(this.keys, key, children);
+            this.anchor = key;
+            this.mode = true;
+            this.onChange();
+          } else this.toggle(key);
           return;
         }
         if (this.click(e, key)) {
