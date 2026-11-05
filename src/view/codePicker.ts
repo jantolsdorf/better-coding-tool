@@ -95,7 +95,7 @@ export function codePicker(opts: CodePickerOptions): CodePicker {
               if (r.selectable) pick(r);
             },
           },
-          ...(r.tree ? treeRowContent(r.tree, opts.counts ? (opts.counts.get(r.tree.code.id) ?? 0) : undefined) : [h('span', { class: 'code-tree-name' }, opts.topLevel ?? '')]),
+          ...(r.tree ? treeRowContent(r.tree, opts.counts ? (opts.counts.get(r.tree.code.id) ?? 0) : undefined, query) : [h('span', { class: 'code-tree-name' }, opts.topLevel ?? '')]),
         ),
       ),
       ...(rows.length ? [] : [h('li', { class: 'empty muted' }, query.trim() ? `No code matches “${query.trim()}”.` : 'No codes yet.')]),

@@ -31,3 +31,18 @@ describe('code paths', () => {
     expect(matchesCodeQuery(c, 'other > dist')).toBe(false);
   });
 });
+
+describe('applying a code as another code of the same name', () => {
+  it('creates a new code at the path, beside the existing one, and codes the passage with it', async () => {
+    const { applyCode } = await import('../src/model/coding');
+    const [doc] = freshProject('Some text to code here.');
+    const first = applyCode(doc.id, 0, 4, 'Trust > Institutions')!.code;
+    const again = applyCode(doc.id, 5, 9, 'Trust > Institutions')!.code;
+    expect(again.id).toBe(first.id);
+    const another = applyCode(doc.id, 10, 14, 'Trust > Institutions', undefined, { another: true })!.code;
+    expect(another.id).not.toBe(first.id);
+    expect(another.parentId).toBe(first.parentId);
+    expect(project.codes.filter((c) => c.name === 'Institutions')).toHaveLength(2);
+    expect(project.segments.filter((s) => s.codeId === another.id)).toHaveLength(1);
+  });
+});

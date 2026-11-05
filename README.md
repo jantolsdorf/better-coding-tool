@@ -98,14 +98,16 @@ build time (`build/licenses.ts`), so they stay right when packages are updated o
   list) so you can see which code the highlighted passage belongs to. Clicking elsewhere or Esc
   ends this.
 - **Coding**: open a document and highlight a passage. A small box opens below the selection;
-  type a code (existing codes are suggested, each with its parent codes as a small line above
-  its name, so long names stay distinguishable) and press **Enter**. **⌘C / Ctrl+C** (or **⧉** in the box)
-  copies the highlighted text. **+ Subcodes** in the box also lists all subcodes of the matching codes,
+  type a code (existing codes are suggested as a tree, with their parent codes and numbers of
+  coded segments, and what you typed highlighted in their names) and press **Enter**. **⌘C / Ctrl+C** (or the copy icon in the box)
+  copies the highlighted text. **Show subcodes** in the box (then **Hide subcodes**) also lists all subcodes of the matching codes,
   each right below its parent (remembered). Pressing **Enter** without
   typing anything creates an *in-vivo code* from the highlighted words (or applies it, if a code
-  with that name exists); **Tab** first puts the words into the box so you can shorten them. **Shift+Enter** applies the
+  with that name exists). **Shift+Enter** applies the
   code and keeps the box open to add more codes to the same passage. **↑/↓** chooses a
-  suggestion, **Tab** completes it, **Esc** cancels.
+  suggestion; **Tab** goes through the codes listed, one by one, putting each into the box, and
+  after the last one back to what you typed (**Shift+Tab** the other way); **Esc** cancels. A new
+  subcode being typed is shown in the tree under its parents, marked as new.
   Type `Level 1 code > Level 2 code` (more levels work too, and `›` is accepted) to create a
   subcode. Missing parent codes are created on the way, and new subcodes take the color of the
   level 1 code. Code names only need to be unique among codes with the same parent, so

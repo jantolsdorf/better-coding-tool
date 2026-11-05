@@ -6,9 +6,8 @@ import './codeBox.css';
 import { codePassage, inVivoName, parseEntry, setCodeBoxHelp, setCodeBoxSubcodes, setCodeTarget, type Entry } from '../../controller/coding';
 import { addMemoToPassage } from '../../controller/memos';
 import {
-  codeById,
+  codeChain,
   codePath,
-  codesInTreeOrder,
   findChildCode,
   findCodeByPath,
   missingInPath,
@@ -17,9 +16,8 @@ import {
   splitCodePath,
 } from '../../model/codes';
 import { currentDoc } from '../../model/documents';
-import { activeLayer, consolidationOf, layerSegments } from '../../model/layers';
+import { activeLayer, consolidationOf } from '../../model/layers';
 import { lineLabel } from '../../model/lines';
-import { memosOf } from '../../model/memos';
 import { project, ui } from '../../model/state';
 import type { Code, Doc } from '../../model/types';
 import { h } from '../dom';
@@ -39,7 +37,6 @@ interface Popup {
   color: HTMLInputElement;
   kind: HTMLElement;
   list: HTMLUListElement;
-  applied: HTMLElement;
   target: HTMLElement;
   help: HTMLElement;
   hint: HTMLElement;
@@ -54,12 +51,17 @@ interface Popup {
   pathExists: boolean;
   /** Index into items, or -1 for "use the typed text". */
   active: number;
-  /** Tab going through a code's subcodes: which ones, the one shown, and the box's text then. */
-  tabCycle?: { parentPath: string; ids: string[]; index: number; value: string };
+  /**
+   * Tab going through the codes listed: the box's text the last Tab put there (typing ends it),
+   * and what was typed before (the last stop, with "Create …" or the in-vivo code).
+   */
+  tabbing?: { value: string; typed: string };
   counts: Map<string, number>;
 }
 
 let popup: Popup | null = null;
+/** While the box's width is measured: all codes are listed, also when subcodes are hidden. */
+let measuringAll = false;
 
 /** Opens the code box whenever text in the document is selected. */
 export function initCodeBox() {
@@ -108,7 +110,6 @@ function openCodeBox(doc: Doc, start: number, end: number) {
   color.addEventListener('input', renderList);
   const kind = h('span', { class: 'entry-kind' });
   const list = h('ul', { class: 'popup-list' });
-  const applied = h('div', { class: 'popup-applied' });
   const target = h('div', { class: 'popup-target' });
   const help = helpSection(() => {
     // Typing "?" also opens the help; closing it clears that.
@@ -118,11 +119,12 @@ function openCodeBox(doc: Doc, start: number, end: number) {
     input.focus({ preventScroll: true });
   });
   const hint = h('div', { class: 'popup-hint' });
+  // Highlighted while the help is shown (see renderHelp).
   const helpToggle = h(
     'button',
     {
-      class: 'icon-btn help-toggle',
-      title: 'Show or hide help (or type ?)',
+      class: 'btn small help-toggle',
+      title: 'Show or hide the help (or type ?)',
       onMousedown: (e: MouseEvent) => {
         e.preventDefault();
         setCodeBoxHelp(!ui.codeBoxHelp);
@@ -130,29 +132,36 @@ function openCodeBox(doc: Doc, start: number, end: number) {
         input.focus({ preventScroll: true });
       },
     },
-    '?',
+    icon('fa-regular fa-circle-question'),
+    'Help',
   );
-  const subcodesBtn = h(
-    'button',
-    {
-      class: 'seg-toggle subcodes-toggle' + (ui.codeBoxSubcodes ? ' on' : ''),
-      title: 'Also list all subcodes of the codes that match what you type',
-      'aria-pressed': String(ui.codeBoxSubcodes),
-      onMousedown: (e: MouseEvent) => {
-        e.preventDefault();
-        setCodeBoxSubcodes(!ui.codeBoxSubcodes);
-        subcodesBtn.classList.toggle('on', ui.codeBoxSubcodes);
-        subcodesBtn.setAttribute('aria-pressed', String(ui.codeBoxSubcodes));
-        refreshSuggestions();
-        input.focus({ preventScroll: true });
-      },
+  // Says what clicking it does: show all subcodes in the list (while searching, all subcodes of
+  // the codes that match), or hide them (only top-level codes; while searching, the matches).
+  const subcodesBtn = h('button', {
+    class: 'btn small subcodes-toggle',
+    title: 'Show or hide the subcodes in the list (while searching: all subcodes of the codes that match)',
+    onMousedown: (e: MouseEvent) => {
+      e.preventDefault();
+      setCodeBoxSubcodes(!ui.codeBoxSubcodes);
+      updateSubcodesBtn();
+      refreshSuggestions();
+      input.focus({ preventScroll: true });
     },
-    '+ Subcodes',
-  );
+  });
+  const updateSubcodesBtn = () => {
+    subcodesBtn.classList.toggle('on', ui.codeBoxSubcodes);
+    subcodesBtn.setAttribute('aria-pressed', String(ui.codeBoxSubcodes));
+    // The eye shows whether they are shown (open) or not (crossed out); the label what clicking does.
+    subcodesBtn.replaceChildren(
+      icon(ui.codeBoxSubcodes ? 'fa-regular fa-eye' : 'fa-regular fa-eye-slash'),
+      'Subcodes',
+    );
+  };
+  updateSubcodesBtn();
   const copyBtn = h(
     'button',
     {
-      class: 'icon-btn copy-toggle',
+      class: 'btn small copy-btn',
       title: 'Copy the selected text (⌘C / Ctrl+C)',
       onMousedown: (e: MouseEvent) => {
         e.preventDefault();
@@ -160,7 +169,7 @@ function openCodeBox(doc: Doc, start: number, end: number) {
         input.focus({ preventScroll: true });
       },
     },
-    '⧉',
+    ...copyLabel(),
   );
   const meta = h('span', { class: 'grow' }, `${lineLabel(doc, start, end)} · ${end - start} characters`);
   const el = h(
@@ -177,22 +186,25 @@ function openCodeBox(doc: Doc, start: number, end: number) {
     ),
     target,
     h('div', { class: 'popup-row' }, color, input),
-    list,
-    applied,
-    help,
+    // What the keys do now, right under the field (renderHint).
     hint,
+    list,
+    help,
   );
   gridEl.append(el);
 
   popup = {
-    el, docId: doc.id, start, end, input, color, kind, list, applied, target, help, hint,
+    el, docId: doc.id, start, end, input, color, kind, list, target, help, hint,
     entry: parseEntry(''), inVivo: inVivoName(doc.content.slice(start, end)),
     rows: [], items: [], exact: undefined, pathExists: false, active: -1, counts: segmentCounts(),
   };
-  // As wide as all codes need (listed as a tree while nothing is typed), within the text area;
-  // it then stays that wide while typing.
+  // As wide as all codes need (listed as a tree, subcodes too), within the text area; it then
+  // stays that wide while typing.
+  measuringAll = true;
   refreshSuggestions();
   const width = fittedWidth(el, grid.width - 16);
+  measuringAll = false;
+  refreshSuggestions();
   el.style.setProperty('--box-width', `${width}px`);
   placeBox(el, start, end, width);
   setNamedHighlight('qc-pending', range, 10);
@@ -216,13 +228,12 @@ function openCodeBox(doc: Doc, start: number, end: number) {
   input.addEventListener('keydown', onKey);
   refreshSuggestions();
   renderTarget();
-  renderApplied();
   input.focus({ preventScroll: true });
   el.scrollIntoView({ block: 'nearest' });
 }
 
 /** Narrowest the box gets (room for the field and its hints). */
-const MIN_WIDTH = 340;
+const MIN_WIDTH = 420;
 /** Room for the list's scrollbar. */
 const SCROLLBAR = 16;
 
@@ -252,18 +263,22 @@ function placeBox(el: HTMLElement, start: number, end: number, width: number) {
   el.style.setProperty('--box-top', `${last.bottom - grid.top + lineHeight}px`);
 }
 
+/** A Font Awesome icon. */
+const icon = (cls: string) => h('i', { class: cls, 'aria-hidden': 'true' });
+const copyLabel = () => [icon('fa-regular fa-copy'), 'Copy selected'];
+
 /** Copies the passage the box was opened for (the text selection itself is gone once the box has focus). */
 async function copyPassage() {
   const p = popup;
   const doc = currentDoc();
   if (!p || !doc || doc.id !== p.docId) return;
-  const btn = p.el.querySelector('.copy-toggle');
+  const btn = p.el.querySelector('.copy-btn');
   if (await copyText(doc.content.slice(p.start, p.end))) {
     btn?.classList.add('done');
-    if (btn) btn.textContent = '✓';
+    btn?.replaceChildren(icon('fa-solid fa-check'), 'Copied');
     setTimeout(() => {
       btn?.classList.remove('done');
-      if (btn) btn.textContent = '⧉';
+      btn?.replaceChildren(...copyLabel());
     }, 1200);
   } else toast('Could not copy to the clipboard.');
 }
@@ -305,8 +320,8 @@ function helpSection(onClose: () => void): HTMLElement {
     row('↵', 'apply the code or save the memo, and close'),
     row('⇧↵', 'apply and keep the box open to add another code or memo'),
     row('↑ ↓', 'choose a suggestion'),
-    row('Tab', 'complete the suggestion (“par” → “Parent”); Tab again goes through its subcodes, ⇧Tab back, “>” goes a level deeper. With nothing typed: put the highlighted words in the box to edit them'),
-    row('⌘C / Ctrl+C', 'copy the selected text (or click ⧉)'),
+    row('Tab', 'go through the codes listed, one by one, each put into the box, then back to what you typed (⇧Tab the other way); typing searches again. “>” after a code lists its subcodes'),
+    row('⌘C / Ctrl+C', 'copy the selected text (or click the copy icon)'),
     row('Esc', 'close without changes'),
   );
 }
@@ -314,7 +329,11 @@ function helpSection(onClose: () => void): HTMLElement {
 function renderHelp() {
   const p = popup;
   if (!p) return;
-  p.help.hidden = !(ui.codeBoxHelp || p.entry.help);
+  const shown = ui.codeBoxHelp || p.entry.help;
+  p.help.hidden = !shown;
+  const toggle = p.el.querySelector('.help-toggle');
+  toggle?.classList.toggle('on', shown);
+  toggle?.setAttribute('aria-pressed', String(shown));
 }
 
 /** Shows whether the box currently creates a code or a memo. */
@@ -326,11 +345,26 @@ function renderKind() {
   p.kind.className = 'entry-kind ' + (memo ? 'memo' : 'code');
   p.kind.title = memo ? 'Saves a memo (sticky note). Remove “memo:” to apply a code.' : 'Applies a code. Start with “memo:” to add a memo instead.';
   p.el.classList.toggle('memo-mode', memo);
-  p.hint.textContent = memo
-    ? '↵ save memo · ⇧↵ save & add another · Esc cancel'
-    : p.entry.text.trim()
-      ? '↵ apply · ⇧↵ apply & add another · ↑↓ choose · Esc cancel'
-      : '↵ in-vivo code · type to find or create a code · ? help · Esc cancel';
+}
+
+/**
+ * The keys that do something right now, right under the field: Enter (when something is
+ * highlighted), Tab (when codes are listed), ">" (after a name), ? (while the field is empty), Esc.
+ */
+function renderHint() {
+  const p = popup;
+  if (!p) return;
+  const q = p.entry.text.trim();
+  const memo = p.entry.kind === 'memo';
+  const typingSubcode = /[>›]\s*$/.test(q);
+  const listed = !memo && p.rows.some((r) => r.match || !q);
+  const hints: [string, string][] = [];
+  if (memo ? q : p.active >= 0 || (q ? !typingSubcode : !!p.inVivo)) hints.push(['↵', 'apply highlighted']);
+  if (listed) hints.push(['Tab', 'go through list']);
+  if (!memo && q && !typingSubcode) hints.push(['>', 'add subcode']);
+  if (!p.input.value.trim()) hints.push(['?', 'help']);
+  hints.push(['Esc', 'close']);
+  p.hint.replaceChildren(...hints.flatMap(([key, text], i) => [i ? ' · ' : '', h('kbd', {}, key), ` ${text}`]));
 }
 
 /** While consolidating, lets the user choose whether the code goes into their coding or the consolidated one. */
@@ -347,8 +381,7 @@ function renderTarget() {
           e.preventDefault();
           setCodeTarget(value);
           renderTarget();
-          renderApplied();
-        },
+                },
       },
       label,
     );
@@ -381,7 +414,7 @@ function refreshSuggestions() {
   const exactPath = !trailing && parts.length ? findCodeByPath(parts) : undefined;
   // The matches as a tree, with their parents for context (and optionally all their subcodes).
   // All are listed; the list scrolls. The cap only keeps huge codebooks responsive.
-  p.rows = codeTreeRows(typed, { withSubcodes: ui.codeBoxSubcodes }).slice(0, 500);
+  p.rows = codeTreeRows(typed, { withSubcodes: ui.codeBoxSubcodes, collapsed: !ui.codeBoxSubcodes && !measuringAll }).slice(0, 500);
   p.items = p.rows.map((r) => r.code);
   p.pathExists = !!exactPath;
   // A single name also picks an existing subcode of that name by default (it stays findable),
@@ -389,27 +422,6 @@ function refreshSuggestions() {
   p.exact = exactPath ?? (parts.length === 1 && !trailing ? p.rows.find((r) => r.match && r.code.name.toLowerCase() === last)?.code : undefined);
   p.active = p.exact ? p.items.indexOf(p.exact) : -1;
   renderList();
-}
-
-/**
- * A suggestion's text: the parent codes as a small breadcrumb line above the name, so the parent
- * stays readable however long the names are. Both lines wrap instead of being cut off.
- */
-function suggestionText(parents: string[], name: string, prefix = '', suffix = ''): HTMLElement {
-  return h(
-    'span',
-    { class: 'sugg-text' },
-    parents.length
-      ? h(
-          'span',
-          { class: 'sugg-path' },
-          prefix ? `${prefix} ` : '',
-          ...parents.flatMap((part, i) => [i ? h('span', { class: 'sugg-sep' }, ' › ') : '', h('span', { class: 'sugg-part' }, part)]),
-          suffix,
-        )
-      : null,
-    h('span', { class: 'sugg-name' }, name),
-  );
 }
 
 function renderList() {
@@ -421,6 +433,7 @@ function renderList() {
     p.active = i;
     apply(e.shiftKey);
   };
+  renderHint();
   if (p.entry.help) return p.list.replaceChildren();
   if (p.entry.kind === 'memo') {
     p.list.replaceChildren(
@@ -432,36 +445,92 @@ function renderList() {
   }
   // Nothing typed: Enter uses the highlighted words as an in-vivo code.
   const inVivo = !q && p.inVivo ? inVivoRow(p, pick(-1)) : null;
-  p.list.replaceChildren(
-    ...(inVivo ? [inVivo] : []),
-    ...p.rows.map((r, i) =>
-      h(
-        'li',
-        { class: ['code-tree-row', i === p.active ? 'active' : '', treeRowClass(r, q)].filter(Boolean).join(' '), title: codePath(r.code), onMousedown: pick(i) },
-        ...treeRowContent(r, p.counts.get(r.code.id) ?? 0),
-      ),
-    ),
-  );
   const parts = splitCodePath(q);
   const typingSubcode = /[>›]\s*$/.test(q);
-  if (parts.length && !typingSubcode && !p.pathExists) {
+  // A new subcode of an existing code goes in the tree under it, first among its other subcodes:
+  // highlighted with its name ("Parent > New"), or as its place while it has none ("Parent >").
+  const parentCode = typingSubcode && parts.length ? findCodeByPath(parts) : undefined;
+  const placeholder: Code | undefined = parentCode && { id: '', name: 'type its name…', color: codeChain(parentCode)[0].color, parentId: parentCode.id };
+  const newParent = !typingSubcode && parts.length > 1 && !p.pathExists ? findCodeByPath(parts.slice(0, -1)) : undefined;
+  const newSubcode: Code | undefined = newParent && { id: '', name: parts.at(-1)!, color: codeChain(newParent)[0].color, parentId: newParent.id };
+  const extra = placeholder ?? newSubcode;
+  const shown = extra ? codeTreeRows(q, { withSubcodes: ui.codeBoxSubcodes, collapsed: !ui.codeBoxSubcodes, extra }) : p.rows;
+  const indexOf = new Map(p.rows.map((r, i) => [r.code.id, i]));
+  // Creating a code comes first: "Create new code …", or the new subcode under its parents.
+  const create: HTMLElement[] = [];
+  if (parts.length && !typingSubcode && p.pathExists) {
+    // The name is an existing code's (highlighted; Enter applies it): another code of that name.
     const name = parts.at(-1)!;
-    const parents = parts.slice(0, -1);
-    const newParents = missingInPath(parts).slice(0, -1);
-    // Subcodes take the color of the level 1 code.
-    const color = parents.length ? (findChildCode(null, parents[0])?.color ?? p.color.value) : p.color.value;
-    const also = newParents.length ? ` (also creates ${newParents.map((n) => `“${n}”`).join(', ')})` : '';
-    p.list.append(
+    const where = parts.length > 1 ? ` under “${parts.at(-2)}”` : '';
+    create.push(
       h(
         'li',
-        { class: 'create' + (p.active === -1 ? ' active' : ''), title: parts.join(' > '), onMousedown: pick(-1) },
-        colorSwatch(color),
-        parents.length
-          ? suggestionText(parents, `Create subcode “${name}”`, 'in', also)
-          : h('span', { class: 'sugg-text' }, h('span', { class: 'sugg-name' }, `Create new code “${name}”`)),
+        { class: 'create' + (p.active === -1 ? ' active' : ''), title: `A new code “${name}”${where}, besides the existing one`, onMousedown: pick(-1) },
+        colorSwatch(parts.length > 1 ? (findChildCode(null, parts[0])?.color ?? p.color.value) : p.color.value),
+        h('span', { class: 'sugg-text' }, h('span', { class: 'sugg-name' }, `Create another code “${name}”${where}`)),
       ),
     );
   }
+  if (parts.length && !typingSubcode && !p.pathExists && !newSubcode) {
+    const name = parts.at(-1)!;
+    const parents = parts.slice(0, -1);
+    // Subcodes take the color of the level 1 code.
+    const color = parents.length ? (findChildCode(null, parents[0])?.color ?? p.color.value) : p.color.value;
+    if (parents.length) create.push(...createTree(parts, color, p.active === -1, pick(-1)));
+    else
+      create.push(
+        h(
+          'li',
+          { class: 'create' + (p.active === -1 ? ' active' : ''), title: parts.join(' > '), onMousedown: pick(-1) },
+          colorSwatch(color),
+          h('span', { class: 'sugg-text' }, h('span', { class: 'sugg-name' }, `Create new code “${name}”`)),
+        ),
+      );
+  }
+  // Just typed ">" after a code that does not exist yet: it and its new subcode's place.
+  if (parts.length && typingSubcode && !parentCode) {
+    const color = findChildCode(null, parts[0])?.color ?? p.color.value;
+    create.push(...createTree([...parts, ''], color, false));
+  }
+  p.list.replaceChildren(
+    ...(inVivo ? [inVivo] : []),
+    ...create,
+    ...shown.map((r) => {
+      if (r.code === placeholder)
+        return h(
+          'li',
+          { class: 'code-tree-row create create-context create-unnamed' + (p.active === -1 ? ' active' : '') },
+          ...withBadge(treeRowContent(r), 'new subcode'),
+        );
+      if (r.code === newSubcode)
+        return h(
+          'li',
+          { class: 'code-tree-row create new-subcode' + (p.active === -1 ? ' active' : ''), title: `Create ${parts.join(' > ')}`, onMousedown: pick(-1) },
+          ...withBadge(treeRowContent(r), 'new subcode'),
+        );
+      const i = indexOf.get(r.code.id);
+      // Shown only for context (e.g. the siblings of a new subcode): clicking puts it in the box.
+      if (i === undefined)
+        return h(
+          'li',
+          {
+            class: 'code-tree-row tree-context',
+            title: codePath(r.code),
+            onMousedown: (e: MouseEvent) => {
+              e.preventDefault();
+              p.input.value = p.entry.prefix + codePath(r.code);
+              refreshSuggestions();
+            },
+          },
+          ...treeRowContent(r, p.counts.get(r.code.id) ?? 0, q),
+        );
+      return h(
+        'li',
+        { class: ['code-tree-row', i === p.active ? 'active' : '', treeRowClass(r, q)].filter(Boolean).join(' '), title: codePath(r.code), onMousedown: pick(i) },
+        ...treeRowContent(r, p.counts.get(r.code.id) ?? 0, q),
+      );
+    }),
+  );
   if (!p.items.length && !q) {
     p.list.append(h('li', { class: 'empty' }, 'Or type a code name, “parent code > subcode”, or “memo: …”. Type ? for help.'));
   }
@@ -480,6 +549,52 @@ function withCodeColor<T extends HTMLElement>(el: T, color: string): T {
 /** A code's color as a swatch. */
 const colorSwatch = (color: string) => withCodeColor(h('span', { class: 'swatch code-swatch' }), color);
 
+/** The badge of a code about to be created ("new", "new subcode"), in front of its name. */
+const newBadge = (label: string) => h('span', { class: 'code-tree-new' }, label);
+
+/** A tree row's content (codeTree.ts) with the "new" badge in front of the name. */
+function withBadge(content: (HTMLElement | null)[], label: string): (HTMLElement | null)[] {
+  const name = content.findIndex((el) => el?.classList.contains('code-tree-name'));
+  return [...content.slice(0, name), newBadge(label), ...content.slice(name)];
+}
+
+/**
+ * Creating a subcode ("Parent > New"), shown as a tree: its existing parent codes, then the new
+ * codes (missing parents too), each marked as new; clicking (or Enter) creates them. A new
+ * subcode without a name yet ("Parent >") is shown as a place for it only.
+ */
+function createTree(parts: string[], color: string, active: boolean, onPick?: (e: MouseEvent) => void): HTMLElement[] {
+  const unnamed = !parts.at(-1);
+  const missing = missingInPath(parts.slice(0, -1)).length + 1;
+  let parent: Code | undefined;
+  return parts.map((name, d) => {
+    const lines = h('span', { class: 'code-tree-lines', 'aria-hidden': 'true' }, d ? '   '.repeat(d - 1) + '└─ ' : '');
+    const isNew = d >= parts.length - missing;
+    if (!isNew) {
+      parent = findChildCode(parent?.id ?? null, name);
+      return h('li', { class: 'code-tree-row create-context' }, lines, colorSwatch(parent?.color ?? color), h('span', { class: 'code-tree-name' }, name));
+    }
+    const isLeaf = d === parts.length - 1;
+    if (unnamed)
+      return h(
+        'li',
+        { class: 'code-tree-row create create-context' + (isLeaf ? ' create-unnamed' : '') },
+        lines,
+        colorSwatch(color),
+        newBadge(isLeaf ? 'new subcode' : 'new'),
+        h('span', { class: 'code-tree-name' }, isLeaf ? 'type its name…' : name),
+      );
+    return h(
+      'li',
+      { class: 'code-tree-row create' + (isLeaf && active ? ' active' : ''), title: `Create ${parts.join(' > ')}`, onMousedown: onPick },
+      lines,
+      colorSwatch(color),
+      newBadge(isLeaf ? (d ? 'new subcode' : 'new code') : 'new'),
+      h('span', { class: 'code-tree-name' }, name),
+    );
+  });
+}
+
 /** The "in-vivo code" option: the highlighted words as the code name (reusing such a code if it exists). */
 function inVivoRow(p: Popup, onPick: (e: MouseEvent) => void): HTMLElement {
   const existing = findChildCode(null, p.inVivo);
@@ -492,23 +607,6 @@ function inVivoRow(p: Popup, onPick: (e: MouseEvent) => void): HTMLElement {
   );
 }
 
-/** Codes and memos already on the whole selected passage (possibly as part of a larger one). */
-function renderApplied() {
-  const p = popup;
-  if (!p) return;
-  const covers = (x: { start: number; end: number }) => x.start <= p.start && x.end >= p.end;
-  const here = layerSegments().filter((s) => s.docId === p.docId && covers(s));
-  const memos = memosOf(p.docId).filter(covers);
-  p.applied.replaceChildren(
-    ...(here.length || memos.length ? [h('span', { class: 'muted' }, 'Already here: ')] : []),
-    ...here.map((s) => {
-      const c = codeById(s.codeId);
-      return c ? withCodeColor(h('span', { class: 'chip code-chip' }, c.name), c.color) : '';
-    }),
-    ...memos.map((m) => h('span', { class: 'chip memo-chip', title: m.note }, m.note.length > 40 ? m.note.slice(0, 40) + '…' : m.note)),
-  );
-}
-
 function apply(keepOpen: boolean) {
   const p = popup;
   if (!p) return;
@@ -517,10 +615,14 @@ function apply(keepOpen: boolean) {
   } else {
     // A chosen suggestion is applied by its full path, so codes with the same name stay distinct.
     const chosen = p.active >= 0 ? p.items[p.active] : undefined;
+    // "Parent >" with nothing chosen: the new subcode has no name yet.
+    if (!chosen && /[>›]\s*$/.test(p.entry.text)) return;
     // Nothing typed and no suggestion chosen: an in-vivo code from the highlighted words.
     const name = chosen ? codePath(chosen) : p.entry.text.trim() || p.inVivo;
     if (!splitCodePath(name).length) return;
-    codePassage(p.docId, p.start, p.end, name, p.color.value);
+    // "Create another code" highlighted: a new code even though one has the typed path.
+    const another = !chosen && p.pathExists && !!p.entry.text.trim();
+    codePassage(p.docId, p.start, p.end, name, p.color.value, { another });
   }
   if (!keepOpen) return closeCodeBox();
   // Ready for the next code (a memo prefix is not kept: codes are the default).
@@ -528,50 +630,35 @@ function apply(keepOpen: boolean) {
   p.color.value = nextColor();
   p.counts = segmentCounts();
   refreshSuggestions();
-  renderApplied();
   p.input.focus({ preventScroll: true });
 }
 
-/** A code's direct subcodes in the codebook's custom order. */
-const subcodesInOrder = (parentId: string) => codesInTreeOrder(parentId).filter((c) => c.parentId === parentId);
-
 /**
- * Tab in the box, as in a shell: "par" completes to the suggested code's path ("Parent"); Tab on
- * a code's path (or on "Parent >") goes through its subcodes ("Parent > Sub", then the next one;
- * Shift+Tab backwards). Typing ">" after a subcode goes one level deeper.
+ * Tab in the box: goes through the codes listed (the matches, or all codes while nothing is
+ * typed), one by one, putting each one's path into the box, and after the last one back to what
+ * was typed (with "Create …" highlighted); ⇧Tab goes the other way. The list stays as it is
+ * meanwhile (what was typed stays highlighted); typing searches again. Returns false if no code
+ * is listed.
  */
-function tabComplete(back: boolean) {
+function tabThrough(back: boolean): boolean {
   const p = popup;
-  if (!p) return;
-  const set = (path: string) => {
-    p.input.value = p.entry.prefix + path;
-    refreshSuggestions();
-    const end = p.input.value.length;
-    p.input.setSelectionRange(end, end);
-  };
-  // Going on through the same subcodes, if the text is still what the last Tab put there.
-  const cycle = p.tabCycle;
-  if (cycle && cycle.value === p.input.value) {
-    cycle.index = (cycle.index + (back ? -1 : 1) + cycle.ids.length) % cycle.ids.length;
-    set(`${cycle.parentPath} > ${codeById(cycle.ids[cycle.index])!.name}`);
-    cycle.value = p.input.value;
-    return;
-  }
-  p.tabCycle = undefined;
-  // On a code's full path (or with ">" after it): its subcodes.
-  const parts = splitCodePath(p.entry.text);
-  const parent = parts.length ? findCodeByPath(parts) : undefined;
-  const subs = parent ? subcodesInOrder(parent.id) : [];
-  if (parent && subs.length) {
-    const index = back ? subs.length - 1 : 0;
-    const parentPath = codePath(parent);
-    set(`${parentPath} > ${subs[index].name}`);
-    p.tabCycle = { parentPath, ids: subs.map((c) => c.id), index, value: p.input.value };
-    return;
-  }
-  // Otherwise: complete to the chosen (or first matching) suggestion's path.
-  const pick = p.active >= 0 ? p.items[p.active] : (p.rows.find((r) => r.match) ?? p.rows[0])?.code;
-  if (pick) set(codePath(pick));
+  if (!p) return false;
+  const typed = !!p.entry.text.trim();
+  // The codes listed, then what was typed (-1).
+  const stops = [...p.rows.flatMap((r, i) => (r.match || !typed ? [i] : [])), -1];
+  if (stops.length === 1) return false;
+  const going = p.tabbing?.value === p.input.value;
+  const typedText = going ? p.tabbing!.typed : p.input.value;
+  const at = stops.indexOf(p.active);
+  // The first Tab takes the highlighted code (or the first or last one listed); the next ones go on.
+  const index = !going ? (p.active >= 0 && at >= 0 ? at : back ? stops.length - 2 : 0) : (at + (back ? -1 : 1) + stops.length) % stops.length;
+  p.active = stops[index];
+  p.input.value = p.active >= 0 ? p.entry.prefix + codePath(p.items[p.active]) : typedText;
+  p.tabbing = { value: p.input.value, typed: typedText };
+  const end = p.input.value.length;
+  p.input.setSelectionRange(end, end);
+  renderList();
+  return true;
 }
 
 function onKey(e: KeyboardEvent) {
@@ -585,14 +672,13 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault();
     p.active = Math.max(p.active - 1, -1);
     renderList();
-  } else if (e.key === 'Tab' && p.entry.kind === 'code' && p.entry.text.trim()) {
+  } else if (e.key === 'Tab' && p.entry.kind === 'code') {
     e.preventDefault();
-    tabComplete(e.shiftKey);
-  } else if (e.key === 'Tab' && p.entry.kind === 'code' && !p.entry.text.trim() && p.inVivo) {
-    // Put the in-vivo name into the box to edit it before applying.
-    e.preventDefault();
-    p.input.value = p.entry.prefix + p.inVivo;
-    refreshSuggestions();
+    // Through the codes listed; with no codes at all, the in-vivo name goes into the box to edit.
+    if (!tabThrough(e.shiftKey) && !p.entry.text.trim() && p.inVivo) {
+      p.input.value = p.entry.prefix + p.inVivo;
+      refreshSuggestions();
+    }
   } else if (e.key === 'Enter') {
     e.preventDefault();
     apply(e.shiftKey);

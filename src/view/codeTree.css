@@ -29,3 +29,9 @@
 .tree-match .code-tree-name {
   font-weight: 600;
 }
+/* What was searched for, in the names. */
+.code-tree-hit {
+  background: var(--flash);
+  color: inherit;
+  border-radius: 2px;
+}

@@ -56,8 +56,9 @@ export function setCodeBoxSubcodes(on: boolean) {
 }
 
 /** Codes a passage with a typed name or path, and explains when an existing segment was extended instead. */
-export function codePassage(docId: string, start: number, end: number, codeNameOrPath: string, colorForNew: string) {
-  const res = applyCode(docId, start, end, codeNameOrPath, colorForNew);
+/** `another`: a new code even if one has that path already. */
+export function codePassage(docId: string, start: number, end: number, codeNameOrPath: string, colorForNew: string, opts: { another?: boolean } = {}) {
+  const res = applyCode(docId, start, end, codeNameOrPath, colorForNew, opts);
   if (res?.result === 'extended') toast(`Extended the existing “${res.code.name}” segment to include this passage.`);
   if (res?.result === 'contained') toast(`This passage is already part of a “${res.code.name}” segment.`);
   return res;
