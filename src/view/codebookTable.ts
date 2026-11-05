@@ -65,6 +65,11 @@ interface TableView {
    * codes typed into such a column, so rows do not shift while the table is open.
    */
   pinned: Map<string, number>;
+  /**
+   * Codes created in a deeper level than they are (at the top level, their parents to be typed
+   * later): the empty cells before them ask for their parents.
+   */
+  unparented: Set<string>;
   /** Unapplied edits of code rows, by the row's code id. */
   issues: Map<string, Issue>;
   /**
@@ -168,8 +173,12 @@ function columnOf(id: string): number {
   return -1;
 }
 
-/** Whether column `k` is an inserted level: some row has an empty cell there before its code. */
-const isInsertedColumn = (k: number) => !!view?.rows.some((r) => k < r.ids.length - 1 && !r.ids[k]);
+/**
+ * Whether column `k` is an inserted level: some row has an empty cell there before its code (not
+ * one before a code whose parents are still to be typed: that cell is a missing parent).
+ */
+const isInsertedColumn = (k: number) =>
+  !!view?.rows.some((r) => k < r.ids.length - 1 && !r.ids[k] && !r.ids.slice(k + 1).some((id) => !!id && view!.unparented.has(id)));
 
 /**
  * A new row's level cells as the codebook's levels: empty cells in an inserted level column
@@ -395,6 +404,9 @@ const descriptionsOf = (cells: string[], levels: number) => Array.from({ length:
 const lastFilled = (names: string[]) => names.reduce((last, v, i) => (v.trim() ? i : last), -1);
 
 /** Whether a level before the last filled one is empty (the row's parent is missing). */
+/** The name of the parents made for a code typed after empty levels (when so chosen): one per level, shared. */
+const PLACEHOLDER = 'Unsorted';
+
 const missingParent = (names: string[]) => names.slice(0, lastFilled(names)).some((v) => !v.trim());
 
 /** Level columns: as many as the deepest code, or a draft row, needs (and at least as many as added with "+"). */
@@ -412,7 +424,7 @@ const unresolved = () => (view ? view.issues.size + view.drafts.filter((d) => la
 // What each edit came from (its cells as typed, read before applying refreshes the table).
 type Target =
   | { kind: 'code'; id: string; xs: number[]; cells: string[] }
-  | { kind: 'draft'; draft: Draft; cells: string[]; choices: (CellChoice | undefined)[]; cols: number[] };
+  | { kind: 'draft'; draft: Draft; cells: string[]; choices: (CellChoice | undefined)[]; cols: number[]; later?: boolean };
 
 function onEdits(ws: Worksheet, changes: jspreadsheet.CellChange[]) {
   if (syncing || !view) return;
@@ -503,6 +515,14 @@ function onEdits(ws: Worksheet, changes: jspreadsheet.CellChange[]) {
       const after = rowChoices.slice(lastCol + 1).find((c): c is { id: string } => !!c && 'id' in c && movedIds.has(c.id));
       const taken = (own && 'id' in own && movedIds.has(own.id) && own.id !== row.id && relocate(own.id, row.id)) || (!!after && relocate(after.id, row.id));
       if (!taken) keepPlace(row, names, rowChoices, cells, xsByRow.get(y)!, drafts);
+      // A parent's name cleared from this row: the codes after it stay in their columns (not moved
+      // up a level), the emptied cell asking for a parent again.
+      const cleared = cols.filter((c, i) => i < cols.length - 1 && !names[c].trim() && !!row.path[c]?.trim());
+      if (cleared.length) {
+        cols.forEach((c, i) => view!.pinned.set(base.ids[i], c));
+        const next = cols.findIndex((c) => c > Math.min(...cleared));
+        if (next >= 0) view!.unparented.add(base.ids[next]);
+      }
       edits.push({
         ids: base.ids,
         path: byLevel(names),
@@ -516,7 +536,19 @@ function onEdits(ws: Worksheet, changes: jspreadsheet.CellChange[]) {
       continue;
     }
     const base = draftBefore ?? newDraft();
-    const levelled = levelsOfRow(names, rowChoices);
+    // A name after empty levels (its parents missing), created as chosen in the suggestions:
+    // with placeholder parents, or at the top level with its parents to be typed later.
+    const last = lastFilled(names);
+    const lastChoice = rowChoices[last];
+    const parents = last > 0 && names.slice(0, last).some((v) => !v.trim()) && lastChoice && 'new' in lastChoice ? lastChoice.parents : undefined;
+    if (parents === 'placeholder') {
+      for (let j = 0; j < last; j++) {
+        if (names[j].trim()) continue;
+        names[j] = PLACEHOLDER;
+        cells[nameCol(j)] = PLACEHOLDER;
+      }
+    }
+    const levelled = parents === 'later' ? { names: [names[last]], values: [lastChoice], cols: [last] } : levelsOfRow(names, rowChoices);
     const parent = rowParentCode(levelled.names, levelled.values);
     const hasText = cells.some((c) => c.trim());
     if (!draftBefore && hasText) fillGap(y);
@@ -540,7 +572,7 @@ function onEdits(ws: Worksheet, changes: jspreadsheet.CellChange[]) {
       const draft: Draft = { key: base.key, cells, choices: rowChoices };
       put(draftBefore, draft);
       edits.push({ ids: [], path: levelled.names, choices: levelled.values, descriptions: levelled.cols.map((k) => descriptions[k]) });
-      targets.push({ kind: 'draft', draft, cells, choices: rowChoices, cols: levelled.cols });
+      targets.push({ kind: 'draft', draft, cells, choices: rowChoices, cols: levelled.cols, later: parents === 'later' });
     }
   }
   fill = null;
@@ -559,21 +591,16 @@ function onEdits(ws: Worksheet, changes: jspreadsheet.CellChange[]) {
   appendNew();
   for (const t of targets) if (t.kind === 'draft') view.slots.set(`draft:${t.draft.key}`, namesOf(t.cells, levels));
   const existed = new Set(project.codes.map((c) => c.id));
-  const segmentsBefore = segmentCounts();
-  const names0 = new Map(project.codes.map((c) => [c.id, c.name]));
+  const before = deletionSnapshot();
   const { problems } = applyRowEdits(edits);
   if (!view) return;
-  // Codes deleted by clearing or replacing their cells (no dialog: ⌘Z brings them back).
-  const gone = [...existed].filter((id) => !codeById(id));
-  if (gone.length) {
-    const segments = gone.reduce((n, id) => n + (segmentsBefore.get(id) ?? 0), 0);
-    const what = gone.length === 1 ? `“${names0.get(gone[0])}”` : `${gone.length} codes`;
-    toast(`Deleted ${what}${segments ? ` with ${segments} coded segment${segments === 1 ? '' : 's'}` : ''}. ⌘Z / Ctrl+Z undoes it.`, 5000);
-  }
+  // Codes deleted by clearing or replacing their cells (no dialog: said, with Undo).
+  noteDeleted(before, [...existed].filter((id) => !codeById(id)));
   // New codes stay in the columns they were typed in (also where those are after an inserted level).
   edits.forEach((edit, i) => {
     const t = targets[i];
     if (t.kind === 'draft') edit.created?.forEach((id, j) => !existed.has(id) && view!.pinned.set(id, t.cols[j]));
+    if (t.kind === 'draft' && t.later && edit.created?.length) view!.unparented.add(edit.created.at(-1)!);
     for (const insert of edit.inserts ?? []) if (insert.id) view!.pinned.set(insert.id, (insert as typeof insert & { col: number }).col);
   });
   const failed = new Map(problems.map((p) => [p.edit, p.message]));
@@ -909,9 +936,59 @@ interface Suggestion {
   choice: CellChoice;
 }
 
-let suggest: { el: HTMLElement; close: () => void } | null = null;
+let suggest: { el: HTMLElement; close: () => void; place: () => void } | null = null;
+
+/** While a cell is edited: keeps its popped-out editor (and suggestions) over the cell as the table scrolls. */
+let followEditor: (() => void) | null = null;
 
 /** A list below a name cell being edited: the codes of that level column, and "(new) name" for a new code of an existing name. */
+/**
+ * The editor pops out of its cell (as in Google Sheets): over the cell and at least its size, it
+ * grows to the right as the text gets longer (as far as the table shows), then its lines wrap and
+ * it grows downwards. The cell keeps its height meanwhile, so the rows do not move.
+ */
+function popOutEditor(td: HTMLTableCellElement) {
+  const ed = td.querySelector<HTMLTextAreaElement>(':scope > textarea');
+  const area = view?.host.querySelector<HTMLElement>('.jss_content')?.getBoundingClientRect();
+  if (!ed || !area) return;
+  const cell = td.getBoundingClientRect();
+  td.style.height = `${cell.height}px`;
+  ed.classList.add('cbt-editor');
+  ed.style.minHeight = '';
+  const scroller = view!.host.querySelector<HTMLElement>('.jss_content')!;
+  // Over the cell, cut off where the table does not show (outside it, under its column headers).
+  const place = () => {
+    const c = td.getBoundingClientRect();
+    ed.style.left = `${c.left}px`;
+    ed.style.top = `${c.top}px`;
+    const shown = scroller.getBoundingClientRect();
+    const top = Math.max(shown.top, scroller.querySelector('thead')?.getBoundingClientRect().bottom ?? shown.top);
+    const r = ed.getBoundingClientRect();
+    const cut = [top - r.top, r.right - shown.right, r.bottom - shown.bottom, shown.left - r.left].map((v) => `${Math.max(0, Math.round(v))}px`);
+    ed.style.clipPath = `inset(${cut.join(' ')})`;
+    // Its suggestions only while it shows.
+    suggest?.place();
+    if (suggest) suggest.el.style.visibility = c.bottom < top || c.top > shown.bottom ? 'hidden' : '';
+  };
+  const style = getComputedStyle(ed);
+  const ctx = document.createElement('canvas').getContext('2d')!;
+  ctx.font = style.font;
+  const frameX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+  const frameY = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+  const maxWidth = Math.max(cell.width, Math.min(520, area.right - cell.left - 4));
+  const maxHeight = Math.max(cell.height, Math.min(area.bottom, innerHeight) - cell.top - 4);
+  const fit = () => {
+    const longest = Math.max(0, ...ed.value.split('\n').map((line) => ctx.measureText(line).width));
+    ed.style.width = `${Math.min(maxWidth, Math.max(cell.width, Math.ceil(longest + frameX + 2)))}px`;
+    ed.style.height = '0';
+    ed.style.height = `${Math.min(maxHeight, Math.max(cell.height, ed.scrollHeight + frameY))}px`;
+    place();
+  };
+  ed.addEventListener('input', fit);
+  fit();
+  followEditor = place;
+}
+
 function onEditionStart(ws: Worksheet, td: HTMLTableCellElement, x: number, y: number) {
   closeSuggestions();
   if (!view || !isNameCol(x, view.levels)) return;
@@ -936,6 +1013,11 @@ function onEditionStart(ws: Worksheet, td: HTMLTableCellElement, x: number, y: n
     input.value = items[i].name;
     choices.set(key, items[i].choice);
   };
+  // What the editor commits never has leading or trailing whitespace.
+  const trimValue = () => {
+    const t = input.value.trim();
+    if (t !== input.value) input.value = t;
+  };
   // A parent's cell: a new name renames the parent (for all its rows) or moves only this row.
   const parentCell = !!row && !!own && k < row.ids.length - 1;
   const renderParent = (q: string): { items: Suggestion[]; active: number } => {
@@ -953,32 +1035,59 @@ function onEditionStart(ws: Worksheet, td: HTMLTableCellElement, x: number, y: n
     if (!q || q === current.name) return { items: others, active: -1 };
     return {
       items: [
-        { name: q, label: `Rename “${current.name}” to “${q}”`, hint: n > 1 ? `all ${n} rows` : 'this code', choice: { rename: true } },
-        { name: q, label: `Move “${moved}” under a new code “${q}”`, hint: 'only this row', choice: { new: true } },
+        { name: q, label: `Rename code to “${q}”`, hint: n > 1 ? `all ${n} rows` : 'this code', choice: { rename: true } },
+        { name: q, label: `Turn into new L${k + 1} code “${q}”`, hint: 'only this row', choice: { new: true } },
         ...others,
       ],
       // Enter renames.
       active: 0,
     };
   };
+  /** Where a new code in this (empty) cell goes: under the code (or name) in the level before it. */
+  const newCodeHint = () => {
+    if (!k) return 'top level';
+    const parentName = (parentId ? codeById(parentId)?.name : undefined) ?? String(ws.getValueFromCoords(nameCol(k - 1), y) ?? '').trim();
+    return parentName ? `subcode of “${parentName}”` : `in Level ${k + 1}`;
+  };
   const render = () => {
-    const q = input.value.trim();
+    const raw = input.value;
+    const q = raw.trim();
+    // A trailing space means the name is still being typed, not that it is an existing code.
+    const typing = /\s$/.test(raw);
     const all = codesInColumn(k);
     if (parentCell) {
       ({ items, active } = renderParent(q));
     } else {
-    items = all
-      .filter((c) => c.id !== own && (!q || c.name.toLowerCase().includes(q.toLowerCase())))
-      .sort((a, b) => Number(sameName(b.name, q)) - Number(sameName(a.name, q)) || Number((b.parentId ?? null) === parentId) - Number((a.parentId ?? null) === parentId) || a.name.localeCompare(b.name))
-      .slice(0, 30)
-      .map((c) => {
-        const parents = codeChain(c).slice(0, -1).map((p) => p.name).join(' › ');
-        const subs = project.codes.filter((s) => s.parentId === c.id).length;
-        return { name: c.name, hint: [parents, subs ? `${subs} subcode${subs === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · '), choice: { id: c.id } };
-      });
-    if (q && all.some((c) => c.id !== own && sameName(c.name, q))) items.push({ name: q, label: `(new) ${q}`, hint: 'a new code with this name', choice: { new: true } });
-    // An exact name is that code unless something else is picked.
-    active = items.findIndex((i) => 'id' in i.choice && sameName(i.name, q));
+      items = all
+        .filter((c) => c.id !== own && (!q || c.name.toLowerCase().includes(q.toLowerCase())))
+        .sort((a, b) => Number(sameName(b.name, q)) - Number(sameName(a.name, q)) || Number((b.parentId ?? null) === parentId) - Number((a.parentId ?? null) === parentId) || a.name.localeCompare(b.name))
+        .slice(0, 30)
+        .map((c) => {
+          const parents = codeChain(c).slice(0, -1).map((p) => p.name).join(' › ');
+          const subs = project.codes.filter((s) => s.parentId === c.id).length;
+          return { name: c.name, hint: [parents, subs ? `${subs} subcode${subs === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · '), choice: { id: c.id } };
+        });
+      const taken = all.some((c) => c.id !== own && sameName(c.name, q));
+      // A new row's name after empty levels: its parents are missing.
+      const orphan = !row && k > 0 && Array.from({ length: k }, (_, j) => String(ws.getValueFromCoords(nameCol(j), y) ?? '').trim()).some((v) => !v);
+      if (q && !own && orphan) {
+        // How to make it a code without its parents: first (unless it names a code).
+        items.unshift(
+          { name: q, label: `Create new L${k + 1} code “${q}”`, hint: 'type its parent codes later', choice: { new: true, parents: 'later' } },
+          { name: q, label: `Create “${q}” under placeholder parents`, hint: `“${PLACEHOLDER}” in each empty level, to rename later`, choice: { new: true, parents: 'placeholder' } },
+          { name: q, label: 'Keep as draft', hint: 'a code once its parent codes are typed', choice: { new: true, parents: 'wait' } },
+        );
+      } else if (q && !own) {
+        // An empty cell: a new code at this level, first (as the typed name already is, unless it names a code).
+        items.unshift({ name: q, label: `Create new L${k + 1} code “${q}”`, hint: newCodeHint(), choice: { new: true } });
+      } else if (q && taken) {
+        // The row's code, with the name of another code: this code under that name (not that code).
+        items.push({ name: q, label: `Turn into new L${k + 1} code “${q}”`, hint: `this code, renamed (not the other “${q}”)`, choice: { new: true } });
+      }
+      // An exact name is that code unless something else is picked (or the name is still being
+      // typed); in an empty cell, else the new code.
+      active = typing ? -1 : items.findIndex((i) => 'id' in i.choice && sameName(i.name, q));
+      if (active < 0 && q && !own && !typing) active = 0;
     }
     list.replaceChildren(
       ...items.map((it, i) =>
@@ -1000,12 +1109,18 @@ function onEditionStart(ws: Worksheet, td: HTMLTableCellElement, x: number, y: n
     );
     list.hidden = !items.length;
     setActive(active);
-    const r = td.getBoundingClientRect();
+    place();
+  };
+  // Below the editor (which grows out of the cell).
+  const place = () => {
+    const r = input.getBoundingClientRect();
     list.style.left = `${r.left}px`;
     list.style.top = `${r.bottom + 2}px`;
     list.style.minWidth = `${Math.max(r.width, 200)}px`;
   };
   const onKey = (e: KeyboardEvent) => {
+    // Leaving with Enter or Tab: the input's own listener runs before the worksheet's.
+    if (e.key === 'Enter' || e.key === 'Tab') trimValue();
     if (list.hidden) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       // The list's keys, not the table's.
@@ -1017,15 +1132,23 @@ function onEditionStart(ws: Worksheet, td: HTMLTableCellElement, x: number, y: n
       pick(active);
     }
   };
+  // Leaving with a click or tap elsewhere: capture runs before the worksheet's document handler closes the editor.
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.target instanceof Node && input.contains(e.target)) return;
+    trimValue();
+  };
   input.addEventListener('input', render);
   input.addEventListener('keydown', onKey);
+  document.addEventListener('pointerdown', onPointerDown, true);
   document.body.append(list);
   render();
   suggest = {
     el: list,
+    place,
     close: () => {
       input.removeEventListener('input', render);
       input.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointerDown, true);
       list.remove();
       suggest = null;
     },
@@ -1041,13 +1164,6 @@ function freeName(parentId: string | null): string {
   let name = 'New code';
   for (let n = 2; findChildCode(parentId, name); n++) name = `New code ${n}`;
   return name;
-}
-
-/** The code in a cell: the code at that column's level, or the row's code (null for none). */
-function codeAt(x: number | null, y: number | null): string | null {
-  const row = rowAt(y);
-  if (!row) return null;
-  return (x !== null && x < 2 * view!.levels ? row.ids[levelOf(x)] : undefined) || row.id;
 }
 
 /** Adds a code (next to the code `nextTo`, or as its subcode) and starts editing its name. */
@@ -1071,7 +1187,7 @@ function editName(id: string) {
   const x = nameCol(rowAt(y)!.ids.indexOf(id));
   const cell = view.ws.getCellFromCoords(x, y);
   cell.scrollIntoView({ block: 'nearest' });
-  // jspreadsheet closes an open editor when the table scrolls, so open it once scrolling is done.
+  // Opened once scrolling is done, so the editor pops out where the cell ends up.
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
       if (!view) return;
@@ -1113,6 +1229,45 @@ function selectedCodeIds(ws: Worksheet): string[] {
   return [...ids];
 }
 
+/** What a message about deleted codes needs to know, taken before deleting. */
+function deletionSnapshot() {
+  return { segments: segmentCounts(), names: new Map(project.codes.map((c) => [c.id, c.name])), parents: new Map(project.codes.map((c) => [c.id, c.parentId ?? null])) };
+}
+
+/**
+ * Says which codes were deleted (`gone`), with how many coded segments, and that their subcodes
+ * moved up a level: in the table it can look like just emptying a cell. With Undo.
+ */
+function noteDeleted(before: ReturnType<typeof deletionSnapshot>, gone: string[]) {
+  if (!gone.length) return;
+  const segments = gone.reduce((n, id) => n + (before.segments.get(id) ?? 0), 0);
+  const goneSet = new Set(gone);
+  // Their subcodes that are left: now under the deleted code's parent (or at the top level).
+  const orphans = [...before.parents].filter(([id, parent]) => parent && goneSet.has(parent) && codeById(id)).map(([id]) => codeById(id)!);
+  const where = (id: string) => {
+    const parent = codeById(id)?.parentId;
+    return parent ? `under “${codeById(parent)?.name}”` : 'top-level codes';
+  };
+  const moved =
+    orphans.length === 1
+      ? `; “${orphans[0].name}” is now ${where(orphans[0].id).replace('top-level codes', 'a top-level code')}`
+      : orphans.length
+        ? new Set(orphans.map((c) => c.parentId ?? null)).size === 1
+          ? `; ${gone.length === 1 ? 'its' : 'their'} ${orphans.length} subcodes are now ${where(orphans[0].id)}`
+          : `; ${gone.length === 1 ? 'its' : 'their'} ${orphans.length} subcodes moved up a level`
+        : '';
+  const what = gone.length === 1 ? `code “${before.names.get(gone[0])}”` : `${gone.length} codes`;
+  const parts = [`Deleted ${what}`, segments ? ` and ${segments} coded segment${segments === 1 ? '' : 's'}` : ' (no coded segments)', moved, '.'];
+  toast(parts.join(''), 8000, { label: 'Undo', run: () => undoChange() });
+}
+
+/** Deletes codes (from the menus), saying what was deleted (see noteDeleted). */
+function deleteCodesNoted(ids: string[]) {
+  const before = deletionSnapshot();
+  deleteCodes(ids);
+  noteDeleted(before, ids.filter((id) => !codeById(id)));
+}
+
 function deleteRows(ys: number[]) {
   if (!view) return;
   // Rows just go, without asking (undo brings codes back).
@@ -1122,7 +1277,7 @@ function deleteRows(ys: number[]) {
     refresh();
   }
   const ids = [...new Set(ys.map((y) => rowAt(y)?.id).filter((id): id is string => !!id))];
-  if (ids.length) deleteCodes(ids);
+  if (ids.length) deleteCodesNoted(ids);
 }
 
 /** After a row was dragged: the codes' custom order follows the rows (see reorderAsRows). */
@@ -1149,42 +1304,37 @@ function contextMenu(ws: Worksheet, x: unknown, y: unknown, _e: unknown, items: 
   const levelItems = (c: number): jspreadsheet.ContextMenuItem[] =>
     c < 2 * view!.levels
       ? [
-          { title: `Insert level left of Level ${levelOf(c) + 1}`, onclick: () => insertLevel(levelOf(c)) },
-          { title: `Insert level right of Level ${levelOf(c) + 1}`, onclick: () => insertLevel(levelOf(c) + 1) },
-        ]
+        { title: `Insert code column left of Level ${levelOf(c) + 1}`, onclick: () => insertLevel(levelOf(c)) },
+        { title: `Insert code column right of Level ${levelOf(c) + 1}`, onclick: () => insertLevel(levelOf(c) + 1) },
+      ]
       : [];
   if (role === 'header' && col !== null) return [minimizeItem(col), { type: 'line', title: '' }, ...levelItems(col)];
   const row = y === null || y === undefined ? null : Number(y);
+  if (role === 'row' && row !== null) return rowMenu(row);
   // jspreadsheet's Copy and Paste, and copying only the text (pasted as new codes of those names).
   const keep = items
     .filter((i) => /^(copy|paste)/i.test(i.title ?? ''))
     .flatMap((i): jspreadsheet.ContextMenuItem[] =>
       /^copy/i.test(i.title ?? '')
         ? [
-            { title: 'Cut', shortcut: '⌘X', onclick: () => cutCells(ws) } as jspreadsheet.ContextMenuItem,
-            { ...i, title: 'Copy' },
-            {
-              title: 'Copy text only',
-              onclick: () => {
-                copyTextOnly = true;
-                ws.copy();
-                copyTextOnly = false;
-              },
+          { title: 'Cut', shortcut: '⌘X', onclick: () => cutCells(ws) } as jspreadsheet.ContextMenuItem,
+          { ...i, title: 'Copy' },
+          {
+            title: 'Copy text only',
+            onclick: () => {
+              copyTextOnly = true;
+              ws.copy();
+              copyTextOnly = false;
             },
-          ]
+          },
+        ]
         : [
-            { ...i, title: 'Paste identical copy (with coded segments)', onclick: () => void pasteFromClipboard(ws, 'copy') },
-            { title: 'Paste code name only', onclick: () => void pasteFromClipboard(ws, 'name') },
-          ],
+          { ...i, title: 'Paste identical copy (with coded segments)', onclick: () => void pasteFromClipboard(ws, 'copy') },
+          { title: 'Paste code name only', onclick: () => void pasteFromClipboard(ws, 'name') },
+        ],
     );
   const ids = selectedCodeIds(ws);
-  const here = codeAt(col, row);
-  const name = here ? `“${codeById(here)?.name}”` : '';
   return [
-    { title: here ? `Add code next to ${name}` : 'Add code', onclick: () => addCode(here, false) },
-    { title: here ? `Add subcode of ${name}` : 'Add subcode', disabled: !here, onclick: () => addCode(here, true) },
-    { title: 'Change color…', disabled: !ids.length, onclick: () => view && openColorMenu(view.colorBtn) },
-    { type: 'line', title: '' },
     { title: 'Insert row above', disabled: row === null, onclick: () => insertRow(row!, false) },
     { title: 'Insert row below', disabled: row === null, onclick: () => insertRow(row!, true) },
     ...(col !== null ? levelItems(col) : []),
@@ -1195,7 +1345,31 @@ function contextMenu(ws: Worksheet, x: unknown, y: unknown, _e: unknown, items: 
     {
       title: ids.length > 1 ? `Delete ${ids.length} codes` : ids.length ? `Delete “${codeById(ids[0])?.name}”` : 'Delete code',
       disabled: !ids.length,
-      onclick: () => deleteCodes(ids),
+      onclick: () => deleteCodesNoted(ids),
+    },
+  ];
+}
+
+/**
+ * The menu of a row number: inserting an empty row, and deleting the rows (those selected, if the
+ * row is one of them), which deletes their codes.
+ */
+function rowMenu(row: number): jspreadsheet.ContextMenuItem[] {
+  const sel = view?.selection;
+  const [a, b] = sel ? [Math.min(Number(sel[1]), Number(sel[3])), Math.max(Number(sel[1]), Number(sel[3]))] : [row, row];
+  const total = lines().length;
+  // Only rows of the table (not the empty rows below it).
+  const ys = (row >= a && row <= b ? Array.from({ length: b - a + 1 }, (_, i) => a + i) : [row]).filter((y) => y < total);
+  const codes = [...new Set(ys.map((y) => rowAt(y)?.id).filter((id): id is string => !!id))];
+  const what = codes.length === 1 ? `deletes “${codeById(codes[0])?.name}”` : codes.length ? `deletes ${codes.length} codes` : '';
+  return [
+    { title: 'Insert row above', onclick: () => insertRow(row, false) },
+    { title: 'Insert row below', onclick: () => insertRow(row, true) },
+    { type: 'line', title: '' },
+    {
+      title: `${ys.length > 1 ? `Delete ${ys.length} rows` : 'Delete row'}${what ? ` (${what})` : ''}`,
+      disabled: !ys.length,
+      onclick: () => deleteRows(ys),
     },
   ];
 }
@@ -1324,10 +1498,13 @@ function updateDescButton() {
 
 // ---------- the menu bar (next to the search): heights, widths, line wrapping, code colors, parent descriptions ----------
 
-/** Whether the cell in row `rowKey`, column `x` wraps its lines: its own setting, else its column's (descriptions wrap by default). */
-function isWrapped(rowKey: string, x: number): boolean {
+/**
+ * Whether the cell in row `rowKey`, column `x` wraps its lines: its own setting, else its column's
+ * (descriptions wrap by default; with `setOnly`, only cells set to wrap do).
+ */
+function isWrapped(rowKey: string, x: number, setOnly = false): boolean {
   const col = columnKey(x, view!.levels);
-  return ui.tableWrap.cells[`${rowKey}|${col}`] ?? ui.tableWrap.cols[col] ?? !isNameCol(x, view!.levels);
+  return ui.tableWrap.cells[`${rowKey}|${col}`] ?? ui.tableWrap.cols[col] ?? (!setOnly && !isNameCol(x, view!.levels));
 }
 
 /** The selected cells (or all of them): row keys and column indexes. */
@@ -1438,7 +1615,14 @@ function setWrap(all: boolean, on: boolean) {
   if (all) {
     ui.tableWrap = { cols: Object.fromEntries(t.cols.map((x) => [columnKey(x, levels), on])), cells: {} };
   } else {
-    for (const row of t.rows) for (const x of t.cols) ui.tableWrap.cells[`${row}|${columnKey(x, levels)}`] = on;
+    const ls = lines();
+    for (const row of t.rows)
+      for (const x of t.cols) {
+        ui.tableWrap.cells[`${row}|${columnKey(x, levels)}`] = on;
+        // In the merged view, a block's cells all wrap (or not) as the cell that shows its text.
+        const id = ui.tableMerged ? ls.find((l) => keyOf(l) === row)?.row?.ids[levelOf(x)] : undefined;
+        if (id) for (const l of ls) if (l.row?.ids[levelOf(x)] === id) ui.tableWrap.cells[`${keyOf(l)}|${columnKey(x, levels)}`] = on;
+      }
   }
   commitUI();
   markCells();
@@ -1461,19 +1645,19 @@ function openToolMenu(anchor: HTMLElement, items: ([string, () => void] | null)[
     ...items.map((item) =>
       item
         ? h(
-            'button',
-            {
-              type: 'button',
-              class: 'cbt-tool-item',
-              role: 'menuitem',
-              onMousedown: (e: MouseEvent) => e.preventDefault(),
-              onClick: () => {
-                closeToolMenu();
-                item[1]();
-              },
+          'button',
+          {
+            type: 'button',
+            class: 'cbt-tool-item',
+            role: 'menuitem',
+            onMousedown: (e: MouseEvent) => e.preventDefault(),
+            onClick: () => {
+              closeToolMenu();
+              item[1]();
             },
-            item[0],
-          )
+          },
+          item[0],
+        )
         : h('div', { class: 'cbt-tool-sep' }),
     ),
   );
@@ -1522,13 +1706,13 @@ function toolbar(): HTMLElement {
   return h(
     'div',
     { class: 'cbt-tools', role: 'toolbar' },
-    button('height', 'Height ▾', 'Fit row heights to their content', (b) =>
+    button('height', 'Row height ▾', 'Fit row heights to their content', (b) =>
       openToolMenu(b, [
-        ['Fit selected rows', () => fitHeights(false)],
+        ['Fit selected row', () => fitHeights(false)],
         ['Fit all rows', () => fitHeights(true)],
         null,
-        ['Selected rows as tall as the tallest', () => fitHeights(false, true)],
-        ['All rows as tall as the tallest', () => fitHeights(true, true)],
+        ['Fit selected rows to same height', () => fitHeights(false, true)],
+        ['Fit all rows to same height', () => fitHeights(true, true)],
       ]),
     ),
     button('width', 'Width ▾', 'Fit column widths to their content', (b) =>
@@ -1537,13 +1721,13 @@ function toolbar(): HTMLElement {
         ['Fit all columns', () => fitWidths(true)],
       ]),
     ),
-    button('wrap', 'Wrap ▾', 'Wrap long text onto several lines', (b) =>
+    button('wrap', 'Text wrapping ▾', 'Wrap long text onto several lines', (b) =>
       openToolMenu(b, [
-        ['Wrap selected cells', () => setWrap(false, true)],
-        ['Don’t wrap selected cells', () => setWrap(false, false)],
+        ['Wrap text in selected cells', () => setWrap(false, true)],
+        ['Don’t wrap text in selected cells', () => setWrap(false, false)],
         null,
-        ['Wrap all cells', () => setWrap(true, true)],
-        ['Don’t wrap any cell', () => setWrap(true, false)],
+        ['Wrap text in all cells', () => setWrap(true, true)],
+        ['Don’t wrap text in any cell', () => setWrap(true, false)],
       ]),
     ),
     // The selected codes' color, and minimizing the parent levels' descriptions.
@@ -1567,6 +1751,14 @@ function markCells() {
   ws.options.rows = [];
   // Empty cells in an inserted level are not missing parents.
   const inserted = new Set(Array.from({ length: levels }, (_, k) => k).filter(isInsertedColumn));
+  /** Whether level `k`'s cells in row `y` are part of a merged block (its code also in the row above or below). */
+  const mergedAt = (k: number, y: number) => {
+    const id = ui.tableMerged ? rowAt(y)?.ids[k] : undefined;
+    return !!id && (rowAt(y - 1)?.ids[k] === id || rowAt(y + 1)?.ids[k] === id);
+  };
+  /** Whether a merged block of level `k` starts in row `y` or ends in the row above it. */
+  const blockEdgeAt = (k: number, y: number) =>
+    rowAt(y)?.ids[k] !== rowAt(y - 1)?.ids[k] && (mergedAt(k, y) || mergedAt(k, y - 1));
   for (let y = 0; y < total; y++) {
     const row = rowAt(y);
     const draft = row ? undefined : draftAt(y);
@@ -1588,10 +1780,11 @@ function markCells() {
       const k = levelOf(x);
       // Colors here too: jspreadsheet renders a pasted cell before its row is known.
       if (isNameCol(x, levels)) paintCell(cell, k, y);
-      const wrap = isWrapped(rowKey, x);
-      cell.classList.toggle('cbt-wrap', wrap);
-      cell.classList.toggle('cbt-nowrap', !wrap);
-      const missing = !!names && isNameCol(x, levels) && k < lastFilled(names) && !names[k].trim() && !inserted.has(k);
+      // An empty cell before a code created with its parents to be typed later.
+      const unparentedAt = row ? row.ids.findIndex((id) => !!id && view!.unparented.has(id)) : -1;
+      const missing =
+        (!!names && isNameCol(x, levels) && k < lastFilled(names) && !names[k].trim() && !inserted.has(k)) ||
+        (unparentedAt > 0 && isNameCol(x, levels) && k < unparentedAt && !row!.ids[k]);
       // A row that is an existing parent code: its subcode comes next.
       const subcodeNext = !!draft?.subcodeOf && !draft.message && isNameCol(x, levels) && k === lastFilled(names!) + 1;
       const flagged = !!issue?.cells.has(x) || (!!draft?.message && isNameCol(x, levels) && k === lastFilled(names!));
@@ -1624,7 +1817,14 @@ function markCells() {
         low = label && (bottom - top) % 2 === 1;
       }
       cell.classList.toggle('cbt-merged', cont || next);
+      // A thicker line above and below a block, going on over its subcodes' columns (the deeper levels).
+      cell.classList.toggle('cbt-edge-top', Array.from({ length: k + 1 }, (_, j) => j).some((j) => blockEdgeAt(j, y)));
       cell.classList.toggle('cbt-merge-label', label);
+      // The cells of a merged block whose text does not show (it shows in the middle row) wrap
+      // only when set to: by default, a long text does not make each of the block's rows as tall.
+      const wrap = isWrapped(rowKey, x, (cont || next) && !label);
+      cell.classList.toggle('cbt-wrap', wrap);
+      cell.classList.toggle('cbt-nowrap', !wrap);
       cell.classList.toggle('cbt-merge-low', low);
       const count = id && isNameCol(x, levels) ? (row!.segments[k] ?? 0) : 0;
       if (count) cell.dataset.count = String(count);
@@ -1665,10 +1865,21 @@ function build(host: HTMLElement, levels: number): Worksheet {
       onBeforePaste(data, Number(col), Number(row));
       return undefined;
     },
-    // jspreadsheet creates the editor's input after this event.
-    oneditionstart: (ws, td, x, y) => setTimeout(() => onEditionStart(ws, td, Number(x), Number(y))),
+    // jspreadsheet creates the editor's input after this event: a text area (not a one-line
+    // input) when its column wraps, so the column wraps until then.
+    oneditionstart: (ws, td, x, y) => {
+      const col = ws.options.columns?.[Number(x)];
+      if (col) col.wordWrap = true;
+      setTimeout(() => {
+        if (col) col.wordWrap = false;
+        popOutEditor(td);
+        onEditionStart(ws, td, Number(x), Number(y));
+      });
+    },
     // A choice left over from an edit that changed nothing must not apply to a later change of the cell.
-    oneditionend: (_ws, _td, x, y) => {
+    oneditionend: (_ws, td, x, y) => {
+      td.style.height = '';
+      followEditor = null;
       closeSuggestions();
       setTimeout(() => choices.delete(`${x},${y}`));
     },
@@ -1704,6 +1915,10 @@ function build(host: HTMLElement, levels: number): Worksheet {
     },
   });
   host.querySelector('.jss_filter')?.prepend(toolbar());
+  // Scrolling keeps an open editor (jspreadsheet's own handler would close it; it does nothing
+  // else without lazy loading and frozen columns): the editor follows its cell.
+  const content = (ws as Worksheet & { content?: HTMLElement }).content;
+  if (content) content.onscroll = () => followEditor?.();
   // The search runs as you type (jspreadsheet starts it from keys, which it does not get; see onKeyDown).
   const search = host.querySelector<HTMLInputElement>('.jss_search');
   let searchTimer = 0;
@@ -1721,11 +1936,25 @@ function rebuild(levels: number) {
   const old = view.levels;
   view.drafts = view.drafts.map((d) => ({ ...d, cells: Array.from({ length: 2 * levels }, (_, x) => (x < 2 * old ? (d.cells[x] ?? '') : '')) }));
   view.levels = levels;
+  // The new table keeps the old one's scroll position and selection (the view does not jump).
+  const content = view.host.querySelector<HTMLElement>('.jss_content');
+  const scroll = content ? [content.scrollTop, content.scrollLeft] : null;
+  const sel = view.ws.getSelection() as [number, number, number, number] | null;
+  const wasCurrent = jspreadsheet.current === view.ws;
   syncing = true;
   view.ws = build(view.host, levels);
   syncing = false;
   applyColumnWidths();
   markCells();
+  const next = view.host.querySelector<HTMLElement>('.jss_content');
+  if (next && scroll) [next.scrollTop, next.scrollLeft] = scroll;
+  if (sel) {
+    if (wasCurrent) jspreadsheet.current = view.ws;
+    const max = 2 * levels - 1;
+    view.ws.updateSelectionFromCoords(Math.min(sel[0], max), sel[1], Math.min(sel[2], max), sel[3]);
+    // Selecting scrolls the cell into view; the position stays as it was.
+    if (next && scroll) [next.scrollTop, next.scrollLeft] = scroll;
+  }
 }
 
 /** Shows the codebook's current state: refills the table if it differs (keeping the selection and scroll position). */
@@ -1776,12 +2005,19 @@ function refresh() {
   const scroller = view.host.querySelector<HTMLElement>('.jss_content');
   const top = scroller?.scrollTop ?? 0;
   const sel = view.ws.getSelection();
+  const left = scroller?.scrollLeft ?? 0;
   syncing = true;
   view.ws.setData(data);
   syncing = false;
-  if (scroller) scroller.scrollTop = top;
   if (sel) view.ws.updateSelectionFromCoords(...sel);
+  // Rows get their heights (wrapped descriptions, merged cells) here: only then is the table as
+  // tall as before, so the scroll position is set after it (set before, near the end of the
+  // table it would be cut to the shorter table's, and the view would move up).
   markCells();
+  if (scroller) {
+    scroller.scrollTop = top;
+    scroller.scrollLeft = left;
+  }
 }
 
 // ---------- the Color menu ----------
@@ -1872,7 +2108,19 @@ function openColorMenu(anchor: HTMLElement) {
 // of step with the codebook). Delete or Backspace on selected rows deletes them right away
 // (jspreadsheet would ask first).
 function onKeyDown(e: KeyboardEvent) {
-  if (!view || jspreadsheet.current !== view.ws || view.ws.edition) return;
+  if (!view || jspreadsheet.current !== view.ws) return;
+  if (view.ws.edition) {
+    // Alt+Enter (or Ctrl/⌘+Enter) starts a new line in a description (as in Google Sheets); names are one line.
+    const ed = e.target instanceof HTMLTextAreaElement && e.target.classList.contains('cbt-editor') ? e.target : null;
+    if (ed && e.key === 'Enter' && (e.altKey || e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (isNameCol(Number(view.ws.edition[2]), view.levels)) return;
+      ed.setRangeText('\n', ed.selectionStart, ed.selectionEnd, 'end');
+      ed.dispatchEvent(new Event('input'));
+    }
+    return;
+  }
   // Typing in a text field (e.g. the table's search): its keys are its own. jspreadsheet would
   // take them for the selected cells (open an editor, delete rows), so it does not get them.
   if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]') && !e.target.classList.contains('jss_textarea')) {
@@ -1883,6 +2131,18 @@ function onKeyDown(e: KeyboardEvent) {
     e.preventDefault();
     e.stopImmediatePropagation();
     view.ws.deleteRow();
+    return;
+  }
+  // Enter on a selected cell edits it, keeping its text (jspreadsheet would go to the next cell).
+  // Enter while editing still applies the edit and goes down.
+  if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    const at = (view.ws as Worksheet & { selectedCell?: number[] | null }).selectedCell;
+    const cell = at ? view.ws.getCellFromCoords(Number(at[0]), Number(at[1])) : null;
+    if (cell) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      view.ws.openEditor(cell, false);
+    }
     return;
   }
   if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
@@ -1991,6 +2251,7 @@ export function openCodebookTable() {
     levels,
     rows,
     pinned: new Map(),
+    unparented: new Set(),
     issues: new Map(),
     drafts: [],
     order: rows.map((r) => r.id),
@@ -2001,7 +2262,7 @@ export function openCodebookTable() {
     selectedIds: [],
     colorBtn,
     descBtn,
-    stop: () => {},
+    stop: () => { },
   };
   updateColorButton();
   updateDescButton();

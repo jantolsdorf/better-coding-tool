@@ -108,6 +108,21 @@ describe('applyRowEdits', () => {
     expect(paths()).toEqual(['Rules > Complaints', 'Rules > Trust', 'Rules > Workarounds']);
   });
 
+  it('edits a code with several empty levels after it (a table deeper than its row)', () => {
+    // The table gives every row a cell per level: here two empty ones after "Trust".
+    const e = { ...rowOf('Trust'), path: ['Belief', '', ''], oldPath: ['Trust', '', ''] };
+    expect(applyRowEdits([e])).toEqual({ changed: 1, problems: [] });
+    expect(paths()).toContain('Belief');
+    const f = { ...rowOf('Belief'), path: ['Rules', '', ''], oldPath: ['Belief', '', ''] };
+    expect(applyRowEdits([f]).problems).toEqual([]);
+    expect(paths()).toContain('Rules > Belief');
+  });
+
+  it('reports a subcode typed after an empty level', () => {
+    const e = { ...rowOf('Trust'), path: ['Trust', '', 'Deep'], oldPath: ['Trust', '', ''] };
+    expect(applyRowEdits([e]).problems).toEqual([{ edit: 0, message: 'Type the subcode in Level 2 first.' }]);
+  });
+
   it('gives a row a new parent of an existing name when asked for a new code', () => {
     const e = rowOf('Rules > Workarounds');
     e.choices = [{ new: true }];

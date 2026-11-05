@@ -77,7 +77,12 @@ export function codebookRows(): CodebookRow[] {
 export type CellChoice =
   /** `moveTo`: cut and pasted under another parent: the code moves there first (see the table view). */
   | { id: string; replace?: boolean; moveTo?: string | null }
-  | { new: true; color?: string; replace?: boolean }
+  /**
+   * A new code. `parents`, for a name typed after empty levels (its parents missing): created at
+   * the top level with its parents to be typed later ("later"), under placeholder parents
+   * ("placeholder"), or kept as a draft until they are typed ("wait"; see the table view).
+   */
+  | { new: true; color?: string; replace?: boolean; parents?: 'later' | 'placeholder' | 'wait' }
   /**
    * A pasted copy of a code (`from`): a new code that is an identical copy of it (name, color,
    * description, coded segments, subcodes), only with new ids; named "name (2)" if `numbered`.
@@ -357,7 +362,8 @@ export function applyRowEdits(edits: RowEdit[]): { changed: number; problems: Ro
     }
     const below = cells.slice(edit.ids.length);
     const lastBelow = below.reduce((l, v, i) => (v ? i : l), -1);
-    if (below.slice(0, lastBelow).some((v) => !v)) return problem(`Type the subcode in Level ${edit.ids.length + 1} first.`);
+    // (Only with something typed below: with all levels below empty, there is no gap.)
+    if (lastBelow > 0 && below.slice(0, lastBelow).some((v) => !v)) return problem(`Type the subcode in Level ${edit.ids.length + 1} first.`);
     const pasted = below.findIndex((_, i) => {
       const choice = edit.choices?.[edit.ids.length + i];
       // (Not one moved here already: a cut code pasted after the row's code.)

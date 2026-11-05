@@ -4,8 +4,11 @@
 import { h } from './dom';
 import { currentDocument } from './windows';
 
-/** A short message that disappears by itself. */
-export function toast(message: string, ms = 3500) {
+/**
+ * A short message that disappears by itself (not while the pointer is on it). With `action`, it
+ * has a button (e.g. Undo), which closes it.
+ */
+export function toast(message: string, ms = 3500, action?: { label: string; run: () => void }) {
   // Shown in the window used last (the app can have parts in separate windows).
   const doc = currentDocument();
   let host = doc.getElementById('toasts');
@@ -13,10 +16,31 @@ export function toast(message: string, ms = 3500) {
     host = h('div', { id: 'toasts' });
     doc.body.append(host);
   }
-  const t = h('div', { class: 'toast' }, message);
+  let timer = 0;
+  const close = () => {
+    t.classList.add('out');
+    setTimeout(() => t.remove(), 400);
+  };
+  const button = action
+    ? h(
+        'button',
+        {
+          type: 'button',
+          class: 'toast-action',
+          onClick: () => {
+            close();
+            action.run();
+          },
+        },
+        action.label,
+      )
+    : null;
+  const t = h('div', { class: 'toast' + (action ? ' with-action' : '') }, h('span', {}, message), button);
+  const start = () => (timer = window.setTimeout(close, ms));
+  t.addEventListener('mouseenter', () => clearTimeout(timer));
+  t.addEventListener('mouseleave', start);
   host.append(t);
-  setTimeout(() => t.classList.add('out'), ms);
-  setTimeout(() => t.remove(), ms + 400);
+  start();
 }
 
 interface DialogButton<T> {
