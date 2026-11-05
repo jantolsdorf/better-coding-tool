@@ -179,4 +179,20 @@ export interface UIState {
   challengeMode: boolean;
   /** Fingerprint and time of the project when a copy was last downloaded (or opened from a file). */
   backedUp: { fingerprint: string; at: string } | null;
+  /** Codebook table: minimized columns ("name-0", "desc-1"…). */
+  tableMinimized: string[];
+  /** Codebook table: column widths set by hand or fitted, by column ("name-0", "desc-1"…). */
+  tableWidths: Record<string, number>;
+  /** Codebook table: a parent's cells over several rows look like one merged cell. */
+  tableMerged: boolean;
+  /**
+   * Codebook table: row heights set by hand or made the same, by row (its code's id; "*" for all
+   * rows without their own); other rows fit their content.
+   */
+  tableHeights: Record<string, number>;
+  /**
+   * Codebook table: line wrapping, by column, and by cell ("rowId|name-0") where it differs from
+   * its column. Without a setting, description columns wrap and name columns do not.
+   */
+  tableWrap: { cols: Record<string, boolean>; cells: Record<string, boolean> };
 }

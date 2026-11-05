@@ -4,6 +4,8 @@ import { setPanelSizes } from '../controller/preferences';
 import { ui } from '../model/state';
 
 const MIN_PANEL = 70;
+/** Height of a panel's list that always stays visible. */
+const MIN_LIST = 28;
 
 /**
  * Makes the sidebar panels resizable: dragging a .splitter moves height between the panels
@@ -11,6 +13,15 @@ const MIN_PANEL = 70;
  */
 export function initSplitters(sidebar: HTMLElement) {
   const panels = () => [...sidebar.querySelectorAll<HTMLElement>(':scope > .panel')];
+  // A panel is never lower than its header (whose buttons wrap onto more lines in a narrow
+  // sidebar) and its other bars, plus a line of its list.
+  const fixedParts = (p: HTMLElement) => [...p.children].filter((c): c is HTMLElement => c instanceof HTMLElement && !c.classList.contains('panel-body'));
+  const fit = new ResizeObserver((entries) => {
+    for (const p of new Set(entries.map((e) => e.target.parentElement as HTMLElement))) {
+      p.style.minHeight = `${fixedParts(p).reduce((h, c) => h + c.offsetHeight, 0) + MIN_LIST}px`;
+    }
+  });
+  for (const p of panels()) for (const part of fixedParts(p)) fit.observe(part);
   for (const splitter of sidebar.querySelectorAll<HTMLElement>(':scope > .splitter')) {
     splitter.addEventListener('dblclick', () => setPanelSizes(null));
     splitter.addEventListener('mousedown', (e) => {

@@ -14,6 +14,7 @@ import {
 } from '../controller/transfer';
 import { project } from '../model/state';
 import { h } from './dom';
+import { openLicensesDialog } from './licensesDialog';
 
 /** `firstUse`: nobody has coded here yet; the dialog cannot be dismissed without choosing. */
 export function openStartDialog({ firstUse }: { firstUse: boolean }) {
@@ -74,7 +75,7 @@ export function openStartDialog({ firstUse }: { firstUse: boolean }) {
       else showName('opened');
     });
     parts.push(
-      h('div', { class: 'start-actions' }, openBtn, newBtn, button('FAQ', 'ghost', showFaq)),
+      h('div', { class: 'start-actions' }, openBtn, newBtn, button('FAQ', 'ghost', showFaq), button('Licenses', 'ghost', openLicensesDialog)),
       h('p', { class: 'muted small start-files' }, 'Project files: this app’s export (.zip or .json), or a REFI-QDA project (.qdpx) from MAXQDA, NVivo, ATLAS.ti and others.'),
     );
     body.replaceChildren(...parts);

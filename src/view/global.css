@@ -470,14 +470,22 @@ kbd {
 .panel-head {
   flex: none;
   display: flex;
+  /* In a narrow sidebar the buttons wrap onto more lines instead of being cut off. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   padding: 8px 10px 6px;
-  
+
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
+}
+.panel-head > .grow {
+  flex: 1 0 auto;
+}
+.panel-head > :not(.grow) {
+  flex: none;
 }
 .panel-body {
   flex: 1;
@@ -743,6 +751,22 @@ textarea.field {
   opacity: 0.45;
   cursor: default;
 }
+/* A link at the end of the View menu (to the Licenses dialog). */
+.view-item.view-link {
+  width: 100%;
+  margin-top: 4px;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+}
+.view-item.view-link:hover {
+  background: var(--hover);
+  color: var(--text);
+}
 .view-note {
   
   margin: 6px 6px 2px;
@@ -883,4 +907,24 @@ dialog.modal.message-dialog {
 }
 .btn.danger-solid:hover {
   filter: brightness(0.92);
+}
+
+/* The Licenses dialog (licensesDialog.ts). */
+.license-item {
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+}
+.license-item summary {
+  cursor: pointer;
+}
+.license-text {
+  max-height: 40vh;
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 0.85em;
+  white-space: pre-wrap;
 }

@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.3.1",
-    "fflate": "^0.8.3"
+    "fflate": "^0.8.3",
+    "jspreadsheet-ce": "^5.0.4"
   }
 }

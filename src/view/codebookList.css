@@ -253,3 +253,8 @@
 .code-row.multi-selected .swatch-slot .row-check-mark {
   opacity: 1;
 }
+
+/* A code shown from elsewhere (e.g. clicked in the codebook table): briefly highlighted. */
+.code-row.revealed {
+  animation: flash 1.2s ease-out;
+}

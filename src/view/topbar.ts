@@ -33,11 +33,12 @@ import { toast } from './feedback';
 import { openOccurrenceView } from './occurrenceView';
 import { openAiCodeDialog } from './aiCodeDialog';
 import { openCodeCreateDialog } from './codeCreateDialog';
+import { codebookTableHasFocus, onCodebookTableToggle, toggleCodebookTable } from './codebookTable';
 import { h } from './dom';
 import { openStartDialog } from './startDialog';
 import { clearDocSelection, deleteSelectedItems, toggleDocSelectMode } from './tree';
 import { closeViewMenu, initViewMenu, viewMenu } from './viewMenu';
-import { onEveryDocument } from './windows';
+import { byId, onEveryDocument } from './windows';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const onClick = (id: string, fn: () => void) => $(id).addEventListener('click', fn);
@@ -80,6 +81,12 @@ export function initTopbar() {
   onClick('btn-add-code', () => openCodeCreateDialog('code'));
   onClick('btn-auto-code', () => openCodeCreateDialog('auto'));
   onClick('btn-ai-code', () => void openAiCodeDialog());
+  onClick('btn-codebook-table', toggleCodebookTable);
+  onCodebookTableToggle((open) => {
+    const btn = byId('btn-codebook-table');
+    btn?.classList.toggle('on', open);
+    if (btn) btn.textContent = open ? 'Close table' : 'Table';
+  });
   onClick('btn-select-docs', toggleDocSelectMode);
   onClick('btn-toggle-codes', toggleAllCodesCollapsed);
 
@@ -93,6 +100,8 @@ export function initTopbar() {
   onEveryDocument((doc) => doc.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement;
     if (t.closest?.('input:not([type=checkbox]), textarea, select, [contenteditable]') || doc.querySelector('dialog[open]')) return;
+    // The codebook table uses these keys itself (e.g. Delete clears cells).
+    if (codebookTableHasFocus()) return;
     if (e.key === 'Escape') {
       clearDocSelection();
       clearCodeSelection();

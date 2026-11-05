@@ -15,6 +15,11 @@ npm test           # unit tests (Vitest); npm run test:watch reruns them on chan
 `dist/index.html` can be opened directly from disk or shared with colleagues. Note that
 `localStorage` is per browser and per origin, so export your project to back it up or move it.
 
+The build puts the licenses of the bundled third-party packages (the `dependencies` in
+`package.json` and theirs) at the top of `dist/index.html`, as their licenses ask; the app shows
+them under **Licenses** (start dialog, and View ▾). They are read from the installed packages at
+build time (`build/licenses.ts`), so they stay right when packages are updated or added.
+
 ## Features
 
 - **Getting started**: on first use the start screen lists the main features and offers
@@ -301,6 +306,7 @@ notifies `renderApp`, which re-renders the views.
 | `model/table.ts` | Which coder columns are shown, and their order |
 | `model/consolidation.ts` | Per-document consolidation |
 | `model/autoCode.ts` | Auto-coding: finding occurrences and paragraphs, preview, applying |
+| `model/codebookTable.ts` | The codebook as table rows (one per code without subcodes, with each level's code and description), applying edited cells (a cleared code cell deletes the code where the row is its last place, else moves the row out of that parent; a code pasted over a code replaces it; a name at a level stands for that code: rows go under it, and an empty row given a parent code is that same code, waiting for a subcode; rename, describe, new codes and subcodes; identical copies of codes (segments and subcodes too, new ids; "name (2)" in their own column); same names only on request) as one undo step with problems per row, and row order |
 | `model/aiCoding.ts`, `aiSettings.ts` | AI coding: text units and requests, prompts, parsing answers into suggestions, applying; the API settings (stored outside the project) |
 | `model/formats/refiCodebook.ts` | REFI-QDA Codebook (.qdc) export and import; code elements shared with the .qdpx project format |
 | `model/mergeDocs.ts` | Merging copies of a document (identical text) with everyone's coding, by author |
@@ -330,11 +336,13 @@ notifies `renderApp`, which re-renders the views.
 | `view/codeCreateDialog.ts`, `autoCodeTab.ts`, `codeCreateDialog.css` | The + Code dialog: new code and auto-coding tabs |
 | `view/aiCodeDialog.ts`, `aiSettingsDialog.ts`, `aiCode.css` | AI coding: choosing codes, documents, splitting and examples; reviewing suggestions; the API settings |
 | `view/docPicker.ts` | The document checklist shared by auto-coding and AI coding |
+| `view/codebookTable.ts`, `codebookTable.css` | The codebook as a spreadsheet (jspreadsheet CE) in place of the text; edits go to the codebook and back; parent codes shown like their subcodes, merged-looking over several rows (separate rows on hover, toggle in the menu bar), renaming a parent or moving one row from the list while typing, segment counts, name suggestions per level column, copying cells with their codes' ids and colors in the clipboard (cutting with ⌘X and pasting moves codes with their GUIDs, segments and subcodes; a pasted code under its own parent is that code, under another parent an identical copy with its segments and subcodes or, from the menu, a new code of its name only; plain text is new codes), the fill handle copying exact values, flags on unapplied edits, empty rows inserted anywhere, 10 empty rows at the end, "+" for another level, levels inserted between others (a name typed there inserts a code between that row's codes), draft rows, a row order of its own (rows never move by themselves; new ones go where they were typed), row dragging, the selected code shown in the codebook, colors, minimized columns, and a menu bar next to the search (fit heights or make all rows the same height, fit widths, line wrapping, code colors, parent descriptions; layout kept in the UI settings) |
 | `view/mergeDialog.ts` | Who coded which copy; keeping, renaming or merging authors |
 | `view/windows.ts` | Moving parts of the app into separate browser windows and back; tool windows; the window used last |
 | `view/challengeReview.ts`, `commentDialog.ts`, `occurrenceView.ts` | Reviewing and challenging another coder's codes; the comment dialog; the code occurrence table |
 | `view/topbar.ts`, `startDialog.ts` | Top bar, menus, keyboard shortcuts; the start dialog (new project or open a file) |
 | `view/leaveGuard.ts` | Warning before closing the tab, with an offer to download a copy |
+| `view/licensesDialog.ts`, `build/licenses.ts` | The Licenses dialog; the Vite plugin that collects the bundled packages' licenses (into the built file and `virtual:third-party-licenses`) |
 | `view/layout.ts`, `splitters.ts` | Rearranging and resizing the main areas and sidebar panels |
 | `view/dom.ts`, `feedback.ts`, `files.ts` | DOM helpers; messages and questions as dialogs of the app (`notify`, `confirmAction` with a named confirm button, `askText`, `choose`; never the browser's alert/confirm/prompt); file picking and downloads |
 | `view/global.css` | Global styles: light and dark themes, base elements, buttons, menus, layout, dialogs |

@@ -200,7 +200,8 @@ export function deleteCodes(ids: string[]) {
   commit();
 }
 
-function removeCode(id: string) {
+/** Deletes a code and its segments, without committing (subcodes move up to its parent). */
+export function removeCode(id: string) {
   const code = codeById(id);
   for (const c of project.codes) if (c.parentId === id) c.parentId = code?.parentId ?? null;
   project.codes = project.codes.filter((c) => c.id !== id);
@@ -305,11 +306,16 @@ export function topmostCodes(ids: string[]): string[] {
   return ids.filter((id) => !ids.some((other) => other !== id && isCodeInSubtree(id, other)));
 }
 
-function reparent(id: string, parentId: string | null, adoptParentColor: boolean): 'ok' | 'cycle' | 'duplicate' {
+/**
+ * Makes `id` a subcode of `parentId` without committing (see setCodeParent). With
+ * `allowDuplicate`, the new parent may already have a subcode of the same name (codes are told
+ * apart by their ids; the codebook table allows this).
+ */
+export function reparent(id: string, parentId: string | null, adoptParentColor: boolean, allowDuplicate = false): 'ok' | 'cycle' | 'duplicate' {
   const code = codeById(id);
   if (!code || (parentId && isCodeInSubtree(parentId, id))) return 'cycle';
   const clash = findChildCode(parentId, code.name);
-  if (clash && clash.id !== id) return 'duplicate';
+  if (clash && clash.id !== id && !allowDuplicate) return 'duplicate';
   // A code moved to another parent goes after its new siblings.
   if ((code.parentId ?? null) !== parentId) code.order = nextOrder(parentId);
   code.parentId = parentId;

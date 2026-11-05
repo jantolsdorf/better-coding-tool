@@ -31,7 +31,7 @@ import {
   segmentCounts,
   subtreeOf,
 } from '../model/codes';
-import { project, ui } from '../model/state';
+import { commitUI, project, ui } from '../model/state';
 import type { Code } from '../model/types';
 import { byName } from '../model/util';
 import { openCodeDialog } from './codeDialog';
@@ -112,6 +112,30 @@ function dropDragged(targetId: string | null, merge: boolean) {
 export function setCodebookFilter(text: string) {
   filterText = text.trim().toLowerCase();
   if (lastContainer) renderCodebook(lastContainer);
+}
+
+/**
+ * Scrolls the codebook to a code and briefly highlights it (opening its parents if they are
+ * closed). Does nothing while a filter hides it.
+ */
+export function revealCode(id: string) {
+  if (!lastContainer || !codeById(id)) return;
+  const closed = codeChain(codeById(id)!)
+    .slice(0, -1)
+    .filter((c) => ui.collapsedCodes.includes(c.id));
+  if (closed.length) {
+    ui.collapsedCodes = ui.collapsedCodes.filter((x) => !closed.some((c) => c.id === x));
+    commitUI();
+  }
+  // After the list is shown again (opening parents re-renders it).
+  requestAnimationFrame(() => {
+    const row = lastContainer?.querySelector<HTMLElement>(`.code-row[data-id="${CSS.escape(id)}"]`);
+    if (!row) return;
+    row.scrollIntoView({ block: 'nearest' });
+    row.classList.remove('revealed');
+    void row.offsetWidth;
+    row.classList.add('revealed');
+  });
 }
 
 interface ListState {

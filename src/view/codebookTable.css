@@ -1,0 +1,429 @@
+/* The codebook table (codebookTable.ts): in the text's place, with jspreadsheet's colors taken
+   from the app's theme. */
+
+.layout.table-open > .viewer {
+  display: none;
+}
+.codebook-table {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+}
+.cbt-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.cbt-hint {
+  font-size: 0.85em;
+  line-height: 1.3;
+}
+.cbt-host {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+  overflow: hidden;
+
+  --border_color: var(--border);
+  --border_color_highlighted: var(--accent);
+  --header_background: var(--head);
+  --header_background_highlighted: var(--hover-strong);
+  --header_color: var(--muted);
+  --header_color_highlighted: var(--text);
+  --content_background: var(--surface);
+  --content_color: var(--text);
+  --content_background_highlighted: var(--accent-soft);
+  --content_color_highlighted: var(--text);
+  --selection: color-mix(in srgb, var(--accent) 12%, transparent);
+  --cursor: var(--accent-soft);
+  --menu_background: var(--surface);
+  --menu_background_highlighted: var(--hover);
+  --menu_color: var(--text);
+  --menu_color_highlighted: var(--text);
+  --menu_box_shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+/* The table fills the area and scrolls inside it (the host is jspreadsheet's root element). */
+.cbt-host {
+  display: flex;
+  flex-direction: column;
+}
+.cbt-host > .jtabs-headers-container {
+  display: none;
+}
+.cbt-host > .jtabs-content {
+  flex: 1;
+  min-height: 0;
+}
+.cbt-host > .jtabs-content > .jss_container {
+  height: 100%;
+  /* Over jsuites' tab styles, which show a selected tab as a block. */
+  display: flex !important;
+  flex-direction: column;
+}
+.cbt-host .jss_content {
+  flex: 1;
+  min-height: 0;
+  max-height: none !important;
+  box-shadow: none !important;
+  border: 1px solid var(--border);
+}
+.cbt-host .jss_filter {
+  flex: none;
+  margin-bottom: 6px;
+}
+.cbt-host .jss_search {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+/* jspreadsheet's editor and context menu (jsuites) in the app's theme. */
+.cbt-host .jss_worksheet .editor input,
+.cbt-host .jss_worksheet .editor textarea {
+  background: var(--surface);
+  color: var(--text);
+}
+.jss_contextmenu {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.jss_contextmenu > div:not(.contextmenu-line):hover {
+  background: var(--hover);
+}
+.jss_contextmenu > div.jcontextmenu-disabled,
+.jss_contextmenu > div[data-disabled] {
+  opacity: 0.45;
+}
+
+/* Cells in their code's color (parents like subcodes): a tint over the cell's background, so
+   selection stays visible, and a bar at the left. */
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-colored {
+  background-image: linear-gradient(var(--code-tint), var(--code-tint));
+  box-shadow: inset 3px 0 0 var(--code-color);
+}
+
+/* The Color menu button and its menu. */
+.cbt-color-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cbt-color-swatch {
+  border: 1px solid var(--border-strong);
+}
+.cbt-color-swatch.mixed {
+  background: conic-gradient(#ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444) !important;
+}
+.cbt-color-menu {
+  position: fixed;
+  z-index: 60;
+  width: 212px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cbt-color-title {
+  font-size: 0.85em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cbt-palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+.cbt-palette-swatch {
+  aspect-ratio: 1;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  padding: 0;
+  cursor: pointer;
+}
+.cbt-palette-swatch:hover,
+.cbt-palette-swatch:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+.cbt-palette-swatch.on {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.cbt-color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+}
+
+/* A draft row's empty parent level: to be filled in before the row becomes a code. */
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-missing {
+  outline: 1px dashed var(--warn);
+  outline-offset: -2px;
+}
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-missing:empty::before {
+  content: attr(data-hint);
+  color: var(--warn);
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Rows are dragged from the right edge of their number (jspreadsheet's 6px drag zone): shown as a grip. */
+.cbt-host .jss_worksheet > tbody.draggable > tr > td.jss_row {
+  position: relative;
+  padding-right: 10px;
+}
+.cbt-host .jss_worksheet > tbody.draggable > tr > td.jss_row::after {
+  content: '⋮';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--faint);
+  cursor: grab;
+}
+.cbt-host .jss_worksheet > tbody.draggable > tr:hover > td.jss_row::after {
+  color: var(--text);
+}
+
+/* An edit that could not be applied: kept in the cell, with a red flag in its corner (reason on hover). */
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-issue {
+  position: relative;
+  outline: 1px solid var(--danger);
+  outline-offset: -1px;
+}
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-issue::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-style: solid;
+  border-width: 0 9px 9px 0;
+  border-color: transparent var(--danger) transparent transparent;
+}
+
+/* A parent's cells over several consecutive rows look like one merged cell (Merged view): no
+   border between them, and the text only in the middle one (every cell keeps its value). */
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-merge-cont {
+  border-top-color: transparent;
+}
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-merged:not(.cbt-merge-label):not(.cbt-issue):not(.highlight):not(.cbt-merge-hover) {
+  color: transparent;
+}
+/* The text in the block's middle row, vertically centered in the block. */
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-merge-label {
+  vertical-align: middle;
+}
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-merge-low {
+  vertical-align: bottom;
+}
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-merge-next {
+  border-bottom-color: transparent;
+}
+
+/* A code's number of coded segments, in its name cell. */
+.cbt-host .jss_worksheet > tbody > tr > td[data-count] {
+  position: relative;
+  padding-right: 26px;
+}
+.cbt-host .jss_worksheet > tbody > tr > td[data-count]::before {
+  content: attr(data-count);
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+}
+
+/* Minimizing a column: a small button in its header (placed in the header cell, which stays
+   sticky as jspreadsheet makes it); a minimized column is narrow and shows no text. */
+.cbt-min-btn {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  line-height: 13px;
+  text-align: center;
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--faint);
+  cursor: pointer;
+  visibility: hidden;
+}
+.cbt-host thead td:hover .cbt-min-btn,
+.cbt-host thead td.cbt-min-col .cbt-min-btn {
+  visibility: visible;
+}
+.cbt-min-btn:hover {
+  background: var(--hover-strong);
+  color: var(--text);
+}
+.cbt-host .jss_worksheet > thead > tr > td.cbt-min-col {
+  color: transparent;
+  overflow: hidden;
+}
+.cbt-host .jss_worksheet > thead > tr > td.cbt-min-col .cbt-min-btn {
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  color: var(--text);
+}
+
+/* Suggestions while typing a name: the codes of that level column, and "(new) name". */
+.cbt-suggest {
+  position: fixed;
+  z-index: 70;
+  max-height: 240px;
+  overflow: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+}
+.cbt-suggest[hidden] {
+  display: none;
+}
+.cbt-suggest li {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cbt-suggest li:hover,
+.cbt-suggest li.active {
+  background: var(--accent-soft);
+}
+.cbt-suggest-hint {
+  font-size: 0.8em;
+  color: var(--muted);
+}
+
+/* The menu bar in the search row, and its menus. */
+.cbt-host .jss_filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.cbt-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+}
+.cbt-tool-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.cbt-tool-item {
+  text-align: left;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.cbt-tool-item:hover,
+.cbt-tool-item:focus-visible {
+  background: var(--hover);
+}
+.cbt-tool-sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+
+/* Line wrapping per cell (set in the menu bar; descriptions wrap by default). */
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-nowrap {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* "+" after the last column: one more level. */
+.cbt-host .jss_worksheet {
+  /* Under the "+" (its column has no cells in the body). */
+  background: var(--panel);
+}
+.cbt-host .jss_worksheet > thead > tr > td.cbt-add-level {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+  text-align: center;
+  background: var(--head);
+}
+.cbt-add-level-btn {
+  width: 24px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.cbt-add-level-btn:hover {
+  background: var(--hover-strong);
+}
+
+/* A merged-looking block while hovered: its separate rows, each with its text. */
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-merge-cont.cbt-merge-hover {
+  border-top: 1px dashed var(--border-strong);
+}
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-merge-hover {
+  vertical-align: middle;
+}
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-merged:not(.cbt-merge-label):not(.cbt-merge-hover)[data-count]::before {
+  content: none;
+}
+
+/* A toggle in the menu bar, when on. */
+.cbt-toggle[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+/* The hidden text of a merged block's other cells takes no more than one line (also on hover). */
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-merged:not(.cbt-merge-label).cbt-wrap,
+.cbt-host .jss_worksheet > tbody > tr > td.cbt-merged:not(.cbt-merge-label) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

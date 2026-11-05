@@ -46,6 +46,11 @@ function loadUI(): UIState {
     codeBoxSubcodes: false,
     challengeMode: false,
     backedUp: null,
+    tableMinimized: [],
+    tableWidths: {},
+    tableMerged: true,
+    tableHeights: {},
+    tableWrap: { cols: {}, cells: {} },
   };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? '{}');
@@ -79,10 +84,16 @@ const undoStack: string[] = [];
 const redoStack: string[] = [];
 export const canUndo = () => undoStack.length > 0;
 export const canRedo = () => redoStack.length > 0;
+let restores = 0;
+/** The project as last committed (or restored), serialized: identifies that state of it. */
+export const projectState = () => lastJson;
+/** How many times undo or redo restored the project (so views can tell a restore from an edit). */
+export const historyRestores = () => restores;
 
 function restore(json: string) {
   project = JSON.parse(json) as Project;
   lastJson = json;
+  restores++;
   saveProject(json);
   saveUI();
   emit();

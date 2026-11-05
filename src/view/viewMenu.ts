@@ -5,6 +5,7 @@ import { setCodesShown, setColumnVisible, setMemosShown, setSegmentListShown } f
 import { ui } from '../model/state';
 import { availableColumns } from '../model/table';
 import { h } from './dom';
+import { openLicensesDialog } from './licensesDialog';
 import { onEveryDocument } from './windows';
 import { title as segmentListTitle } from './segmentList';
 
@@ -67,5 +68,17 @@ function menuItems(): HTMLElement[] {
       checkbox(c.label, String(c.count), c.visible, (v) => setColumnVisible(c.key, v), off(c.kind)),
     ),
     h('div', { class: 'view-note muted' }, 'Hidden columns are also left out of the table CSV export.'),
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'view-item view-link',
+        onClick: () => {
+          closeViewMenu();
+          openLicensesDialog();
+        },
+      },
+      'Licenses of the software used…',
+    ),
   ];
 }
