@@ -7,7 +7,7 @@ import {
   mergeCodeInteractive,
   saveCodeDetails,
 } from '../controller/codes';
-import { codeById, codePath, isCodeInSubtree, subtreeOf } from '../model/codes';
+import { codeById, codePath, isCodeInSubtree, segmentCounts, subtreeOf } from '../model/codes';
 import { folderPath, getDoc } from '../model/documents';
 import { lineLabel } from '../model/lines';
 import { project, subscribe } from '../model/state';
@@ -240,6 +240,7 @@ export function openCodeDialog(codeId: string) {
     value: code.parentId ?? null,
     topLevel: '(top level)',
     allow: (c) => !isCodeInSubtree(c.id, codeId),
+    counts: segmentCounts(),
     onPick: () => {
       updateHead();
       refreshFoot();
@@ -341,7 +342,7 @@ export function openCodeDialog(codeId: string) {
                   inner.ownerDocument,
                   `Merge “${code.name}” into…`,
                   'Choose the code that gets its coded segments and subcodes. You see what happens before anything changes.',
-                  { allow: (c) => c.id !== codeId },
+                  { allow: (c) => c.id !== codeId, counts: segmentCounts() },
                 );
                 if (target && (await mergeCodeInteractive(code, target))) close();
               },

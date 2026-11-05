@@ -8,12 +8,9 @@ import { addMemoToPassage } from '../../controller/memos';
 import {
   codeById,
   codePath,
-  codePathParts,
   codesInTreeOrder,
   findChildCode,
   findCodeByPath,
-  isCodeInSubtree,
-  matchesCodeQuery,
   missingInPath,
   nextColor,
   segmentCounts,
@@ -25,8 +22,9 @@ import { lineLabel } from '../../model/lines';
 import { memosOf } from '../../model/memos';
 import { project, ui } from '../../model/state';
 import type { Code, Doc } from '../../model/types';
-import { h, hexToRgba } from '../dom';
+import { h } from '../dom';
 import { onEveryDocument } from '../windows';
+import { codeTreeRows, treeRowClass, treeRowContent, type TreeRow } from '../codeTree';
 import { hidePins, showPins } from './pins';
 import { toast } from '../feedback';
 import { copyText } from '../files';
@@ -48,6 +46,8 @@ interface Popup {
   entry: Entry;
   /** The name an in-vivo code would get (the passage's own words), used when nothing is typed. */
   inVivo: string;
+  /** The suggestions as a tree (codeTree.ts), and their codes (items[i] is rows[i]'s code). */
+  rows: TreeRow[];
   items: Code[];
   exact: Code | undefined;
   /** Whether a code exists at exactly the typed path (then no "Create" option is shown). */
@@ -184,15 +184,17 @@ function openCodeBox(doc: Doc, start: number, end: number) {
   );
   gridEl.append(el);
 
-  const width = Math.min(460, grid.width - 16);
-  el.style.width = `${width}px`;
-  placeBox(el, start, end, width);
-
   popup = {
     el, docId: doc.id, start, end, input, color, kind, list, applied, target, help, hint,
     entry: parseEntry(''), inVivo: inVivoName(doc.content.slice(start, end)),
-    items: [], exact: undefined, pathExists: false, active: -1, counts: segmentCounts(),
+    rows: [], items: [], exact: undefined, pathExists: false, active: -1, counts: segmentCounts(),
   };
+  // As wide as all codes need (listed as a tree while nothing is typed), within the text area;
+  // it then stays that wide while typing.
+  refreshSuggestions();
+  const width = fittedWidth(el, grid.width - 16);
+  el.style.setProperty('--box-width', `${width}px`);
+  placeBox(el, start, end, width);
   setNamedHighlight('qc-pending', range, 10);
   // Pins at both ends adjust the passage before it is coded.
   const adjust = (a: number, b: number) => {
@@ -219,6 +221,22 @@ function openCodeBox(doc: Doc, start: number, end: number) {
   el.scrollIntoView({ block: 'nearest' });
 }
 
+/** Narrowest the box gets (room for the field and its hints). */
+const MIN_WIDTH = 340;
+/** Room for the list's scrollbar. */
+const SCROLLBAR = 16;
+
+/**
+ * The width the box needs for its list of codes, each on one line (measured with the codes
+ * shown at their natural width, see .measuring in codeBox.css), between MIN_WIDTH and `max`.
+ */
+function fittedWidth(el: HTMLElement, max: number): number {
+  el.classList.add('measuring');
+  const natural = Math.ceil(el.getBoundingClientRect().width) + SCROLLBAR;
+  el.classList.remove('measuring');
+  return Math.max(Math.min(MIN_WIDTH, max), Math.min(natural, max));
+}
+
 /**
  * Places the box one text line below the end of the passage [start, end), so the passage stays
  * visible; horizontally where the passage ends, within the text area.
@@ -229,8 +247,9 @@ function placeBox(el: HTMLElement, start: number, end: number, width: number) {
   const last = rects[rects.length - 1] ?? range.getBoundingClientRect();
   const grid = gridEl.getBoundingClientRect();
   const lineHeight = parseFloat(getComputedStyle(textBody).lineHeight) || 24;
-  el.style.left = `${Math.max(8, Math.min(last.left - grid.left, grid.width - width - 8))}px`;
-  el.style.top = `${last.bottom - grid.top + lineHeight}px`;
+  // Only the computed place is set here; the box's styles are in codeBox.css.
+  el.style.setProperty('--box-left', `${Math.max(8, Math.min(last.left - grid.left, grid.width - width - 8))}px`);
+  el.style.setProperty('--box-top', `${last.bottom - grid.top + lineHeight}px`);
 }
 
 /** Copies the passage the box was opened for (the text selection itself is gone once the box has focus). */
@@ -347,6 +366,7 @@ function refreshSuggestions() {
   renderKind();
   renderHelp();
   if (p.entry.kind === 'memo' || p.entry.help) {
+    p.rows = [];
     p.items = [];
     p.exact = undefined;
     p.pathExists = false;
@@ -359,30 +379,14 @@ function refreshSuggestions() {
   const trailing = /[>›]\s*$/.test(typed);
   const last = trailing ? '' : (parts.at(-1) ?? '').toLowerCase();
   const exactPath = !trailing && parts.length ? findCodeByPath(parts) : undefined;
-  const ownRank = (c: Code) => {
-    const n = c.name.toLowerCase();
-    return c === exactPath ? 0 : n === last ? 1 : n.startsWith(last) ? 2 : 3;
-  };
-  const matches = project.codes.filter((c) => matchesCodeQuery(c, typed));
-  // Optionally also every subcode of a match; it ranks like that match, so (sorted by path) it
-  // is listed right below its parent.
-  const rankOf = new Map(matches.map((c) => [c, ownRank(c)]));
-  if (ui.codeBoxSubcodes && typed.trim()) {
-    const own = new Map(rankOf);
-    for (const c of project.codes) {
-      // Also a subcode that matches by itself is grouped under its best-matching parent.
-      const ranks = matches.filter((m) => isCodeInSubtree(c.id, m.id)).map((m) => own.get(m)!);
-      if (ranks.length) rankOf.set(c, Math.min(...ranks));
-    }
-  }
-  p.items = [...rankOf.keys()]
-    .sort((a, b) => rankOf.get(a)! - rankOf.get(b)! || codePath(a).localeCompare(codePath(b)))
-    // All matches are listed; the list scrolls. The cap only keeps huge codebooks responsive.
-    .slice(0, 300);
+  // The matches as a tree, with their parents for context (and optionally all their subcodes).
+  // All are listed; the list scrolls. The cap only keeps huge codebooks responsive.
+  p.rows = codeTreeRows(typed, { withSubcodes: ui.codeBoxSubcodes }).slice(0, 500);
+  p.items = p.rows.map((r) => r.code);
   p.pathExists = !!exactPath;
   // A single name also picks an existing subcode of that name by default (it stays findable),
   // while "Create" is still offered for a new top-level code.
-  p.exact = exactPath ?? (parts.length === 1 && !trailing ? p.items.find((c) => c.name.toLowerCase() === last) : undefined);
+  p.exact = exactPath ?? (parts.length === 1 && !trailing ? p.rows.find((r) => r.match && r.code.name.toLowerCase() === last)?.code : undefined);
   p.active = p.exact ? p.items.indexOf(p.exact) : -1;
   renderList();
 }
@@ -430,13 +434,11 @@ function renderList() {
   const inVivo = !q && p.inVivo ? inVivoRow(p, pick(-1)) : null;
   p.list.replaceChildren(
     ...(inVivo ? [inVivo] : []),
-    ...p.items.map((c, i) =>
+    ...p.rows.map((r, i) =>
       h(
         'li',
-        { class: i === p.active ? 'active' : '', title: codePath(c), onMousedown: pick(i) },
-        h('span', { class: 'swatch', style: { background: c.color } }),
-        suggestionText(codePathParts(c).slice(0, -1), c.name),
-        h('span', { class: 'muted sugg-count' }, String(p.counts.get(c.id) ?? 0)),
+        { class: ['code-tree-row', i === p.active ? 'active' : '', treeRowClass(r, q)].filter(Boolean).join(' '), title: codePath(r.code), onMousedown: pick(i) },
+        ...treeRowContent(r, p.counts.get(r.code.id) ?? 0),
       ),
     ),
   );
@@ -453,7 +455,7 @@ function renderList() {
       h(
         'li',
         { class: 'create' + (p.active === -1 ? ' active' : ''), title: parts.join(' > '), onMousedown: pick(-1) },
-        h('span', { class: 'swatch', style: { background: color } }),
+        colorSwatch(color),
         parents.length
           ? suggestionText(parents, `Create subcode “${name}”`, 'in', also)
           : h('span', { class: 'sugg-text' }, h('span', { class: 'sugg-name' }, `Create new code “${name}”`)),
@@ -466,13 +468,25 @@ function renderList() {
   p.list.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
 }
 
+/**
+ * Gives an element its code's color as the CSS variable --code-color; how it is used (a swatch's
+ * background, a chip's tint) is up to codeBox.css.
+ */
+function withCodeColor<T extends HTMLElement>(el: T, color: string): T {
+  el.style.setProperty('--code-color', color);
+  return el;
+}
+
+/** A code's color as a swatch. */
+const colorSwatch = (color: string) => withCodeColor(h('span', { class: 'swatch code-swatch' }), color);
+
 /** The "in-vivo code" option: the highlighted words as the code name (reusing such a code if it exists). */
 function inVivoRow(p: Popup, onPick: (e: MouseEvent) => void): HTMLElement {
   const existing = findChildCode(null, p.inVivo);
   return h(
     'li',
     { class: 'create invivo' + (p.active === -1 ? ' active' : ''), onMousedown: onPick, title: 'Press Enter to use the highlighted words as the code' },
-    h('span', { class: 'swatch', style: { background: existing?.color ?? p.color.value } }),
+    colorSwatch(existing?.color ?? p.color.value),
     h('span', { class: 'grow' }, `${existing ? 'Apply' : 'Create'} in-vivo code “${p.inVivo}”`),
     h('kbd', {}, '↵'),
   );
@@ -489,7 +503,7 @@ function renderApplied() {
     ...(here.length || memos.length ? [h('span', { class: 'muted' }, 'Already here: ')] : []),
     ...here.map((s) => {
       const c = codeById(s.codeId);
-      return c ? h('span', { class: 'chip', style: { background: hexToRgba(c.color, 0.25) } }, c.name) : '';
+      return c ? withCodeColor(h('span', { class: 'chip code-chip' }, c.name), c.color) : '';
     }),
     ...memos.map((m) => h('span', { class: 'chip memo-chip', title: m.note }, m.note.length > 40 ? m.note.slice(0, 40) + '…' : m.note)),
   );
@@ -555,8 +569,8 @@ function tabComplete(back: boolean) {
     p.tabCycle = { parentPath, ids: subs.map((c) => c.id), index, value: p.input.value };
     return;
   }
-  // Otherwise: complete to the chosen (or first) suggestion's path.
-  const pick = p.items[p.active >= 0 ? p.active : 0];
+  // Otherwise: complete to the chosen (or first matching) suggestion's path.
+  const pick = p.active >= 0 ? p.items[p.active] : (p.rows.find((r) => r.match) ?? p.rows[0])?.code;
   if (pick) set(codePath(pick));
 }
 

@@ -1,7 +1,11 @@
 /* The code box that opens when text is selected: input, suggestions, help (codeBox.ts). */
 
 .code-popup {
+  /* Placed and sized by codeBox.ts (below the passage, within the text area). */
   position: absolute;
+  left: var(--box-left, 8px);
+  top: var(--box-top, 8px);
+  width: var(--box-width, 460px);
   z-index: 20;
   background: var(--surface);
   border: 1px solid var(--border-clear);
@@ -258,4 +262,34 @@
 body.pin-dragging .code-popup {
   pointer-events: none;
   opacity: 0.35;
+}
+/* Suggestions as a tree (codeTree.ts): one line each, the count at the right. */
+.popup-list li.code-tree-row {
+  align-items: center;
+  gap: 6px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+.popup-list li.code-tree-row > .swatch {
+  margin-top: 0;
+}
+
+/* Colors of codes, given by codeBox.ts as --code-color: swatches, and chips of codes already on the passage. */
+.code-popup .code-swatch {
+  background: var(--code-color);
+}
+.code-popup .chip.code-chip {
+  background: color-mix(in srgb, var(--code-color) 25%, transparent);
+}
+/* Measuring the width all codes need, once when the box opens (codeBox.ts: fittedWidth): only
+   the codes' rows, each at its natural width. */
+.code-popup.measuring {
+  width: max-content;
+}
+.code-popup.measuring > :not(.popup-list),
+.code-popup.measuring .popup-list li:not(.code-tree-row) {
+  display: none;
+}
+.code-popup.measuring .popup-list {
+  overflow: visible;
 }

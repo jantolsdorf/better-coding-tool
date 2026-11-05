@@ -1,0 +1,31 @@
+/* Codes as a tree in lists that search codes (codeTree.ts). */
+
+/* The tree's lines: monospaced, so │ ├─ └─ line up. */
+.code-tree-lines {
+  flex: none;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--faint, var(--muted));
+}
+.code-tree-swatch {
+  background: var(--code-color);
+}
+.code-tree-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.code-tree-count {
+  flex: none;
+  margin-left: auto;
+  padding-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+/* While searching: parents shown for context are quieter than the matches. */
+.tree-context .code-tree-name {
+  color: var(--muted);
+}
+.tree-match .code-tree-name {
+  font-weight: 600;
+}

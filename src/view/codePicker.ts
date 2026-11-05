@@ -1,14 +1,12 @@
 // Choosing a code (e.g. a parent, or the code to merge into): a search field that finds codes as
 // the code box does when coding (by name, or by path "trust > dist"; Tab completes), with the
-// codes listed as a tree (parent, then │ ├─ └─ its subcodes). While searching, the matches are
-// shown with their parents for context.
+// codes listed as a tree (codeTree.ts). While searching, the matches are shown with their
+// parents for context.
 
-import { byOrder } from '../model/codeOrder';
-import { childCodes, codeById, codeChain, codePath, matchesCodeQuery } from '../model/codes';
-import { ui } from '../model/state';
+import { codeById, codePath } from '../model/codes';
 import type { Code } from '../model/types';
-import { byName } from '../model/util';
 import './codePicker.css';
+import { codeTreeRows, treeRowClass, treeRowContent, type TreeRow } from './codeTree';
 import { h } from './dom';
 
 export interface CodePickerOptions {
@@ -23,6 +21,8 @@ export interface CodePickerOptions {
   onPick?: (id: string | null) => void;
   /** The list is always shown (in a dialog of its own) instead of only while the field has focus. */
   alwaysOpen?: boolean;
+  /** Numbers of coded segments, shown next to the codes. */
+  counts?: Map<string, number>;
 }
 
 export interface CodePicker {
@@ -34,20 +34,12 @@ export interface CodePicker {
 
 interface Row {
   id: string | null;
+  /** The code's row in the tree (none for the top level). */
+  tree?: TreeRow;
   code?: Code;
-  /** The tree lines before the name (│ ├─ └─). */
-  prefix: string;
   selectable: boolean;
   /** Matches what was typed (shown stronger than the parents listed for context). */
   match: boolean;
-}
-
-/** Codes depth-first, siblings in the codebook's order (by name, or the custom order). */
-function treeOrder(parentId: string | null = null, depth = 0): Code[] {
-  if (depth > 100) return [];
-  return childCodes(parentId)
-    .sort(ui.codeSort === 'name' ? byName : byOrder)
-    .flatMap((c) => [c, ...treeOrder(c.id, depth + 1)]);
 }
 
 export function codePicker(opts: CodePickerOptions): CodePicker {
@@ -74,26 +66,10 @@ export function codePicker(opts: CodePickerOptions): CodePicker {
 
   function build() {
     const q = query.trim();
-    const all = treeOrder();
-    const matched = new Set(all.filter((c) => !q || matchesCodeQuery(c, q)).map((c) => c.id));
-    // Matches, and their parents for context.
-    const shown = new Set<string>();
-    for (const id of matched) for (const c of codeChain(codeById(id)!)) shown.add(c.id);
-    const visible = all.filter((c) => shown.has(c.id));
-    const lastChild = new Map<string | null, string>();
-    for (const c of visible) lastChild.set(c.parentId ?? null, c.id);
-    const isLast = (c: Code) => lastChild.get(c.parentId ?? null) === c.id;
-    const prefix = (c: Code) => {
-      const chain = codeChain(c);
-      return chain
-        .slice(1)
-        .map((x, i) => (i === chain.length - 2 ? (isLast(x) ? '└─ ' : '├─ ') : isLast(x) ? '   ' : '│  '))
-        .join('');
-    };
     const top = opts.topLevel !== undefined && (!q || opts.topLevel.toLowerCase().includes(q.toLowerCase()));
     rows = [
-      ...(top ? [{ id: null, prefix: '', selectable: true, match: !!q } as Row] : []),
-      ...visible.map((c): Row => ({ id: c.id, code: c, prefix: prefix(c), selectable: opts.allow?.(c) ?? true, match: !!q && matched.has(c.id) })),
+      ...(top ? [{ id: null, selectable: true, match: !!q } as Row] : []),
+      ...codeTreeRows(q).map((t): Row => ({ id: t.code.id, tree: t, code: t.code, selectable: opts.allow?.(t.code) ?? true, match: t.match })),
     ];
     // Typing: the first match that can be chosen; else the chosen code.
     active = q ? rows.findIndex((r) => r.match && r.selectable) : rows.findIndex((r) => r.id === selected);
@@ -106,7 +82,9 @@ export function codePicker(opts: CodePickerOptions): CodePicker {
         h(
           'li',
           {
-            class: [i === active ? 'active' : '', r.selectable ? '' : 'disabled', r.match ? 'match' : '', r.id === selected ? 'chosen' : ''].filter(Boolean).join(' '),
+            class: [i === active ? 'active' : '', r.selectable ? '' : 'disabled', r.tree ? treeRowClass(r.tree, query) : r.match ? 'tree-match' : '', r.id === selected ? 'chosen' : '']
+              .filter(Boolean)
+              .join(' '),
             role: 'option',
             'aria-selected': String(i === active),
             'aria-disabled': String(!r.selectable),
@@ -117,9 +95,7 @@ export function codePicker(opts: CodePickerOptions): CodePicker {
               if (r.selectable) pick(r);
             },
           },
-          h('span', { class: 'code-picker-tree' }, r.prefix),
-          r.code ? h('span', { class: 'swatch', style: { background: r.code.color } }) : null,
-          h('span', { class: 'code-picker-name' }, r.code ? r.code.name : (opts.topLevel ?? '')),
+          ...(r.tree ? treeRowContent(r.tree, opts.counts ? (opts.counts.get(r.tree.code.id) ?? 0) : undefined) : [h('span', { class: 'code-tree-name' }, opts.topLevel ?? '')]),
         ),
       ),
       ...(rows.length ? [] : [h('li', { class: 'empty muted' }, query.trim() ? `No code matches “${query.trim()}”.` : 'No codes yet.')]),
