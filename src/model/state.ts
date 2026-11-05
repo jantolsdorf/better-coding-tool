@@ -137,7 +137,8 @@ function saveProject(json: string) {
   }
 }
 
-function saveUI() {
+/** Persist the UI state without re-rendering (for settings only one view uses, which updates itself). */
+export function saveUI() {
   try {
     localStorage.setItem(UI_KEY, JSON.stringify(ui));
   } catch {

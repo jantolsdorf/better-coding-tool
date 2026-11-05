@@ -25,7 +25,7 @@ import { recolorCodesTo } from '../controller/codes';
 import { redoChange, undoChange } from '../controller/history';
 import { applyRowEdits, codebookRows, reorderAsRows, rowParentCode, type CellChoice, type CodebookRow, type RowEdit } from '../model/codebookTable';
 import { codeById, codeChain, deleteCodes, findChildCode, nextColor, nextOrder, reparent, segmentCounts, subtreeOf } from '../model/codes';
-import { commit, commitUI, historyRestores, project, projectState, subscribe, ui } from '../model/state';
+import { commit, commitUI, historyRestores, project, projectState, saveUI, subscribe, ui } from '../model/state';
 import type { Code } from '../model/types';
 import { now, PALETTE, uid } from '../model/util';
 import { revealCode } from './codebookList';
@@ -256,9 +256,13 @@ function columns(levels: number): jspreadsheet.Column[] {
         type: 'text',
         width: width(nameCol(k), 160),
         align: 'left',
+        // Wrapping is the table's own (cbt-wrap / cbt-nowrap, see markCells): jspreadsheet would
+        // otherwise wrap any text over 200 characters (inline, over minimized columns, merged
+        // cells and cells set not to wrap).
+        wordWrap: false,
         render: (cell, _value, _x, y) => paintCell(cell, k, Number(y)),
       },
-      { title: `Description ${k + 1}`, type: 'text', width: width(descCol(k), 240), align: 'left' },
+      { title: `Description ${k + 1}`, type: 'text', width: width(descCol(k), 240), align: 'left', wordWrap: false },
     ]).flat(),
     { title: 'id', type: 'hidden' },
   ];
@@ -1202,7 +1206,7 @@ function toggleMinimized(x: number) {
   if (!view) return;
   const key = columnKey(x, view.levels);
   ui.tableMinimized = ui.tableMinimized.includes(key) ? ui.tableMinimized.filter((k) => k !== key) : [...ui.tableMinimized, key];
-  commitUI();
+  saveUI();
   applyColumnWidths();
 }
 
@@ -1236,13 +1240,21 @@ function addLevel() {
   view.host.querySelector('.jss_content')?.scrollTo({ left: 1e6, behavior: 'smooth' });
 }
 
+/** While applyColumnWidths sets widths (not resized by hand). */
+let settingWidths = false;
+
 function applyColumnWidths() {
   if (!view) return;
   const { ws, levels, host } = view;
   const cols = columns(levels);
-  cols.forEach((c, x) => {
-    if (c.type !== 'hidden' && typeof c.width === 'number') ws.setWidth(x, c.width);
-  });
+  // Only the widths that change, in one call: each call makes jspreadsheet lay out the whole
+  // table again (and report it as a resize, which is not one by hand: ignored, see onresizecolumn).
+  const changed = cols.flatMap((c, x) => (c.type !== 'hidden' && typeof c.width === 'number' && Number(ws.options.columns?.[x]?.width) !== c.width ? [x] : []));
+  if (changed.length) {
+    settingWidths = true;
+    ws.setWidth(changed, changed.map((x) => cols[x].width as number));
+    settingWidths = false;
+  }
   for (const td of host.querySelectorAll<HTMLElement>('thead td[data-x]')) {
     const x = Number(td.dataset.x);
     const min = isMinimized(x, levels);
@@ -1294,7 +1306,7 @@ function toggleParentDescriptions() {
   const keys = parentDescKeys();
   if (!keys.length) return;
   ui.tableMinimized = parentDescsMinimized() ? ui.tableMinimized.filter((k) => !keys.includes(k)) : [...new Set([...ui.tableMinimized, ...keys])];
-  commitUI();
+  saveUI();
   applyColumnWidths();
 }
 
@@ -1413,7 +1425,7 @@ function fitWidths(all: boolean) {
     }
     ui.tableWidths[key] = Math.round(Math.min(600, Math.max(48, widest)));
   }
-  commitUI();
+  saveUI();
   applyColumnWidths();
   markCells();
 }
@@ -1550,6 +1562,9 @@ function markCells() {
   if (!view) return;
   const { ws, issues, levels } = view;
   const total = (ws.getData() as unknown[]).length;
+  // Heights are kept by code (ui.tableHeights), not by jspreadsheet's row numbers: it would give
+  // them to the rows it creates at those numbers later (after reordering: other codes).
+  ws.options.rows = [];
   // Empty cells in an inserted level are not missing parents.
   const inserted = new Set(Array.from({ length: levels }, (_, k) => k).filter(isInsertedColumn));
   for (let y = 0; y < total; y++) {
@@ -1558,9 +1573,12 @@ function markCells() {
     const line = lines()[y];
     const rowKey = line ? keyOf(line) : '';
     const tr = ws.getCellFromCoords(0, y)?.parentElement;
-    if (tr) {
+    // Not while its height is being dragged (jspreadsheet keeps the new height in the attribute until the mouse is released).
+    if (tr && !tr.classList.contains('resizing')) {
       const height = ui.tableHeights[rowKey] ?? ui.tableHeights[ALL_ROWS];
       tr.style.height = height ? `${height}px` : '';
+      // Left by a drag: it would keep the row at least that tall, also after fitting it to its content.
+      tr.removeAttribute('height');
     }
     const issue = row ? issues.get(row.id) : undefined;
     const names = draft ? namesOf(draft.cells, levels) : undefined;
@@ -1671,12 +1689,12 @@ function build(host: HTMLElement, levels: number): Worksheet {
     },
     // Widths and heights set by hand are kept (also when the table is opened again).
     onresizecolumn: (_ws, cols, widths) => {
-      if (!view) return;
+      if (!view || settingWidths) return;
       const list = Array.isArray(cols) ? cols : [cols];
       list.forEach((x, i) => {
         if (!isMinimized(Number(x), view!.levels)) ui.tableWidths[columnKey(Number(x), view!.levels)] = Math.round(Number(Array.isArray(widths) ? widths[i] : widths));
       });
-      commitUI();
+      saveUI();
     },
     onresizerow: (_ws, y, height) => {
       const line = view && lines()[Number(y)];
