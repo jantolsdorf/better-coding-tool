@@ -15,7 +15,6 @@ import {
   placeCodes,
   recolorCodes,
   setCodeParent,
-  setSubtreeColor,
   splitCodePath,
   subtreeOf,
   updateCode,
@@ -24,6 +23,7 @@ import { dropSegments } from '../model/coding';
 import { allConsolidated } from '../model/layers';
 import { commitUI, project, ui } from '../model/state';
 import type { Code, UIState } from '../model/types';
+import { now } from '../model/util';
 import { pinSegment } from '../view/document/pins';
 import { focusSegment } from '../view/document/textView';
 import { askText, confirmAction, notify, toast } from '../view/feedback';
@@ -97,8 +97,21 @@ export async function mergeDroppedCode(fromId: string, intoId: string) {
 export async function mergeCodeInteractive(code: Code, targetId: string): Promise<boolean> {
   const target = codeById(targetId);
   if (!target) return false;
-  const question = `All segments and subcodes move to “${target.name}”, and “${code.name}” is removed.`;
-  if (!(await confirmAction(question, { title: `Merge “${code.name}” into “${target.name}”?`, confirm: 'Merge' }))) {
+  // What happens, part by part.
+  const segments = project.segments.filter((s) => s.codeId === code.id).length;
+  const consolidated = Object.values(project.consolidations).reduce((n, list) => n + list.filter((s) => s.codeId === code.id).length, 0);
+  const subcodes = project.codes.filter((c) => c.parentId === code.id).length;
+  const lines = [
+    segments
+      ? `• Its ${plural(segments, 'coded segment')} get the code “${target.name}” (where they overlap with segments of “${target.name}”, they are joined).`
+      : `• It has no coded segments.`,
+    consolidated ? `• The same for its ${plural(consolidated, 'consolidated segment')}.` : '',
+    subcodes ? `• Its ${plural(subcodes, 'subcode')} move under “${target.name}”.` : '',
+    code.description?.trim() ? `• Its description is not kept: “${target.name}” keeps its own.` : '',
+    `• Then “${code.name}” is deleted. You can undo the merge (⌘Z / Ctrl+Z).`,
+  ];
+  const question = lines.filter(Boolean).join('\n');
+  if (!(await confirmAction(question, { title: `Merge “${code.name}” into “${target.name}”?`, confirm: `Merge into “${target.name}”` }))) {
     return false;
   }
   mergeCode(code.id, target.id);
@@ -190,20 +203,14 @@ export function recolorCode(id: string, color: string) {
   updateCode(id, { color });
 }
 
-/** Gives a code and all its subcodes the same color. */
-export function colorSubcodesLike(id: string, color: string) {
-  const n = subtreeOf(id).length - 1;
-  setSubtreeColor(id, color);
-  toast(`Gave ${n} subcode${n === 1 ? '' : 's'} the same color.`);
-}
-
 /**
  * Saves the code details dialog. Returns false (after telling the user why) when the input is
  * not valid, so the dialog stays open.
  */
 export function saveCodeDetails(
   codeId: string,
-  fields: { name: string; color: string; description: string; parentId: string | null },
+  /** `colorSubcodes`: the color also goes to all its subcodes. */
+  fields: { name: string; color: string; description: string; parentId: string | null; colorSubcodes?: boolean },
   /** Segments removed in the dialog; they are only deleted now, together with the other changes. */
   removedSegmentIds: string[] = [],
 ): boolean {
@@ -225,6 +232,13 @@ export function saveCodeDetails(
   }
   // One undo step for everything saved in the dialog.
   dropSegments(removedSegmentIds);
+  if (fields.colorSubcodes) {
+    for (const c of subtreeOf(codeId)) {
+      if (c.id === codeId) continue;
+      c.color = fields.color;
+      c.updatedAt = now();
+    }
+  }
   updateCode(codeId, { name, color: fields.color, description: fields.description.trim() || undefined, parentId: fields.parentId });
   return true;
 }

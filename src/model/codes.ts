@@ -256,15 +256,6 @@ function mergeOne(fromId: string, intoId: string) {
 /** A code and all its (nested) subcodes. */
 export const subtreeOf = (id: string) => project.codes.filter((c) => isCodeInSubtree(c.id, id));
 
-/** Gives a code and all its subcodes one color. */
-export function setSubtreeColor(id: string, color: string) {
-  for (const c of subtreeOf(id)) {
-    c.color = color;
-    c.updatedAt = now();
-  }
-  commit();
-}
-
 /**
  * Makes `id` a subcode of `parentId` (null = top level). Refuses to create cycles, and to
  * create two codes with the same name under one parent (those should be merged instead).

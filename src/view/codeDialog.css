@@ -1,11 +1,10 @@
-/* The code details (modal or own window): retrieved segments, merge, subcode color (codeDialog.ts). */
+/* The code details (modal or own window): header path, retrieved segments, delete and merge buttons, subcode color (codeDialog.ts). */
 
-/* Long code paths must not stretch the dialog footer. */
-select.merge-select {
-  flex: 0 1 240px;
-  min-width: 120px;
-  max-width: 240px;
-  text-overflow: ellipsis;
+/* Footer buttons with an icon (delete, merge). */
+.btn.icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .retrieval {
   border-radius: 8px;
@@ -68,11 +67,26 @@ select.merge-select {
 .retrieval-seg .seg-jump:focus-visible {
   opacity: 1;
 }
+/* "Apply color to N subcodes": switched on, it shows a tick (applied when saving). */
 .btn.subcode-color {
   margin-top: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+.btn.subcode-color[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.btn.subcode-color[aria-pressed='false'] .subcode-color-check {
+  display: none;
+}
+/* The header: the code's path, cut off at the end when long. */
+.code-dialog-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* A segment removed in the code dialog (deleted only when the dialog is saved). */
 .retrieval-seg.removed .seg-body {
@@ -82,4 +96,24 @@ select.merge-select {
 .retrieval-seg .seg-jump:disabled {
   opacity: 0.2;
   cursor: default;
+}
+/* As a floating dialog (not modal): placed next to where it was opened, dragged by its header. */
+dialog.code-dialog.floating {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  z-index: 50;
+}
+dialog.code-dialog.floating .modal-head {
+  cursor: move;
+}
+dialog.code-dialog.floating.dragging {
+  user-select: none;
+}
+/* Close, or close without saving / save / save & close (when something is changed). */
+.code-dialog-close {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }

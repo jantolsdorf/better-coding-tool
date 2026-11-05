@@ -1,0 +1,70 @@
+/* Choosing a code (codePicker.ts): a search field and the codes as a tree. */
+.code-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.code-picker-input {
+  width: 100%;
+}
+.code-picker-list {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.code-picker-list[hidden] {
+  display: none;
+}
+.code-picker.always-open .code-picker-list {
+  max-height: 50vh;
+}
+.code-picker-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.code-picker-list li:hover,
+.code-picker-list li.active {
+  background: var(--accent-soft);
+}
+.code-picker-list li.chosen .code-picker-name {
+  font-weight: 600;
+}
+/* Shown for the tree's sake (parents of matches, or codes that cannot be chosen here). */
+.code-picker-list li.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.code-picker-list li.disabled:hover {
+  background: none;
+}
+/* While searching: the matches stronger than their parents shown for context. */
+.code-picker-list:has(li.match) li:not(.match):not(.disabled) .code-picker-name {
+  color: var(--muted);
+}
+.code-picker-list li.empty {
+  cursor: default;
+}
+/* The tree lines: monospaced, so │ ├─ └─ line up. */
+.code-picker-tree {
+  flex: none;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--faint, var(--muted));
+}
+.code-picker-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+dialog.modal.pick-code-dialog {
+  width: min(480px, 92vw);
+}

@@ -342,6 +342,7 @@ notifies `renderApp`, which re-renders the views.
 | `view/challengeReview.ts`, `commentDialog.ts`, `occurrenceView.ts` | Reviewing and challenging another coder's codes; the comment dialog; the code occurrence table |
 | `view/topbar.ts`, `startDialog.ts` | Top bar, menus, keyboard shortcuts; the start dialog (new project or open a file) |
 | `view/leaveGuard.ts` | Warning before closing the tab, with an offer to download a copy |
+| `view/codePicker.ts` | Choosing a code (parent, merge target): searching as when coding, the codes shown as a tree |
 | `view/licensesDialog.ts`, `build/licenses.ts` | The Licenses dialog; the Vite plugin that collects the bundled packages' licenses (into the built file and `virtual:third-party-licenses`) |
 | `view/layout.ts`, `splitters.ts` | Rearranging and resizing the main areas and sidebar panels |
 | `view/dom.ts`, `feedback.ts`, `files.ts` | DOM helpers; messages and questions as dialogs of the app (`notify`, `confirmAction` with a named confirm button, `askText`, `choose`; never the browser's alert/confirm/prompt); file picking and downloads |
