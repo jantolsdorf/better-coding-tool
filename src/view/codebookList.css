@@ -258,3 +258,135 @@
 .code-row.revealed {
   animation: flash 1.2s ease-out;
 }
+
+/* Code sets, at the end of the codebook (codebookList.ts: setsSection). */
+.code-sets {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.code-sets-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+}
+.code-sets-title {
+  font-weight: 700;
+  font-size: 0.8em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.code-sets-hint {
+  flex: 1;
+  font-size: 0.85em;
+}
+.code-sets-empty {
+  margin: 4px 6px;
+  font-size: 0.9em;
+}
+.code-set-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+}
+.code-set-row:hover {
+  background: var(--hover);
+}
+/* A set with codes dragged over it. */
+.code-set-row.over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.code-set-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.code-set-toggle .fa-caret-right,
+.code-set-toggle .fa-caret-down {
+  width: 10px;
+  color: var(--muted);
+}
+.code-set-icon {
+  color: var(--accent);
+}
+.code-set-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.code-set-row .code-action,
+.code-set-member .code-action {
+  visibility: hidden;
+}
+.code-set-row:hover .code-action,
+.code-set-member:hover .code-action {
+  visibility: visible;
+}
+.code-set-member {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 6px 1px 38px;
+  border-radius: 5px;
+}
+.code-set-member:hover {
+  background: var(--hover);
+}
+.code-set-member.empty {
+  margin: 2px 0;
+  font-size: 0.9em;
+}
+.code-set-member-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.code-set-member-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85em;
+}
+/* While codes are dragged: a place to drop them for a new set. */
+.code-set-new-drop {
+  display: none;
+  margin: 4px;
+  padding: 6px;
+  border: 1px dashed var(--border);
+  border-radius: 5px;
+  text-align: center;
+  color: var(--muted);
+}
+.dragging-code .code-set-new-drop {
+  display: block;
+}
+.code-set-new-drop.over {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}

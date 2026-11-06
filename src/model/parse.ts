@@ -2,7 +2,7 @@
 
 import { ensureCodeOrder } from './codeOrder';
 import { now, uid } from './util';
-import type { Challenge, Code, Doc, ExternalCoding, Folder, Memo, Project, Segment } from './types';
+import type { Challenge, Code, CodeSet, Doc, ExternalCoding, Folder, Memo, Project, Segment } from './types';
 
 export function emptyProject(coderName = ''): Project {
   return {
@@ -56,6 +56,10 @@ export function parseProject(data: unknown): Project {
     challenges: arr<Challenge>(d.challenges).filter(
       (c) => validRange(c) && typeof c.coderName === 'string' && typeof c.comment === 'string' && Array.isArray(c.codePath),
     ),
+    // Code sets, with only codes the project has.
+    codeSets: arr<CodeSet>(d.codeSets)
+      .filter((s) => typeof s?.id === 'string' && typeof s.name === 'string')
+      .map((s) => ({ id: s.id, name: s.name, codeIds: [...new Set(arr<string>(s.codeIds))].filter((id) => codes.some((c) => c.id === id)) })),
   };
   splitByAuthor(result);
   return result;

@@ -36,9 +36,11 @@ import type { Code } from '../model/types';
 import { byName } from '../model/util';
 import { openCodeDialog } from './codeDialog';
 import { h } from './dom';
-import { toast } from './feedback';
+import { askText, toast } from './feedback';
 import { copyTable, copyText } from './files';
 import { byId } from './windows';
+import { addCodesToSet, codeSets, createCodeSet, deleteCodeSet, freeSetName, removeCodeFromSet, renameCodeSet } from '../model/codeSets';
+import { undoChange } from '../controller/history';
 import { actionSelect, Selection, TOP_LEVEL } from './multiSelect';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
@@ -201,7 +203,97 @@ export function renderCodebook(container: HTMLElement) {
   const state: ListState = { counts: segmentCounts(), recent, visible, matches };
   const rows = ui.codeView === 'path' ? pathRows(state, edited) : codeRows(null, 0, state);
   selection.order = rows.map((r) => r.dataset.id!);
-  container.replaceChildren(...(selection.active ? [selectionBar()] : []), ...rows);
+  container.replaceChildren(...(selection.active ? [selectionBar()] : []), ...rows, setsSection());
+}
+
+// ---------- code sets (at the end of the codebook) ----------
+
+/** Sets whose codes are shown (a view setting of this session). */
+const openSets = new Set<string>();
+
+/** Asks for a set's name; creates the set with the dragged codes (if any). */
+async function newSet(codeIds: string[] = []) {
+  const name = await askText({ title: 'New code set', label: 'Name', initial: freeSetName(), okLabel: 'Create' });
+  if (!name?.trim()) return;
+  const set = createCodeSet(name, codeIds);
+  openSets.add(set.id);
+  if (lastContainer) renderCodebook(lastContainer);
+}
+
+/**
+ * "Sets" at the end of the codebook: the code sets, each a drop target for codes (dragged from
+ * the codebook), opening to list its codes. A code stays where it is in the codebook.
+ */
+function setsSection(): HTMLElement {
+  const sets = [...codeSets()].sort(byName);
+  const head = h(
+    'div',
+    { class: 'code-sets-head' },
+    h('span', { class: 'code-sets-title' }, 'Sets'),
+    h('span', { class: 'muted code-sets-hint' }, sets.length ? 'drag codes onto a set' : ''),
+    h('button', { type: 'button', class: 'icon-btn', title: 'New code set', onClick: () => void newSet() }, h('i', { class: 'fa-solid fa-plus', 'aria-hidden': 'true' })),
+  );
+  // While codes are dragged: dropping them here makes a new set of them.
+  const newDrop = h('div', { class: 'code-set-new-drop' }, h('i', { class: 'fa-solid fa-plus', 'aria-hidden': 'true' }), ' Drop here for a new set');
+  onDrop(newDrop, () => void newSet(draggedCodeIds));
+  const empty = sets.length ? null : h('p', { class: 'muted code-sets-empty' }, 'No sets yet. Drag codes here to group them, e.g. by research question.');
+  return h('section', { class: 'code-sets' }, head, ...sets.map(setRow), newDrop, empty);
+}
+
+function setRow(set: { id: string; name: string; codeIds: string[] }): HTMLElement {
+  const open = openSets.has(set.id);
+  const toggle = () => {
+    if (open) openSets.delete(set.id);
+    else openSets.add(set.id);
+    if (lastContainer) renderCodebook(lastContainer);
+  };
+  const rename = async () => {
+    const name = await askText({ title: 'Rename code set', label: 'Name', initial: set.name, okLabel: 'Rename' });
+    if (name) renameCodeSet(set.id, name);
+  };
+  const remove = () => {
+    deleteCodeSet(set.id);
+    toast(`Deleted the set “${set.name}” (its codes stay in the codebook).`, 8000, { label: 'Undo', run: () => undoChange() });
+  };
+  const n = set.codeIds.length;
+  const row = h(
+    'div',
+    { class: 'code-set-row', title: 'Drop codes here to add them to this set' },
+    h('button', { type: 'button', class: 'code-set-toggle', 'aria-expanded': String(open), title: open ? 'Hide its codes' : 'Show its codes', onClick: toggle },
+      h('i', { class: `fa-solid ${open ? 'fa-caret-down' : 'fa-caret-right'}`, 'aria-hidden': 'true' }),
+      h('i', { class: 'fa-solid fa-layer-group code-set-icon', 'aria-hidden': 'true' }),
+      h('span', { class: 'code-set-name' }, set.name),
+    ),
+    h('span', { class: 'count', title: `${n} code${n === 1 ? '' : 's'}` }, String(n)),
+    rowButton('✎', 'Rename this set', () => void rename()),
+    rowButton('🗑', 'Delete this set (its codes stay in the codebook)', remove),
+  );
+  row.addEventListener('dblclick', () => void rename());
+  onDrop(row, () => {
+    const ids = draggedCodeIds;
+    const added = addCodesToSet(set.id, ids);
+    const what = ids.length === 1 ? `“${codeById(ids[0])?.name}”` : `${ids.length} codes`;
+    toast(added ? `Added ${added === ids.length ? what : `${added} of ${ids.length} codes`} to “${set.name}”.` : `${what} ${ids.length === 1 ? 'is' : 'are'} already in “${set.name}”.`);
+    openSets.add(set.id);
+  });
+  const members = open
+    ? set.codeIds.flatMap((id) => {
+        const c = codeById(id);
+        if (!c) return [];
+        return [
+          h(
+            'div',
+            { class: 'code-set-member' },
+            h('span', { class: 'swatch', style: { background: c.color } }),
+            h('button', { type: 'button', class: 'code-set-member-name', title: `${codePath(c)}\nClick for details`, onClick: () => openCodeDialog(c.id) }, c.name),
+            c.parentId ? h('span', { class: 'muted code-set-member-path' }, codeChain(c).slice(0, -1).map((p) => p.name).join(' › ')) : null,
+            rowButton('×', `Remove “${c.name}” from this set (it stays in the codebook)`, () => removeCodeFromSet(set.id, c.id)),
+          ),
+        ];
+      })
+    : [];
+  if (open && !members.length) members.push(h('p', { class: 'muted code-set-member empty' }, 'Drag codes here.'));
+  return h('div', { class: 'code-set' + (open ? ' open' : '') }, row, ...members);
 }
 
 function selectionBar(): HTMLElement {
@@ -437,6 +529,10 @@ function codeRow(c: Code, depth: number, hasChildren: boolean, collapsed: boolea
     e.dataTransfer?.setData('text/plain', draggedCodeIds.length > 1 ? `${draggedCodeIds.length} codes` : c.name);
     setCompactDragImage(e, c, draggedCodeIds.length);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+    // Shows the drop places only there while dragging (after the drag has started: changing the
+    // layout while it starts would cancel it).
+    const list = row.closest('.panel-body');
+    setTimeout(() => draggedCodeIds.length && list?.classList.add('dragging-code'));
   });
   row.addEventListener('dragend', () => {
     draggedCodeIds = [];

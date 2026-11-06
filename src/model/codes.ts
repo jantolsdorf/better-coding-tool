@@ -206,6 +206,7 @@ export function removeCode(id: string) {
   for (const c of project.codes) if (c.parentId === id) c.parentId = code?.parentId ?? null;
   project.codes = project.codes.filter((c) => c.id !== id);
   project.segments = project.segments.filter((s) => s.codeId !== id);
+  for (const set of project.codeSets ?? []) set.codeIds = set.codeIds.filter((x) => x !== id);
   for (const [docId, list] of Object.entries(project.consolidations)) {
     project.consolidations[docId] = list.filter((s) => s.codeId !== id);
   }
@@ -249,6 +250,11 @@ function mergeOne(fromId: string, intoId: string) {
     if (c.parentId === fromId) c.parentId = c.id === intoId ? (from.parentId ?? null) : intoId;
   }
   project.codes = project.codes.filter((c) => c.id !== fromId);
+  // In the sets the merged code was in, the code it was merged into takes its place.
+  for (const set of project.codeSets ?? []) {
+    if (!set.codeIds.includes(fromId)) continue;
+    set.codeIds = set.codeIds.includes(intoId) ? set.codeIds.filter((x) => x !== fromId) : set.codeIds.map((x) => (x === fromId ? intoId : x));
+  }
   const into = codeById(intoId);
   if (into) into.updatedAt = now();
 }

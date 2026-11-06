@@ -110,6 +110,16 @@ export interface Project {
   challenges: Challenge[];
   /** The column id your coding had as one of the other coders, so its column keeps its place when you switch back. */
   myColumnId?: string;
+  /** Named groups of codes across the code hierarchy (a code can be in several). */
+  codeSets?: CodeSet[];
+}
+
+/** A named group of codes (like code sets in MAXQDA or code groups in ATLAS.ti). */
+export interface CodeSet {
+  id: string;
+  name: string;
+  /** Its codes, in the order they were added. */
+  codeIds: string[];
 }
 
 /** 'me', 'consolidated', or the id of an ExternalCoding. */
