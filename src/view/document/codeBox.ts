@@ -229,7 +229,6 @@ function openCodeBox(doc: Doc, start: number, end: number) {
   refreshSuggestions();
   renderTarget();
   input.focus({ preventScroll: true });
-  el.scrollIntoView({ block: 'nearest' });
 }
 
 /** Narrowest the box gets (room for the field and its hints). */
@@ -250,17 +249,31 @@ function fittedWidth(el: HTMLElement, max: number): number {
 
 /**
  * Places the box one text line below the end of the passage [start, end), so the passage stays
- * visible; horizontally where the passage ends, within the text area.
+ * visible; horizontally where the passage ends, within the text area. When the box does not fit
+ * below the passage in the visible part of the text (e.g. at the end of a document) but fits better
+ * above it, it opens above the start of the passage instead, so opening it never scrolls the view.
  */
 function placeBox(el: HTMLElement, start: number, end: number, width: number) {
   const range = rangeFor(start, end);
   const rects = range.getClientRects();
   const last = rects[rects.length - 1] ?? range.getBoundingClientRect();
+  const first = rects[0] ?? range.getBoundingClientRect();
   const grid = gridEl.getBoundingClientRect();
   const lineHeight = parseFloat(getComputedStyle(textBody).lineHeight) || 24;
+  const view = (gridEl.parentElement ?? gridEl).getBoundingClientRect();
+  const height = el.getBoundingClientRect().height;
+  const roomBelow = view.bottom - (last.bottom + lineHeight);
+  const roomAbove = first.top - lineHeight / 2 - view.top;
+  const above = roomBelow < height && roomAbove > roomBelow;
   // Only the computed place is set here; the box's styles are in codeBox.css.
   el.style.setProperty('--box-left', `${Math.max(8, Math.min(last.left - grid.left, grid.width - width - 8))}px`);
-  el.style.setProperty('--box-top', `${last.bottom - grid.top + lineHeight}px`);
+  el.classList.toggle('above', above);
+  if (above) {
+    // Anchored at its bottom, so it stays next to the passage while the list changes height.
+    el.style.setProperty('--box-bottom', `${grid.bottom - first.top + lineHeight / 2}px`);
+  } else {
+    el.style.setProperty('--box-top', `${last.bottom - grid.top + lineHeight}px`);
+  }
 }
 
 /** A Font Awesome icon. */
@@ -534,7 +547,19 @@ function renderList() {
   if (!p.items.length && !q) {
     p.list.append(h('li', { class: 'empty' }, 'Or type a code name, “parent code > subcode”, or “memo: …”. Type ? for help.'));
   }
-  p.list.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
+  const active = p.list.querySelector<HTMLElement>('.active');
+  if (active) scrollListTo(p.list, active);
+}
+
+/**
+ * Scrolls the list just enough to show `item`. Not scrollIntoView, which would also scroll the
+ * text (e.g. down to the box when it opens at the end of a document).
+ */
+function scrollListTo(list: HTMLElement, item: HTMLElement) {
+  const l = list.getBoundingClientRect();
+  const r = item.getBoundingClientRect();
+  if (r.top < l.top) list.scrollTop -= l.top - r.top;
+  else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
 }
 
 /**

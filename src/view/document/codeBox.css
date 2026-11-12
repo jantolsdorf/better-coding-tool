@@ -13,6 +13,10 @@
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
   padding: 8px;
 }
+.code-popup.above {
+  top: auto;
+  bottom: var(--box-bottom, 8px);
+}
 .popup-meta {
   color: var(--muted);
 }
